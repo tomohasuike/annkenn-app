@@ -81,7 +81,7 @@ export default function TomorrowScheduleForm() {
             const { data: workerMatch } = await supabase
               .from('worker_master')
               .select('name')
-              .eq('email', user.email)
+              .ilike('email', user.email)
               .single()
 
             if (workerMatch && workerMatch.name) {
