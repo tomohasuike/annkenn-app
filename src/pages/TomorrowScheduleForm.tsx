@@ -164,11 +164,26 @@ export default function TomorrowScheduleForm() {
             formattedTime = `${hours}:${minutes}`;
         }
 
+        let loadedReporter = data.reporter || '';
+        // If the loaded reporter name looks like an email prefix (contains english letters), find the real name
+        if (loadedReporter && /^[a-zA-Z.]+$/.test(loadedReporter)) {
+             const { data: workerMatch } = await supabase
+              .from('worker_master')
+              .select('name')
+              .ilike('email', `${loadedReporter}%`)
+              .limit(1)
+              .single()
+              
+             if (workerMatch && workerMatch.name) {
+                 loadedReporter = workerMatch.name;
+             }
+        }
+
         setSchedule({
           project_id: data.project_id || '',
           schedule_date: formattedDate || format(addDays(new Date(), 1), 'yyyy-MM-dd'),
           category: data.category || '一般',
-          reporter: data.reporter || '',
+          reporter: loadedReporter,
           work_content: data.work_content || '',
           one_point_ky: data.one_point_ky || '',
           workers: data.workers || '',
