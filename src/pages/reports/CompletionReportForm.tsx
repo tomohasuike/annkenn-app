@@ -94,7 +94,20 @@ export function CompletionReportForm() {
       if (projData) setProjects(projData.map(p => ({id: p.id, name: p.project_name || '名称未設定'})));
       
       const { data: { user } } = await supabase.auth.getUser();
-      const currentUserEmailName = user?.email?.split('@')[0] || '';
+      let currentUserEmailName = user?.email?.split('@')[0] || '';
+      
+      // Attempt to map email to real name using worker_master
+      if (user && user.email) {
+          const { data: workerMatch } = await supabase
+            .from('worker_master')
+            .select('name')
+            .ilike('email', user.email)
+            .single()
+
+          if (workerMatch && workerMatch.name) {
+              currentUserEmailName = workerMatch.name;
+          }
+      }
 
       if (isEditing) {
         // Load existing report
@@ -106,14 +119,28 @@ export function CompletionReportForm() {
           
         if (error) throw error;
         if (report) {
+          
+          let loadedReporter = report.reporter || currentUserEmailName;
+          let loadedInspector = report.inspector || currentUserEmailName;
+          
+          // Retroactive fix for older english prefix records
+          if (loadedReporter && /^[a-zA-Z.]+$/.test(loadedReporter)) {
+             const { data: workerMatch } = await supabase.from('worker_master').select('name').ilike('email', `${loadedReporter}%`).limit(1).single()
+             if (workerMatch && workerMatch.name) loadedReporter = workerMatch.name;
+          }
+          if (loadedInspector && /^[a-zA-Z.]+$/.test(loadedInspector)) {
+             const { data: workerMatch } = await supabase.from('worker_master').select('name').ilike('email', `${loadedInspector}%`).limit(1).single()
+             if (workerMatch && workerMatch.name) loadedInspector = workerMatch.name;
+          }
+
           setFormData({
             id: report.id,
             report_id: report.report_id,
-            reporter: report.reporter || currentUserEmailName,
+            reporter: loadedReporter,
             project_id: report.project_id || '',
             completion_date: report.completion_date || format(new Date(), 'yyyy-MM-dd'),
             inspection_datetime: report.inspection_datetime ? report.inspection_datetime.slice(0, 16) : format(new Date(), "yyyy-MM-dd'T'HH:mm"),
-            inspector: report.inspector || currentUserEmailName,
+            inspector: loadedInspector,
             witness: report.witness || '',
             inspection_items: report.inspection_items || [],
             inspection_details: report.inspection_details || '',
