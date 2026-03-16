@@ -15,6 +15,7 @@ import BillingForm from "./pages/BillingForm"
 import WorkSummary from "./pages/work-summary/WorkSummary"
 
 import Login from "./pages/Login"
+import ProtectedRoute from "./components/auth/ProtectedRoute"
 
 function WorkersPlaceholder() {
   return <div className="p-8"><h2 className="text-xl font-bold">作業員マスター</h2></div>
@@ -30,28 +31,29 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         
-        {/* 一時的にログイン制限を無効化 */}
-        <Route path="/" element={<AppLayout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="projects" element={<Projects />} />
-          <Route path="projects/new" element={<ProjectForm />} />
-          <Route path="projects/:id" element={<ProjectForm />} />
-          <Route path="reports" element={<ReportsList />} />
-          <Route path="reports/new" element={<ReportForm />} />
-          <Route path="reports/:id" element={<ReportForm />} />
-          <Route path="completion-reports" element={<CompletionReports />} />
-          <Route path="completion-reports/new" element={<CompletionReportForm />} />
-          <Route path="completion-reports/:id" element={<CompletionReportForm />} />
-          <Route path="tomorrow-schedules" element={<TomorrowSchedules />} />
-          <Route path="tomorrow-schedules/new" element={<TomorrowScheduleForm />} />
-          <Route path="tomorrow-schedules/:id" element={<TomorrowScheduleForm />} />
-          <Route path="schedule-management" element={<ScheduleManagement />} />
-          <Route path="billing" element={<Billing />} />
-          <Route path="billing/new" element={<BillingForm />} />
-          <Route path="billing/:id" element={<BillingForm />} />
-          <Route path="work-summary" element={<WorkSummary />} />
-          <Route path="workers" element={<WorkersPlaceholder />} />
-          <Route path="settings" element={<SettingsPlaceholder />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/" element={<AppLayout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="projects" element={<Projects />} />
+            <Route path="projects/new" element={<ProjectForm />} />
+            <Route path="projects/:id" element={<ProjectForm />} />
+            <Route path="reports" element={<ReportsList />} />
+            <Route path="reports/new" element={<ReportForm />} />
+            <Route path="reports/:id" element={<ReportForm />} />
+            <Route path="completion-reports" element={<CompletionReports />} />
+            <Route path="completion-reports/new" element={<CompletionReportForm />} />
+            <Route path="completion-reports/:id" element={<CompletionReportForm />} />
+            <Route path="tomorrow-schedules" element={<TomorrowSchedules />} />
+            <Route path="tomorrow-schedules/new" element={<TomorrowScheduleForm />} />
+            <Route path="tomorrow-schedules/:id" element={<TomorrowScheduleForm />} />
+            <Route path="schedule-management" element={<ScheduleManagement />} />
+            <Route path="billing" element={<Billing />} />
+            <Route path="billing/new" element={<BillingForm />} />
+            <Route path="billing/:id" element={<BillingForm />} />
+            <Route path="work-summary" element={<WorkSummary />} />
+            <Route path="workers" element={<WorkersPlaceholder />} />
+            <Route path="settings" element={<SettingsPlaceholder />} />
+          </Route>
         </Route>
       </Routes>
     </BrowserRouter>

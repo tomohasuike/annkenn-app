@@ -76,9 +76,20 @@ export default function TomorrowScheduleForm() {
       } else {
         const { data: { session } } = await supabase.auth.getSession()
         const user = session?.user;
-        if (user) {
-            const reporterName = user.email ? user.email.split('@')[0] : '';
-            setSchedule(prev => ({ ...prev, reporter: reporterName }))
+        if (user && user.email) {
+            // Attempt to map email to real name using worker_master
+            const { data: workerMatch } = await supabase
+              .from('worker_master')
+              .select('name')
+              .eq('email', user.email)
+              .single()
+
+            if (workerMatch && workerMatch.name) {
+                setSchedule(prev => ({ ...prev, reporter: workerMatch.name }))
+            } else {
+                const reporterName = user.email.split('@')[0];
+                setSchedule(prev => ({ ...prev, reporter: reporterName }))
+            }
         }
         // Add one empty row by default for a new form
         setSubcontractors([{ subcontractor_name: '', worker_count: '1' }])

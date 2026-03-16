@@ -100,9 +100,20 @@ export default function ReportForm() {
 
       const { data: { user } } = await supabase.auth.getUser()
       if (user && user.email) {
-          // Extract purely the name part before @hitec-inc.co.jp
-          const namePart = user.email.split('@')[0]
-          setReporterName(namePart)
+          // Attempt to map email to real name using worker_master
+          const { data: workerMatch } = await supabase
+            .from('worker_master')
+            .select('name')
+            .eq('email', user.email)
+            .single()
+
+          if (workerMatch && workerMatch.name) {
+              setReporterName(workerMatch.name)
+          } else {
+              // Fallback to purely the name part before @hitec-inc.co.jp
+              const namePart = user.email.split('@')[0]
+              setReporterName(namePart)
+          }
       }
       return { 
           workers: wData ? wData.map(w => ({ id: w.id, name: w.name })) : [],
