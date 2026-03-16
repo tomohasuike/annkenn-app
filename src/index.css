@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+ 
+@layer base {
+  :root {
+    /* Theme A: Clean & Modern (Light) - Default */
+    --background: #ffffff;
+    --foreground: #09090b;
+
+    --card: #ffffff;
+    --card-foreground: #09090b;
+ 
+    --popover: #ffffff;
+    --popover-foreground: #09090b;
+ 
+    --primary: #18181b;
+    --primary-foreground: #fafafa;
+ 
+    --secondary: #f4f4f5;
+    --secondary-foreground: #18181b;
+ 
+    --muted: #f4f4f5;
+    --muted-foreground: #71717a;
+ 
+    --accent: #f4f4f5;
+    --accent-foreground: #18181b;
+ 
+    --border: #e4e4e7;
+    --input: #e4e4e7;
+    --ring: #18181b;
+ 
+    --radius: 0.5rem;
+  }
+ 
+  .theme-dark {
+    /* Theme B: Rich & Dark */
+    --background: #09090b;
+    --foreground: #fafafa;
+ 
+    --card: #09090b;
+    --card-foreground: #fafafa;
+ 
+    --popover: #09090b;
+    --popover-foreground: #fafafa;
+ 
+    --primary: #fafafa;
+    --primary-foreground: #18181b;
+ 
+    --secondary: #27272a;
+    --secondary-foreground: #fafafa;
+ 
+    --muted: #27272a;
+    --muted-foreground: #a1a1aa;
+ 
+    --accent: #27272a;
+    --accent-foreground: #fafafa;
+ 
+    --border: #27272a;
+    --input: #27272a;
+    --ring: #d4d4d8;
+  }
+
+  .theme-friendly {
+    /* Theme C: Friendly & オーソドックス (Blue base) */
+    --background: #f0f4f8;
+    --foreground: #334155;
+
+    --card: #ffffff;
+    --card-foreground: #334155;
+ 
+    --popover: #ffffff;
+    --popover-foreground: #334155;
+ 
+    --primary: #0284c7; /* Sky 600 */
+    --primary-foreground: #ffffff;
+ 
+    --secondary: #e0f2fe; /* Sky 100 */
+    --secondary-foreground: #0284c7;
+ 
+    --muted: #f8fafc;
+    --muted-foreground: #64748b;
+ 
+    --accent: #e0f2fe;
+    --accent-foreground: #0284c7;
+ 
+    --border: #cbd5e1;
+    --input: #cbd5e1;
+    --ring: #0284c7;
+  }
+}
+ 
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}

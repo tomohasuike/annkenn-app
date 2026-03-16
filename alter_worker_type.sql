@@ -1,0 +1,2 @@
+ALTER TYPE worker_type ADD VALUE IF NOT EXISTS '社長';
+ALTER TYPE worker_type ADD VALUE IF NOT EXISTS '協力会社';
