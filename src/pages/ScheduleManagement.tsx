@@ -110,7 +110,7 @@ export default function ScheduleManagement() {
     try {
       const [projRes, workerRes, vehicleRes] = await Promise.all([
         supabase.from('projects').select('id, project_name, category, status_flag, project_number, site_name, legacy_id, client_name, client_company_name, folder_url').order('created_at', { ascending: false }),
-        supabase.from('worker_master').select('id, name, type').eq('is_active', true).order('created_at', { ascending: true }),
+        supabase.from('worker_master').select('id, name, type').eq('is_active', true).neq('type', '事務員').order('created_at', { ascending: true }),
         supabase.from('vehicle_master').select('id, vehicle_name, category').eq('is_active', true).order('created_at', { ascending: true })
       ])
 
@@ -340,7 +340,7 @@ export default function ScheduleManagement() {
                 worker_master: draggedItem.type === 'worker' ? (() => {
                    const r = resources.find(res => res.id === draggedItem.id);
                    if (!r) return null;
-                   let dbType = '社員';
+                   let dbType = '作業員';
                    if (r.categoryId === 'partner') dbType = '協力会社';
                    if (r.categoryId === 'president') dbType = '社長';
                    return { ...r, type: dbType } as any;
@@ -392,7 +392,7 @@ export default function ScheduleManagement() {
         const { error } = await supabase.from('vehicle_master').insert({ vehicle_name: newResourceName.trim(), category: catStr, is_active: true })
         if (error) throw error
       } else {
-        const typeStr = newResourceType === 'president' ? '社長' : newResourceType === 'partner' ? '協力会社' : '社員'
+        const typeStr = newResourceType === 'president' ? '社長' : newResourceType === 'partner' ? '協力会社' : '作業員'
         const { error } = await supabase.from('worker_master').insert({ name: newResourceName.trim(), type: typeStr, is_active: true })
         if (error) throw error
       }
@@ -614,7 +614,7 @@ export default function ScheduleManagement() {
                 const resourcesForThisKey = resources.filter(r => r.categoryId === typeKey && r.name.includes(searchTerm));
                 if (resourcesForThisKey.length === 0) return null;
                 const isCollapsed = collapsedResources[`left_${typeKey}`];
-                const typeLabel = typeKey === 'president' ? '社長' : typeKey === 'employee' ? '社員' : typeKey === 'partner' ? '協力会社' : typeKey === 'vehicle' ? '作業車' : '建設機械';
+                const typeLabel = typeKey === 'president' ? '社長' : typeKey === 'employee' ? '作業員' : typeKey === 'partner' ? '協力会社' : typeKey === 'vehicle' ? '作業車' : '建設機械';
                 const typeColor = typeKey === 'president' ? 'text-blue-800' : typeKey === 'employee' ? 'text-blue-600' : typeKey === 'partner' ? 'text-purple-600' : typeKey === 'machine' ? 'text-teal-600' : 'text-emerald-600';
                 const typeBorder = typeKey === 'president' ? 'border-l-blue-800 border-opacity-70' : typeKey === 'employee' ? 'border-l-blue-400' : typeKey === 'partner' ? 'border-l-purple-400' : typeKey === 'machine' ? 'border-l-teal-400' : 'border-l-emerald-400';
                 const Icon = (typeKey === 'vehicle' || typeKey === 'machine') ? Truck : Users;
@@ -694,12 +694,12 @@ export default function ScheduleManagement() {
               {/* 未配置プール (Sticky Row) */}
               <tr className="bg-[#e8f5e9] sticky top-[92px] z-30 shadow-sm border-b-2 border-[#c8e6c9]">
                 <td className="p-1 border-r border-[#c8e6c9] font-bold text-emerald-800 text-[0.95em] align-top sticky left-0 bg-[#e8f5e9] z-40" style={{ width: `${cellWidth}px`, minWidth: `${cellWidth}px` }}>
-                  【未配置】 <span className="text-[0.85em] text-emerald-600 font-normal ml-2">社員のみ</span>
+                  【未配置】 <span className="text-[0.85em] text-emerald-600 font-normal ml-2">作業員のみ</span>
                 </td>
                 {dates.map(d => {
                   const dateStr = format(d, 'yyyy-MM-dd')
                   
-                  // ユーザー要望により、未配置プールに表示するのは「社員」のみとする
+                  // ユーザー要望により、未配置プールに表示するのは「作業員」のみとする
                   let poolEmployee  = getUnassignedResources(dateStr, 'employee')
                   
                   return (
@@ -714,7 +714,7 @@ export default function ScheduleManagement() {
                           const pool = poolEmployee;
                           if (pool.length === 0) return null;
                           const isCollapsed = collapsedResources[typeKey];
-                          const label = '社員';
+                          const label = '作業員';
                           const typeBorder = 'border-l-blue-500';
                           
                           return (
@@ -924,11 +924,11 @@ export default function ScheduleManagement() {
                           
                           // 予定人員カラーロジック：
                           // 配置されている作業員数の合計を計算 (車両以外)
-                          // 社員は1人としてカウント、協力会社は count の数値
+                          // 作業員は1人としてカウント、協力会社は count の数値
                           const assignedWorkerCount = cellAssignments.reduce((total, a) => {
                             if (a.vehicle_id) return total; // 車両は除外
                             if (a.worker_master?.type === '協力会社') return total + (a.count || 1);
-                            return total + 1; // 社長・社員
+                            return total + 1; // 社長・作業員
                           }, 0);
 
                           let plannedCountClasses = 'text-slate-400 border border-transparent';
@@ -1384,7 +1384,7 @@ export default function ScheduleManagement() {
                   className="w-full p-0.5 text-[0.95em] border border-slate-300 rounded outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="president">社長</option>
-                  <option value="employee">社員</option>
+                  <option value="employee">作業員</option>
                   <option value="partner">協力会社</option>
                   <option value="vehicle">作業車</option>
                   <option value="machine">建設機械</option>

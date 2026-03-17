@@ -1,11 +1,40 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Outlet, NavLink } from "react-router-dom"
-import { Users, Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart } from "lucide-react"
+import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert } from "lucide-react"
 import { ThemeSwitcher } from "../ui/ThemeSwitcher"
 import logoImg from "../../assets/logo.png"
+import { supabase } from "../../lib/supabase"
 
 export default function AppLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [userInitial, setUserInitial] = useState("U");
+  const [allowedApps, setAllowedApps] = useState<string[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user && user.email) {
+          // Extract the first character of the name before @
+          const namePart = user.email.split('@')[0];
+          setUserInitial(namePart.charAt(0).toUpperCase());
+
+        // Fetch user permissions
+          supabase.from('worker_master').select('is_admin, allowed_apps').eq('email', user.email).single()
+            .then(({ data, error }) => {
+                if (!error && data) {
+                    setIsAdmin(data.is_admin || false);
+                    setAllowedApps(data.allowed_apps || ['dashboard', 'projects', 'reports', 'tomorrow-schedules', 'schedule-management', 'work-summary', 'completion-reports', 'workers']);
+                } else {
+                    // Default fallback if no record found yet
+                    setAllowedApps(['dashboard', 'projects', 'reports', 'tomorrow-schedules', 'schedule-management', 'work-summary', 'completion-reports', 'workers']);
+                }
+            });
+      }
+    });
+  }, []);
+
+  const hasAccess = (appId: string) => allowedApps.includes(appId);
+
   const getNavClass = ({ isActive }: { isActive: boolean }) => 
     `flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors relative ${
       isActive 
@@ -44,7 +73,7 @@ export default function AppLayout() {
             <span className="absolute top-1 right-1 sm:top-1.5 sm:right-1.5 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-red-500 rounded-full"></span>
           </button>
           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs sm:text-sm border-2 border-primary/30 ml-1">
-            U
+            {userInitial}
           </div>
         </div>
       </header>
@@ -66,6 +95,7 @@ export default function AppLayout() {
             : 'w-0 overflow-hidden md:w-0 md:border-r-0 fixed inset-y-0 left-0 top-16 md:relative md:top-0 -translate-x-full md:translate-x-0'
         }`}>
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+            {hasAccess('dashboard') && (
             <NavLink to="/" className={getNavClass}>
               {({ isActive }) => (
                 <>
@@ -75,6 +105,8 @@ export default function AppLayout() {
                 </>
               )}
             </NavLink>
+            )}
+            {hasAccess('projects') && (
             <NavLink to="/projects" className={getNavClass}>
               {({ isActive }) => (
                 <>
@@ -84,15 +116,9 @@ export default function AppLayout() {
                 </>
               )}
             </NavLink>
-            <NavLink to="/workers" className={getNavClass}>
-              {({ isActive }) => (
-                <>
-                  <Users className="w-5 h-5" />
-                  作業員マスター
-                  {isActive && <span className="absolute left-0 top-1 bottom-1 w-1 bg-primary rounded-r-md"></span>}
-                </>
-              )}
-            </NavLink>
+            )}
+
+            {hasAccess('reports') && (
             <NavLink to="/reports" className={getNavClass}>
               {({ isActive }) => (
                 <>
@@ -102,6 +128,8 @@ export default function AppLayout() {
                 </>
               )}
             </NavLink>
+            )}
+            {hasAccess('completion-reports') && (
             <NavLink to="/completion-reports" className={getNavClass}>
               {({ isActive }) => (
                 <>
@@ -111,6 +139,8 @@ export default function AppLayout() {
                 </>
               )}
             </NavLink>
+            )}
+            {hasAccess('tomorrow-schedules') && (
             <NavLink to="/tomorrow-schedules" className={getNavClass}>
               {({ isActive }) => (
                 <>
@@ -120,6 +150,8 @@ export default function AppLayout() {
                 </>
               )}
             </NavLink>
+            )}
+            {hasAccess('schedule-management') && (
             <NavLink to="/schedule-management" className={getNavClass}>
               {({ isActive }) => (
                 <>
@@ -129,6 +161,8 @@ export default function AppLayout() {
                 </>
               )}
             </NavLink>
+            )}
+            {hasAccess('work-summary') && (
             <NavLink to="/work-summary" className={getNavClass}>
               {({ isActive }) => (
                 <>
@@ -138,6 +172,8 @@ export default function AppLayout() {
                 </>
               )}
             </NavLink>
+            )}
+            {hasAccess('billing') && (
             <NavLink to="/billing" className={getNavClass}>
               {({ isActive }) => (
                 <>
@@ -147,6 +183,8 @@ export default function AppLayout() {
                 </>
               )}
             </NavLink>
+            )}
+            {isAdmin && (
             <NavLink to="/settings" className={getNavClass}>
               {({ isActive }) => (
                 <>
@@ -156,6 +194,18 @@ export default function AppLayout() {
                 </>
               )}
             </NavLink>
+            )}
+            {hasAccess('safety-dashboard') && (
+            <NavLink to="/safety-dashboard" className={getNavClass}>
+              {({ isActive }) => (
+                <>
+                  <ShieldAlert className="w-5 h-5 text-red-500" />
+                  安否確認ダッシュボード
+                  {isActive && <span className="absolute left-0 top-1 bottom-1 w-1 bg-primary rounded-r-md"></span>}
+                </>
+              )}
+            </NavLink>
+            )}
           </nav>
         </aside>
 

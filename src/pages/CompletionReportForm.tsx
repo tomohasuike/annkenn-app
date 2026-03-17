@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase"
 import { ArrowLeft, Loader2, Save, CheckSquare, Calendar, User, Search, Camera, X, Plus } from "lucide-react"
 import imageCompression from 'browser-image-compression';
 import { format } from 'date-fns';
+import { AutocompleteInput } from "../components/ui/AutocompleteInput"
 
 type ProjectData = {
   id: string
@@ -307,14 +308,19 @@ export default function CompletionReportForm() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">報告者</label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <input 
-                        type="text"
-                        value={report.reporter}
-                        onChange={(e) => setReport({...report, reporter: e.target.value})}
-                        className="w-full h-10 rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        placeholder="氏名を入力"
-                      />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
+                      <div className="pl-10">
+                          <AutocompleteInput
+                              tableName="worker_master"
+                              columnName="name"
+                              value={report.reporter}
+                              onChange={(val) => setReport({...report, reporter: val})}
+                              placeholder="氏名を入力"
+                              className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              filters={{ is_active: true }}
+                              customFilter={(item) => item.type !== '事務員'}
+                          />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -331,20 +337,28 @@ export default function CompletionReportForm() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">検査者（元請等）</label>
-                    <input 
-                      type="text"
+                    <AutocompleteInput
+                      tableName="worker_master"
+                      columnName="name"
                       value={report.inspector}
-                      onChange={(e) => setReport({...report, inspector: e.target.value})}
+                      onChange={(val) => setReport({...report, inspector: val})}
+                      placeholder="氏名を入力"
                       className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      filters={{ is_active: true }}
+                      customFilter={(item) => item.type !== '事務員'}
                     />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">立会者</label>
-                    <input 
-                      type="text"
+                    <AutocompleteInput
+                      tableName="worker_master"
+                      columnName="name"
                       value={report.witness}
-                      onChange={(e) => setReport({...report, witness: e.target.value})}
+                      onChange={(val) => setReport({...report, witness: val})}
+                      placeholder="氏名を入力"
                       className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      filters={{ is_active: true }}
+                      customFilter={(item) => item.type !== '事務員'}
                     />
                   </div>
                   <div className="space-y-2">

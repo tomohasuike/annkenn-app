@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom"
 import { supabase } from "../lib/supabase"
 import { ArrowLeft, Loader2, Save, CalendarClock, User, Users, Search, Target, Plus, Trash2, Truck, Wrench } from "lucide-react"
 import { format, addDays } from 'date-fns';
+import { AutocompleteInput } from '../components/ui/AutocompleteInput';
 
 type ProjectData = {
   id: string
@@ -116,7 +117,7 @@ export default function TomorrowScheduleForm() {
       
       const { data, error } = await query
       
-      const { data: wData } = await supabase.from('worker_master').select('id, name')
+      const { data: wData } = await supabase.from('worker_master').select('id, name').neq('type', '事務員')
       if (wData) setWorkersList(wData.map(w => ({ id: w.id, name: w.name })))
 
       const { data: vData } = await supabase.from('vehicle_master').select('id, vehicle_name, category')
@@ -596,12 +597,14 @@ export default function TomorrowScheduleForm() {
                     {subcontractors.map((sub, index) => (
                         <div key={index} className="flex gap-2 items-start">
                             <div className="flex-1">
-                                <input 
-                                    type="text" 
+                                <AutocompleteInput 
                                     value={sub.subcontractor_name}
-                                    onChange={(e) => handleSubcontractorChange(index, 'subcontractor_name', e.target.value)}
+                                    onChange={(val) => handleSubcontractorChange(index, 'subcontractor_name', val)}
+                                    tableName="tomorrow_subcontractors"
+                                    columnName="subcontractor_name"
+                                    projectId={schedule.project_id}
                                     placeholder="業者名"
-                                    className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                    className="w-full border-slate-300"
                                 />
                             </div>
                             <div className="w-24">

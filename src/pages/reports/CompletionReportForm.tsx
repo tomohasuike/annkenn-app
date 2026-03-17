@@ -15,6 +15,7 @@ import {
   FileText
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import { AutocompleteInput } from '../../components/ui/AutocompleteInput';
 
 interface CompletionReportFormData {
   id?: string;
@@ -458,21 +459,25 @@ export function CompletionReportForm() {
             <div className="grid grid-cols-2 gap-4">
                <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1"><User className="w-4 h-4"/> 検査者 <span className="text-blue-500">*</span></label>
-                  <input 
-                    type="text" 
+                  <AutocompleteInput 
                     value={formData.inspector} 
-                    onChange={e => handleInputChange('inspector', e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
+                    onChange={val => handleInputChange('inspector', val)}
+                    tableName="completion_reports"
+                    columnName="inspector"
+                    projectId={formData.project_id}
+                    className="w-full border-slate-300"
                     required
                   />
                </div>
                <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1"><User className="w-4 h-4"/> 立会者</label>
-                  <input 
-                    type="text" 
+                  <AutocompleteInput 
                     value={formData.witness} 
-                    onChange={e => handleInputChange('witness', e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
+                    onChange={val => handleInputChange('witness', val)}
+                    tableName="completion_reports"
+                    columnName="witness"
+                    projectId={formData.project_id}
+                    className="w-full border-slate-300"
                   />
                </div>
             </div>

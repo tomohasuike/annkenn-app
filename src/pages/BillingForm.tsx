@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { supabase } from "../lib/supabase"
 import { ArrowLeft, Save, Trash2, Loader2, FileText, PlusCircle } from "lucide-react"
+import { AutocompleteInput } from "../components/ui/AutocompleteInput"
 
 type ProjectData = { id: string; name: string; number: string | null }
 
@@ -273,20 +274,24 @@ export default function BillingForm() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">請求先名称</label>
-                  <input
-                    type="text"
+                  <AutocompleteInput
+                    tableName="projects"
+                    columnName="client_company_name"
                     value={billingDestination}
-                    onChange={(e) => setBillingDestination(e.target.value)}
+                    onChange={(val) => setBillingDestination(val)}
+                    placeholder="請求先組織・会社名を入力"
                     className="w-full h-10 rounded-md border border-input bg-background px-3"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">請求件名</label>
-                  <input
-                    type="text"
+                  <AutocompleteInput
+                    tableName="projects"
+                    columnName="project_name"
                     value={billingSubject}
-                    onChange={(e) => setBillingSubject(e.target.value)}
+                    onChange={(val) => setBillingSubject(val)}
+                    placeholder="件名を入力"
                     className="w-full h-10 rounded-md border border-input bg-background px-3"
                   />
                 </div>

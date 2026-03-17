@@ -5,6 +5,7 @@ import { ArrowLeft, Loader2, Save, Users, Truck, Wrench, Package, Building, Clip
 import imageCompression from 'browser-image-compression';
 
 import { format, parseISO } from 'date-fns';
+import { AutocompleteInput } from '../../components/ui/AutocompleteInput';
 
 // --- TYPES ---
 
@@ -78,12 +79,41 @@ export default function ReportForm() {
     init()
   }, [id])
 
+  // ---- Fetch latest progress when project changes (for new reports) ----
+  useEffect(() => {
+     if (id) return; // Only apply to new reports
+     if (!report.project_id) return;
+
+     const fetchLatestProgress = async () => {
+         try {
+             // 過去の案件日報の最新進捗を取得
+             const { data, error: _err } = await supabase
+                 .from('daily_reports')
+                 .select('progress')
+                 .eq('project_id', report.project_id)
+                 .lt('report_date', report.보고日時)
+                 .order('report_date', { ascending: false })
+                 .limit(1)
+                 .single();
+
+             if (data && data.progress) {
+                 setReport(prev => ({ ...prev, 工事進捗: data.progress }));
+             }
+         } catch(err) {
+             console.log("No previous progress found");
+         }
+     };
+
+     fetchLatestProgress();
+  }, [report.project_id, id]); 
+  // ----------------------------------------------------------------------
+
   async function fetchMasterData() {
     try {
       const { data: pData, error: pErr } = await supabase.from('projects').select('id, project_name, category, status_flag, project_number, client_name, site_name').order('created_at', { ascending: false })
       if (pErr) console.error("Error fetching projects:", pErr)
       
-      const { data: wData } = await supabase.from('worker_master').select('id, name')
+      const { data: wData } = await supabase.from('worker_master').select('id, name').neq('type', '事務員')
       const { data: vData } = await supabase.from('vehicle_master').select('id, vehicle_name, category')
       
       if (pData) setProjectsList(pData.map(p => ({ 
@@ -804,10 +834,14 @@ export default function ReportForm() {
                             <div key={index} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-muted/30 p-3 rounded-lg border">
                                 <div className="flex-[2] w-full space-y-1">
                                     <label className="text-xs text-muted-foreground sm:hidden">業者名</label>
-                                    <input 
-                                        type="text" placeholder="協力業者名" value={s.company_name}
-                                        onChange={(e) => { const n = [...subcontractors]; n[index].company_name = e.target.value; setSubcontractors(n); }}
-                                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                    <AutocompleteInput 
+                                        value={s.company_name}
+                                        onChange={(val) => { const n = [...subcontractors]; n[index].company_name = val; setSubcontractors(n); }}
+                                        tableName="report_subcontractors"
+                                        columnName="subcontractor_name"
+                                        projectId={report.project_id}
+                                        placeholder="協力業者名"
+                                        className="w-full h-10 border-input"
                                     />
                                 </div>
                                 <div className="w-full sm:w-24 space-y-1">

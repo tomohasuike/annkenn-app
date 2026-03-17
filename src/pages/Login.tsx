@@ -95,6 +95,45 @@ export default function Login() {
             </>
           )}
         </button>
+
+        {import.meta.env.MODE === 'development' && (
+             <button
+                type="button"
+                onClick={async () => {
+                    const testEmail = 'test@hitec-inc.co.jp';
+                    const testPassword = 'password123';
+                    
+                    let { error } = await supabase.auth.signInWithPassword({
+                        email: testEmail,
+                        password: testPassword
+                    });
+                    
+                    // If invalid credentials, meaning user might not exist, try to sign up
+                    if (error && error.message === 'Invalid login credentials') {
+                        const { error: signUpError } = await supabase.auth.signUp({
+                            email: testEmail,
+                            password: testPassword,
+                        });
+                        
+                        if (!signUpError) {
+                            // Retry login after successful signup
+                             const { error: retryError } = await supabase.auth.signInWithPassword({
+                                email: testEmail,
+                                password: testPassword
+                            });
+                            error = retryError;
+                        } else {
+                            error = signUpError;
+                        }
+                    }
+
+                    if (error) alert("Dev login error: " + error.message);
+                }}
+                className="w-full h-12 mt-4 flex items-center justify-center gap-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-medium transition-all"
+            >
+                テスト用ユーザーとしてログイン (開発環境のみ)
+            </button>
+        )}
       </div>
     </div>
   )
