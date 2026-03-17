@@ -113,10 +113,21 @@ export default function ReportForm() {
       const { data: pData, error: pErr } = await supabase.from('projects').select('id, project_name, category, status_flag, project_number, client_name, site_name').order('created_at', { ascending: false })
       if (pErr) console.error("Error fetching projects:", pErr)
       
-      const { data: wData } = await supabase.from('worker_master').select('id, name').neq('type', '事務員')
+      const { data: wData } = await supabase.from('worker_master').select('id, name, type, display_order').neq('type', '事務員')
+      
+      const sortedWData = (wData || []).slice().sort((a, b) => {
+          const orderA = a.display_order ?? 999;
+          const orderB = b.display_order ?? 999;
+          if (orderA !== orderB) return orderA - orderB;
+          return (a.name || '').localeCompare(b.name || '', 'ja');
+      });
+      
       const { data: vData } = await supabase.from('vehicle_master').select('id, vehicle_name, category')
       
-      if (pData) setProjectsList(pData.map(p => ({ 
+      if (pData) {
+        // 工程管理用の特別な案件（VACATIONなど）を除外
+        const visibleProjects = pData.filter(p => p.project_number !== 'VACATION' && p.project_name !== '■ 休暇')
+        setProjectsList(visibleProjects.map(p => ({ 
           id: p.id, 
           name: p.project_name, 
           category: p.category || '未分類', 
@@ -124,8 +135,9 @@ export default function ReportForm() {
           project_number: p.project_number || '',
           client_name: p.client_name || '',
           site_name: p.site_name || ''
-      })))
-      if (wData) setWorkersList(wData.map(w => ({ id: w.id, name: w.name })))
+        })))
+      }
+      if (sortedWData) setWorkersList(sortedWData.map(w => ({ id: w.id, name: w.name })))
       if (vData) setVehiclesList(vData.map(v => ({ id: v.id, name: v.vehicle_name, category: v.category })))
 
       const { data: { user } } = await supabase.auth.getUser()
@@ -146,7 +158,7 @@ export default function ReportForm() {
           }
       }
       return { 
-          workers: wData ? wData.map(w => ({ id: w.id, name: w.name })) : [],
+          workers: sortedWData ? sortedWData.map(w => ({ id: w.id, name: w.name })) : [],
           vehicles: vData ? vData.map(v => ({ id: v.id, name: v.vehicle_name, category: v.category })) : []
       }
     } catch (e) {
@@ -317,7 +329,35 @@ export default function ReportForm() {
 
   const handleSave = async () => {
     if (!report.project_id) {
-        alert("案件を選択してください")
+        alert("対象案件を選択してください")
+        return
+    }
+    if (!report.作業区分) {
+        alert("作業区分を選択してください")
+        return
+    }
+    if (!report.作業開始時間 || !report.作業終了時間) {
+        alert("作業開始日時および作業終了日時を入力してください")
+        return
+    }
+    if (!report.工事内容 || report.工事内容.trim() === '') {
+        alert("作業内容を入力してください")
+        return
+    }
+    if (!report.工事進捗 || report.工事進捗 === '') {
+        alert("工事進捗を入力してください")
+        return
+    }
+
+    const hasPersonnel = personnel.some(p => p.worker_id || (p.worker_name && p.worker_name.trim() !== ''));
+    if (!hasPersonnel) {
+        alert("作業員編成を1名以上入力してください")
+        return
+    }
+
+
+    if (existingPhotos.length === 0 && pendingPhotos.length === 0) {
+        alert("現場写真を1枚以上追加してください")
         return
     }
 
@@ -359,6 +399,7 @@ export default function ReportForm() {
             work_content: report.工事内容,
             notes: report.備考,
             reporter_id: user?.id || null,
+            reporter_name: reporterName || user?.email?.split('@')[0] || '未設定',
             site_photos: JSON.stringify(uploadedUrls)
         }
 
@@ -710,7 +751,7 @@ export default function ReportForm() {
                     )}
                 </div>
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">作業開始日時</label>
+                    <label className="text-sm font-medium text-foreground">作業開始日時 <span className="text-red-500">*</span></label>
                     <input 
                         type="datetime-local" 
                         value={report.作業開始時間}
@@ -719,7 +760,7 @@ export default function ReportForm() {
                     />
                 </div>
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">作業終了日時</label>
+                    <label className="text-sm font-medium text-foreground">作業終了日時 <span className="text-red-500">*</span></label>
                     <input 
                         type="datetime-local" 
                         value={report.作業終了時間}
@@ -728,7 +769,7 @@ export default function ReportForm() {
                     />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium text-foreground">作業内容</label>
+                    <label className="text-sm font-medium text-foreground">作業内容 <span className="text-red-500">*</span></label>
                     <textarea 
                         rows={4}
                         value={report.工事内容}
@@ -776,7 +817,7 @@ export default function ReportForm() {
                 <div className="pb-2 border-b">
                     <h3 className="text-lg font-medium flex items-center gap-2">
                         <Users className="w-5 h-5 text-muted-foreground" />
-                        作業員編成
+                        作業員編成 <span className="text-red-500 text-sm">*</span>
                     </h3>
                     <p className="text-sm text-muted-foreground mt-1">参加した作業員を選択してください。</p>
                 </div>
@@ -1050,7 +1091,7 @@ export default function ReportForm() {
                 <div className="flex justify-between items-center pb-2 border-b">
                     <h3 className="text-lg font-medium flex items-center gap-2">
                         <Camera className="w-5 h-5 text-muted-foreground" />
-                        現場写真
+                        現場写真 <span className="text-red-500 text-sm">*</span>
                     </h3>
                 </div>
                 <div className="pt-2">

@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import type { ProjectSummary } from './useWorkSummary';
 import { useWorkSummary } from './useWorkSummary';
-import { PieChart, Hammer, Briefcase, FileSignature, List, Truck, Building2, UserCircle, Package, Camera, FileText, ChevronDown, CalendarDays, ExternalLink } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { PieChart, Hammer, Briefcase, FileSignature, List, Truck, Building2, UserCircle, Package, Camera, FileText, Info } from 'lucide-react';
+import ReportDetailsModal from '../../components/reports/ReportDetailsModal';
+import ProjectDetailsModal from '../../components/work-summary/ProjectDetailsModal';
 
 export default function WorkSummary() {
   const { data, loading, error, fetchData, projectsList } = useWorkSummary();
@@ -13,8 +15,8 @@ export default function WorkSummary() {
   const [isAllTime, setIsAllTime] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
-
-  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [selectedProjectForModal, setSelectedProjectForModal] = useState<ProjectSummary | null>(null);
 
   useEffect(() => {
     // Initial fetch
@@ -28,10 +30,6 @@ export default function WorkSummary() {
       return;
     }
     fetchData(startDate, endDate, projectId, isAllTime);
-  };
-
-  const toggleDetail = (id: string) => {
-    setExpandedProjects(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   const searchLower = searchQuery.toLowerCase();
@@ -249,17 +247,16 @@ export default function WorkSummary() {
                   </tr>
                 ) : (
                   displayedProjects.map(p => (
-                    <React.Fragment key={p.id}>
-                      <tr className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => toggleDetail(p.id)}>
-                        <td className="px-5 py-5 border-b">
-                          <div className="text-[11px] text-primary font-bold mb-1 uppercase tracking-wider">{p.no || "-"}</div>
-                          <div className="font-bold text-base leading-snug">{p.name}</div>
-                          <div className="mt-2 flex items-center gap-2">
-                             <span className="text-[10px] bg-muted px-2 py-0.5 rounded border font-bold uppercase">{p.kubun}</span>
-                             {p.dailyLogs.length > 0 && <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold">{p.dailyLogs.length} 日の記録</span>}
-                          </div>
-                        </td>
-                        <td className="px-4 py-5 text-center border-b">
+                    <tr key={p.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-5 py-5 border-b">
+                        <div className="text-[11px] text-primary font-bold mb-1 uppercase tracking-wider">{p.no || "-"}</div>
+                        <div className="font-bold text-base leading-snug">{p.name}</div>
+                        <div className="mt-2 flex items-center gap-2">
+                           <span className="text-[10px] bg-muted px-2 py-0.5 rounded border font-bold uppercase">{p.kubun}</span>
+                           {p.dailyLogs.length > 0 && <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold">{p.dailyLogs.length} 日の記録</span>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-5 text-center border-b">
                           <div className="flex flex-col gap-2 items-center">
                             <div className="flex flex-col w-36 sm:w-40 bg-blue-50/50 px-3 py-1.5 rounded-lg border border-blue-100">
                               <div className="flex items-center justify-between">
@@ -298,86 +295,30 @@ export default function WorkSummary() {
                           <div className="text-[10px] text-muted-foreground uppercase font-bold mt-1 tracking-wider">自社 / 協力</div>
                         </td>
                         <td className="px-5 py-5 text-right border-b">
-                           <div className="font-bold text-primary text-3xl tracking-tight flex items-center justify-end gap-3">
-                             <div>{p.totalHours.toFixed(1)}<span className="text-sm font-normal ml-0.5 text-muted-foreground">h</span></div>
-                             <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${expandedProjects[p.id] ? 'rotate-180' : ''}`} />
-                           </div>
-                           <div className="text-xs font-medium text-muted-foreground mt-2 flex justify-end flex-wrap items-center gap-1.5">
-                             <span className="bg-muted px-2 py-1 rounded">日中 {p.normalHours.toFixed(1)}h</span>
-                             {p.overtimeHours > 0 && <span className="bg-orange-50 text-orange-600 border border-orange-100 px-2 py-1 rounded font-bold">残業 {p.overtimeHours.toFixed(1)}h</span>}
-                           </div>
+                          <div className="flex items-center justify-end gap-4">
+                            <div className="flex flex-col items-end w-32">
+                               <div className="text-3xl font-black text-primary tracking-tighter">
+                                 {p.totalHours.toFixed(1)}<span className="text-sm font-medium text-muted-foreground ml-1">h</span>
+                               </div>
+                               <div className="text-[10px] font-medium text-muted-foreground mt-1 flex gap-1">
+                                 <span>日中 {p.normalHours.toFixed(1)}h</span>
+                                 {p.overtimeHours > 0 && <span className="text-orange-500 font-bold">残業 {p.overtimeHours.toFixed(1)}h</span>}
+                               </div>
+                            </div>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedProjectForModal(p);
+                              }}
+                              className="p-2 sm:p-3 bg-secondary/80 hover:bg-secondary text-secondary-foreground rounded-full transition-colors flex shrink-0 items-center gap-2 group border shadow-sm"
+                              title="案件詳細・日報一覧を開く"
+                            >
+                              <span className="hidden sm:inline text-xs font-bold transition-transform group-hover:-translate-x-0.5">案件詳細</span>
+                              <Info className="w-4 h-4 text-primary transition-transform group-hover:scale-110" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
-                      {expandedProjects[p.id] && (
-                        <tr className="bg-muted/10">
-                          <td colSpan={4} className="p-0 border-b">
-                            <div className="p-4 sm:p-6 shadow-inner border-l-4 border-l-primary/60">
-                              <div className="flex flex-col xl:flex-row gap-6">
-                                {/* Daily Logs Table */}
-                                <div className="flex-1 overflow-x-auto">
-                                  <h4 className="font-bold mb-3 text-sm flex items-center gap-2">
-                                    <CalendarDays className="w-4 h-4 text-primary" /> 日報エビデンス
-                                  </h4>
-                                  <div className="overflow-hidden rounded-lg border bg-card shadow-sm min-w-[500px]">
-                                    <table className="w-full text-left text-sm">
-                                      <thead className="bg-muted/50 uppercase text-[10px] sm:text-[11px] text-muted-foreground border-b">
-                                        <tr>
-                                          <th className="px-4 py-3">日付</th>
-                                          <th className="px-3 py-3">区分</th>
-                                          <th className="px-4 py-3">作業員 (協力会社)</th>
-                                          <th className="px-4 py-3 text-center">実働 (日中 / 残業)</th>
-                                          <th className="px-4 py-3">車両 / 建機</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y">
-                                        {p.dailyLogs.length > 0 ? p.dailyLogs.map((log, i) => (
-                                          <tr key={i} className="hover:bg-muted/30">
-                                            <td className="px-4 py-3 font-medium whitespace-nowrap">
-                                              <Link to={`/reports/${log.reportId}`} className="text-primary hover:text-blue-600 hover:underline flex items-center gap-1.5 transition-colors group">
-                                                {log.date}
-                                                <ExternalLink className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity" />
-                                              </Link>
-                                            </td>
-                                            <td className="px-3 py-3 whitespace-nowrap"><span className="text-[10px] bg-secondary px-2 py-1 rounded font-bold">{log.kubun}</span></td>
-                                            <td className="px-4 py-3 font-bold">{log.staffs || '-'} <span className="text-orange-500 ml-1 text-[11px] font-normal">{log.partners ? `[${log.partners}]` : ''}</span></td>
-                                            <td className="px-4 py-3 text-center whitespace-nowrap">
-                                              <span className="font-bold text-primary text-sm sm:text-base">{log.hours.toFixed(1)}h</span>
-                                              <div className="text-[10px] text-muted-foreground mt-1">
-                                                日中 {(log.hours - log.ot).toFixed(1)}h {log.ot > 0 && <span className="text-orange-500 font-bold ml-1">/ 残業 {log.ot.toFixed(1)}h</span>}
-                                              </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-muted-foreground text-xs font-medium">{log.car || '-'} <span className="text-muted/50 mx-1">/</span> {log.machine || '-'}</td>
-                                          </tr>
-                                        )) : (
-                                          <tr><td colSpan={5} className="px-4 py-5 text-center text-muted-foreground italic">記録がありません</td></tr>
-                                        )}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </div>
-                                
-                                {/* Equipment Summary for Project */}
-                                <div className="w-full xl:w-72 shrink-0">
-                                  <h4 className="font-bold mb-3 text-sm flex items-center gap-2">
-                                    <Truck className="w-4 h-4 text-teal-500" /> 利用車両・建機
-                                  </h4>
-                                  <div className="flex flex-col gap-2 bg-card p-4 rounded-lg border shadow-sm">
-                                    {Object.keys(p.equipment).length > 0
-                                       ? Object.entries(p.equipment).sort((a,b) => b[1]-a[1]).map(([eq, count]) => (
-                                           <div key={eq} className="flex justify-between items-center text-sm border-b pb-2 last:border-0 last:pb-0 pt-2 first:pt-0">
-                                             <span className="font-bold truncate mr-2">{eq}</span>
-                                             <span className="bg-teal-50 text-teal-700 border border-teal-200 px-2 py-0.5 rounded-full font-bold text-[11px] whitespace-nowrap">{count} 台(日)</span>
-                                           </div>
-                                         ))
-                                       : <span className="text-sm text-muted-foreground italic">利用実績なし</span>}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
                   ))
                 )}
               </tbody>
@@ -560,6 +501,19 @@ export default function WorkSummary() {
          </div>
       </div>
       
+      {selectedReportId && (
+        <ReportDetailsModal 
+          reportId={selectedReportId} 
+          onClose={() => setSelectedReportId(null)} 
+        />
+      )}
+
+      {selectedProjectForModal && (
+        <ProjectDetailsModal
+          project={selectedProjectForModal}
+          onClose={() => setSelectedProjectForModal(null)}
+        />
+      )}
     </div>
   );
 }

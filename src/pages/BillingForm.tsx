@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { supabase } from "../lib/supabase"
-import { ArrowLeft, Save, Trash2, Loader2, FileText, PlusCircle } from "lucide-react"
+import { ArrowLeft, Save, Trash2, Loader2, FileText, PlusCircle, Folder } from "lucide-react"
 import { AutocompleteInput } from "../components/ui/AutocompleteInput"
 
-type ProjectData = { id: string; name: string; number: string | null }
+type ProjectData = { id: string; name: string; number: string | null; clientName: string | null; statusFlag: string | null }
 
 type InvoiceDetailData = {
   id?: string
@@ -28,8 +28,9 @@ export default function BillingForm() {
 
   // Header State
   const [projectId, setProjectId] = useState("")
+  const [projectIds, setProjectIds] = useState<string[]>([]) // For combined projects
   const [projectNumber, setProjectNumber] = useState("")
-  const [billingCategory, setBillingCategory] = useState("工事請求")
+  const [billingCategory, setBillingCategory] = useState("出来高")
   const [ordererCategory, setOrdererCategory] = useState("元請")
   const [billingSubject, setBillingSubject] = useState("")
   const [billingDestination, setBillingDestination] = useState("")
@@ -50,10 +51,16 @@ export default function BillingForm() {
     try {
       const { data, error } = await supabase
         .from('projects')
-        .select('id, project_name, project_number')
+        .select('id, project_name, project_number, client_name, status_flag')
         .order('created_at', { ascending: false })
       if (!error && data) {
-        setProjectsList(data.map(p => ({ id: p.id, name: p.project_name, number: p.project_number })))
+        setProjectsList(data.map(p => ({ 
+          id: p.id, 
+          name: p.project_name, 
+          number: p.project_number,
+          clientName: p.client_name,
+          statusFlag: p.status_flag
+        })))
       }
     } catch (error) {
       console.error('Error fetching projects:', error)
@@ -72,8 +79,13 @@ export default function BillingForm() {
       if (error) throw error
       if (data) {
         setProjectId(data.project_id || "")
+        
+        // Extract related project IDs, excluding the primary project
+        const pIds = data.project_ids || []
+        setProjectIds(pIds.filter((idx: string) => idx !== data.project_id))
+
         setProjectNumber(data.project_number || "")
-        setBillingCategory(data.billing_category || "工事請求")
+        setBillingCategory(data.billing_category || "出来高")
         setOrdererCategory(data.orderer_category || "元請")
         setBillingSubject(data.billing_subject || "")
         setBillingDestination(data.billing_destination || "")
@@ -143,8 +155,11 @@ export default function BillingForm() {
 
     setSaving(true)
     try {
+      const combinedProjectIds = [projectId, ...projectIds].filter(id => id)
+
       const headerPayload = {
         project_id: projectId,
+        project_ids: combinedProjectIds,
         project_number: projectNumber,
         billing_category: billingCategory,
         orderer_category: ordererCategory,
@@ -303,9 +318,8 @@ export default function BillingForm() {
                     onChange={(e) => setBillingCategory(e.target.value)}
                     className="w-full h-10 rounded-md border border-input bg-background px-3"
                   >
-                    <option value="工事請求">工事請求</option>
-                    <option value="単価請求">単価請求</option>
-                    <option value="その他">その他</option>
+                    <option value="出来高">出来高 (中間請求)</option>
+                    <option value="完成">完成 (最終請求・一括)</option>
                   </select>
                 </div>
 
@@ -329,6 +343,71 @@ export default function BillingForm() {
                     onChange={(e) => setOverallNotes(e.target.value)}
                     className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2"
                   />
+                </div>
+                
+                {/* Combined Billing Selection */}
+                <div className="space-y-4 md:col-span-2 pt-4 border-t">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <Folder className="w-5 h-5 text-slate-500" />
+                      関連する案件を追加（合算請求）
+                    </label>
+                    <p className="text-xs text-muted-foreground font-medium pl-1">※同じ発注者で「着工中」または「完工」の案件が表示されています。</p>
+                    
+                    {!projectId && (
+                      <div className="mt-3 text-sm text-slate-500 bg-slate-50 p-4 rounded-lg border border-dashed">
+                        対象の基本情報・宛先から「関連案件」を選択してください。
+                      </div>
+                    )}
+                    
+                    {projectId && (() => {
+                      const primaryClient = projectsList.find(p => p.id === projectId)?.clientName;
+                      const combinableProjects = projectsList.filter(p => 
+                        p.id !== projectId && 
+                        p.clientName === primaryClient && 
+                        primaryClient && 
+                        (p.statusFlag === '着工中' || p.statusFlag === '完工' || p.statusFlag === '完了') // support legacy status too just in case
+                      );
+                      
+                      if (!primaryClient) {
+                        return (
+                          <div className="mt-3 text-sm text-slate-500 bg-slate-50 p-4 rounded-lg border border-dashed">
+                            選択された案件にクライアント名（発注者）が設定されていないため、関連案件を検索できません。
+                          </div>
+                        );
+                      }
+
+                      if (combinableProjects.length === 0) {
+                        return (
+                          <div className="mt-3 text-sm text-slate-500 bg-slate-50 p-4 rounded-lg border border-dashed">
+                            合算可能な関連案件（同じ発注者で進行中・完了のもの）はありません。
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                          {combinableProjects.map(p => (
+                            <label key={p.id} className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-all ${projectIds.includes(p.id) ? 'bg-blue-50/50 border-blue-200' : 'bg-white hover:bg-slate-50'}`}>
+                              <input 
+                                type="checkbox"
+                                className="mt-1 flex-shrink-0 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                checked={projectIds.includes(p.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) setProjectIds(prev => [...prev, p.id]);
+                                  else setProjectIds(prev => prev.filter(id => id !== p.id));
+                                }}
+                              />
+                              <div className="flex flex-col flex-1 min-w-0">
+                                <span className="text-[11px] font-bold text-blue-600 tracking-wider font-mono">{p.number || "番号未設定"}</span>
+                                <span className="text-sm font-bold text-slate-800 line-clamp-2 mt-0.5">{p.name}</span>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
             </div>

@@ -117,7 +117,13 @@ export default function TomorrowScheduleForm() {
       
       const { data, error } = await query
       
-      const { data: wData } = await supabase.from('worker_master').select('id, name').neq('type', '事務員')
+      const { data: wData } = await supabase
+        .from('worker_master')
+        .select('id, name')
+        .neq('type', '事務員')
+        .order('display_order', { ascending: true, nullsFirst: false })
+        .order('id', { ascending: true })
+        
       if (wData) setWorkersList(wData.map(w => ({ id: w.id, name: w.name })))
 
       const { data: vData } = await supabase.from('vehicle_master').select('id, vehicle_name, category')

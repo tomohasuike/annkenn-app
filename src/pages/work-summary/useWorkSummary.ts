@@ -226,19 +226,38 @@ export function useWorkSummary() {
 
         // Parse Staff
         const workers = Array.isArray(row.report_personnel) ? row.report_personnel : [];
-        const staffsRaw = workers.map((w: any) => {
+        const rawNames = workers.map((w: any) => {
           if (w.worker_master && !Array.isArray(w.worker_master) && w.worker_master.name) return w.worker_master.name;
           if (w.worker_master && Array.isArray(w.worker_master) && w.worker_master[0]?.name) return w.worker_master[0].name;
           return w.worker_name;
         }).filter(Boolean);
         
-        // Parse Equipment
-        const cars = Array.isArray(row.report_vehicles) ? row.report_vehicles.map((v:any) => v.vehicle_name).filter(Boolean) : [];
-        const machines = Array.isArray(row.report_machinery) ? row.report_machinery.map((m:any) => m.machinery_name).filter(Boolean) : [];
+        // Deduplicate Staff
+        const staffMap = new Map<string, string>();
+        rawNames.forEach(name => {
+           const key = name.replace(/[\s　]+/g, "");
+           if (!staffMap.has(key)) staffMap.set(key, name);
+        });
+        const staffsRaw = Array.from(staffMap.values());
+        
+        // Parse Equipment and Deduplicate
+        const cars = [...new Set(Array.isArray(row.report_vehicles) ? row.report_vehicles.map((v:any) => v.vehicle_name).filter(Boolean) : [])];
+        const machines = [...new Set(Array.isArray(row.report_machinery) ? row.report_machinery.map((m:any) => m.machinery_name).filter(Boolean) : [])];
         const eqList = [...cars, ...machines];
         
-        // Parse Subcontractors
-        const subs = Array.isArray(row.report_subcontractors) ? row.report_subcontractors : [];
+        // Parse Subcontractors and Deduplicate
+        const subsRaw = Array.isArray(row.report_subcontractors) ? row.report_subcontractors : [];
+        const subsMap = new Map<string, any>();
+        subsRaw.forEach(s => {
+           const name = (s.subcontractor_name || '不明業者').replace(/[\s　]+/g, "");
+           if (!subsMap.has(name)) {
+               subsMap.set(name, s);
+           } else {
+               const existing = subsMap.get(name);
+               existing.worker_count = (Number(existing.worker_count) || 0) + (Number(s.worker_count) || 0);
+           }
+        });
+        const subs = Array.from(subsMap.values());
         
         // Parse Materials/Photos/Docs
         const materials = Array.isArray(row.report_materials) ? row.report_materials : [];

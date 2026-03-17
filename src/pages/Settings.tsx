@@ -16,6 +16,7 @@ export interface WorkerMaster {
   telephone?: string
   is_admin?: boolean
   allowed_apps?: string[]
+  display_order?: number
 }
 
 export interface VehicleMaster {
@@ -69,6 +70,21 @@ export default function Settings() {
   const [editingVehicle, setEditingVehicle] = useState<Partial<VehicleMaster> | null>(null)
   const [vehicleSaving, setVehicleSaving] = useState(false)
 
+  // Drag and Drop State
+  const [draggedWorkerId, setDraggedWorkerId] = useState<string | null>(null);
+  const [dragOverWorkerId, setDragOverWorkerId] = useState<string | null>(null);
+
+  // Styling helper for roles
+  const getRoleColorClass = (type?: string) => {
+      switch (type) {
+          case '社長': return 'bg-yellow-50/50';
+          case '事務員': return 'bg-purple-50/50';
+          case '協力会社': return 'bg-orange-50/50';
+          case '作業員': return 'bg-blue-50/30';
+          default: return 'bg-white';
+      }
+  };
+
   // Fetch Data
   useEffect(() => {
     fetchData()
@@ -83,6 +99,8 @@ export default function Settings() {
       const { data: workerData, error: workerErr } = await supabase
         .from('worker_master')
         .select('*')
+        // Order by display_order first, then fallback to id
+        .order('display_order', { ascending: true, nullsFirst: false })
         .order('id', { ascending: true })
         
       if (workerErr) throw workerErr
@@ -165,23 +183,67 @@ export default function Settings() {
   const savePermissions = async () => {
     setSaving(true)
     try {
-      // Loop through and update. For a robust app, use an upsert or bulk update
-      for (const w of workers) {
-          await supabase.from('worker_master')
+      // Setup promises for all updates (display order + permissions)
+      const updates = workers.map((w, index) => {
+          return supabase.from('worker_master')
             .update({
                 is_admin: w.is_admin,
-                allowed_apps: w.allowed_apps
+                allowed_apps: w.allowed_apps,
+                display_order: index + 1
             })
-            .eq('id', w.id)
-      }
-      alert('権限を保存しました。')
+            .eq('id', w.id);
+      });
+      
+      // Execute all updates concurrently in batches
+      await Promise.all(updates);
+      alert('権限と表示順を保存しました。');
     } catch (e) {
       console.error(e)
-      alert('権限の保存に失敗しました。')
+      alert('保存に失敗しました。')
     } finally {
       setSaving(false)
     }
   }
+
+  // --- Drag and Drop Handlers ---
+  const handleDragStart = (e: React.DragEvent<HTMLTableRowElement>, id: string) => {
+      setDraggedWorkerId(id);
+      // Optional: set drag image or effect
+      if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = "move";
+      }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>, id: string) => {
+      e.preventDefault(); // Necessary to allow dropping
+      if (id !== dragOverWorkerId) {
+          setDragOverWorkerId(id);
+      }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLTableRowElement>, targetId: string) => {
+      e.preventDefault();
+      setDragOverWorkerId(null);
+      if (!draggedWorkerId || draggedWorkerId === targetId) return;
+
+      setWorkers(prev => {
+          const newWorkers = [...prev];
+          const draggedIndex = newWorkers.findIndex(w => w.id === draggedWorkerId);
+          const targetIndex = newWorkers.findIndex(w => w.id === targetId);
+
+          if (draggedIndex === -1 || targetIndex === -1) return prev;
+
+          const [draggedWorker] = newWorkers.splice(draggedIndex, 1);
+          newWorkers.splice(targetIndex, 0, draggedWorker);
+          return newWorkers;
+      });
+      setDraggedWorkerId(null);
+  };
+  
+  const handleDragEnd = () => {
+      setDraggedWorkerId(null);
+      setDragOverWorkerId(null);
+  };
 
   const saveAppSettings = async () => {
     if (!appSettings) return;
@@ -402,8 +464,8 @@ export default function Settings() {
                     <table className="w-full text-sm text-left">
                         <thead className="text-xs text-muted-foreground bg-muted/50 border-b">
                             <tr>
-                                <th className="px-4 py-3 font-medium sticky left-0 bg-muted/50 z-20 shadow-[1px_0_0_0_theme(colors.border)]">作業員名</th>
-                                <th className="px-4 py-3 font-medium text-center sticky left-[120px] bg-muted/50 z-20 shadow-[1px_0_0_0_theme(colors.border)]">管理者</th>
+                                <th className="px-4 py-3 font-medium sticky left-0 bg-muted/50 z-20 shadow-[1px_0_0_0_theme(colors.border)] min-w-[140px]">作業員名</th>
+                                <th className="px-4 py-3 font-medium text-center sticky left-[140px] bg-muted/50 z-20 shadow-[1px_0_0_0_theme(colors.border)]">管理者</th>
                                 {APPS.map(app => (
                                     <th key={app.id} className="px-4 py-3 font-medium text-center writing-mode-vertical sm:writing-mode-horizontal whitespace-nowrap">
                                         <div className="flex items-center justify-center gap-1">
@@ -413,14 +475,33 @@ export default function Settings() {
                                 ))}
                             </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody className="divide-y relative">
                             {workers.filter(w => w.status !== '離職').map(worker => (
-                                <tr key={worker.id} className="hover:bg-muted/10">
-                                    <td className="px-4 py-3 font-medium sticky left-0 bg-white z-10 shadow-[1px_0_0_0_theme(colors.border)] min-w-[120px]">
-                                        {worker.name}
-                                        {worker.email && <div className="text-xs text-muted-foreground font-normal">{worker.email}</div>}
+                                <tr 
+                                    key={worker.id} 
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, worker.id)}
+                                    onDragOver={(e) => handleDragOver(e, worker.id)}
+                                    onDrop={(e) => handleDrop(e, worker.id)}
+                                    onDragEnd={handleDragEnd}
+                                    className={`transition-colors border-l-4 ${
+                                        draggedWorkerId === worker.id ? 'opacity-50 break-dash border-l-gray-400 bg-gray-50' : 
+                                        dragOverWorkerId === worker.id ? 'border-t-2 border-t-primary border-l-transparent bg-primary/5' : 
+                                        'border-l-transparent hover:bg-muted/30'
+                                    } ${draggedWorkerId !== worker.id && getRoleColorClass(worker.type)}`}
+                                >
+                                    <td className={`px-4 py-3 font-medium sticky left-0 z-10 shadow-[1px_0_0_0_theme(colors.border)] min-w-[140px] ${getRoleColorClass(worker.type)}`}>
+                                        <div className="flex items-center gap-2">
+                                            <div className="text-muted-foreground/50 hover:text-foreground cursor-grab active:cursor-grabbing p-1">
+                                                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5"><path d="M5.5 4.625C6.12132 4.625 6.625 4.12132 6.625 3.5C6.625 2.87868 6.12132 2.375 5.5 2.375C4.87868 2.375 4.375 2.87868 4.375 3.5C4.375 4.12132 4.87868 4.625 5.5 4.625ZM9.5 4.625C10.1213 4.625 10.625 4.12132 10.625 3.5C10.625 2.87868 10.1213 2.375 9.5 2.375C8.87868 2.375 8.375 2.87868 8.375 3.5C8.375 4.12132 8.87868 4.625 9.5 4.625ZM10.625 7.5C10.625 8.12132 10.1213 8.625 9.5 8.625C8.87868 8.625 8.375 8.12132 8.375 7.5C8.375 6.87868 8.87868 6.375 9.5 6.375C10.1213 6.375 10.625 6.87868 10.625 7.5ZM5.5 8.625C6.12132 8.625 6.625 8.12132 6.625 7.5C6.625 6.87868 6.12132 6.375 5.5 6.375C4.87868 6.375 4.375 6.87868 4.375 7.5C4.375 8.12132 4.87868 8.625 5.5 8.625ZM10.625 11.5C10.625 12.1213 10.1213 12.625 9.5 12.625C8.87868 12.625 8.375 12.1213 8.375 11.5C8.375 10.8786 8.87868 10.375 9.5 10.375C10.1213 10.375 10.625 10.8786 10.625 11.5ZM5.5 12.625C6.12132 12.625 6.625 12.1213 6.625 11.5C6.625 10.8786 6.12132 10.375 5.5 10.375C4.87868 10.375 4.375 10.8786 4.375 11.5C4.375 12.1213 4.87868 12.625 5.5 12.625Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
+                                            </div>
+                                            <div>
+                                                {worker.name}
+                                                {worker.email && <div className="text-xs text-muted-foreground font-normal">{worker.email}</div>}
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td className="px-4 py-3 text-center sticky left-[120px] bg-white z-10 shadow-[1px_0_0_0_theme(colors.border)]">
+                                    <td className={`px-4 py-3 text-center sticky left-[140px] z-10 shadow-[1px_0_0_0_theme(colors.border)] ${getRoleColorClass(worker.type)}`}>
                                          <label className="relative inline-flex items-center cursor-pointer">
                                             <input type="checkbox" className="sr-only peer" checked={worker.is_admin} onChange={() => toggleAdmin(worker.id)} />
                                             <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
@@ -455,30 +536,64 @@ export default function Settings() {
           {activeTab === 'workers' && (
               <div className="space-y-6">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">作業員マスター</h3>
-                    <button 
-                         onClick={() => handleOpenWorkerModal()}
-                         className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm font-medium shadow-sm">
-                        <Plus className="w-4 h-4" />
-                        新規追加
-                    </button>
+                    <div>
+                        <h3 className="text-lg font-semibold">作業員マスター</h3>
+                        <p className="text-sm text-muted-foreground">新しい作業員の追加や、表示順の変更（ドラッグ＆ドロップ）ができます。</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button 
+                            onClick={savePermissions}
+                            disabled={saving}
+                            className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm font-medium shadow-sm disabled:opacity-50"
+                        >
+                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            並び順を保存
+                        </button>
+                        <button 
+                             onClick={() => handleOpenWorkerModal()}
+                             className="bg-muted text-foreground px-4 py-2 rounded-md hover:bg-muted/80 transition-colors flex items-center gap-2 text-sm font-medium shadow-sm">
+                            <Plus className="w-4 h-4" />
+                            新規追加
+                        </button>
+                    </div>
                   </div>
                   
                   <div className="overflow-x-auto border rounded-lg">
                       <table className="w-full text-sm text-left">
                           <thead className="text-xs text-muted-foreground bg-muted/50 border-b">
                               <tr>
-                                  <th className="px-4 py-3 font-medium">名前</th>
+                                  <th className="px-4 py-3 font-medium min-w-[140px]">名前</th>
                                   <th className="px-4 py-3 font-medium">区分</th>
                                   <th className="px-4 py-3 font-medium">メールアドレス</th>
                                   <th className="px-4 py-3 font-medium text-right">操作</th>
                               </tr>
                           </thead>
-                          <tbody className="divide-y">
+                          <tbody className="divide-y relative">
                               {workers.map(worker => (
-                                  <tr key={worker.id} className="hover:bg-muted/10">
-                                      <td className="px-4 py-3 font-medium">{worker.name}</td>
-                                      <td className="px-4 py-3">
+                                  <tr 
+                                      key={worker.id} 
+                                      draggable
+                                      onDragStart={(e) => handleDragStart(e, worker.id)}
+                                      onDragOver={(e) => handleDragOver(e, worker.id)}
+                                      onDrop={(e) => handleDrop(e, worker.id)}
+                                      onDragEnd={handleDragEnd}
+                                      className={`transition-colors border-l-4 ${
+                                          draggedWorkerId === worker.id ? 'opacity-50 break-dash border-l-gray-400 bg-gray-50' : 
+                                          dragOverWorkerId === worker.id ? 'border-t-2 border-t-primary border-l-transparent bg-primary/5' : 
+                                          'border-l-transparent hover:bg-muted/30'
+                                      } ${draggedWorkerId !== worker.id && getRoleColorClass(worker.type)}`}
+                                  >
+                                      <td className={`px-4 py-3 font-medium min-w-[140px] ${getRoleColorClass(worker.type)}`}>
+                                            <div className="flex items-center gap-2">
+                                                <div className="text-muted-foreground/50 hover:text-foreground cursor-grab active:cursor-grabbing p-1">
+                                                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5"><path d="M5.5 4.625C6.12132 4.625 6.625 4.12132 6.625 3.5C6.625 2.87868 6.12132 2.375 5.5 2.375C4.87868 2.375 4.375 2.87868 4.375 3.5C4.375 4.12132 4.87868 4.625 5.5 4.625ZM9.5 4.625C10.1213 4.625 10.625 4.12132 10.625 3.5C10.625 2.87868 10.1213 2.375 9.5 2.375C8.87868 2.375 8.375 2.87868 8.375 3.5C8.375 4.12132 8.87868 4.625 9.5 4.625ZM10.625 7.5C10.625 8.12132 10.1213 8.625 9.5 8.625C8.87868 8.625 8.375 8.12132 8.375 7.5C8.375 6.87868 8.87868 6.375 9.5 6.375C10.1213 6.375 10.625 6.87868 10.625 7.5ZM5.5 8.625C6.12132 8.625 6.625 8.12132 6.625 7.5C6.625 6.87868 6.12132 6.375 5.5 6.375C4.87868 6.375 4.375 6.87868 4.375 7.5C4.375 8.12132 4.87868 8.625 5.5 8.625ZM10.625 11.5C10.625 12.1213 10.1213 12.625 9.5 12.625C8.87868 12.625 8.375 12.1213 8.375 11.5C8.375 10.8786 8.87868 10.375 9.5 10.375C10.1213 10.375 10.625 10.8786 10.625 11.5ZM5.5 12.625C6.12132 12.625 6.625 12.1213 6.625 11.5C6.625 10.8786 6.12132 10.375 5.5 10.375C4.87868 10.375 4.375 10.8786 4.375 11.5C4.375 12.1213 4.87868 12.625 5.5 12.625Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
+                                                </div>
+                                                <div>
+                                                    {worker.name}
+                                                </div>
+                                            </div>
+                                      </td>
+                                      <td className={`px-4 py-3 ${getRoleColorClass(worker.type)}`}>
                                           <span className={`px-2 py-1 rounded-full text-xs font-medium border ${
                                               worker.type === '事務員' ? 'bg-purple-50 text-purple-700 border-purple-200' :
                                               worker.type === '協力会社' ? 'bg-orange-50 text-orange-700 border-orange-200' :
@@ -487,8 +602,8 @@ export default function Settings() {
                                               {worker.type || '作業員'}
                                           </span>
                                       </td>
-                                      <td className="px-4 py-3 text-muted-foreground">{worker.email || '-'}</td>
-                                      <td className="px-4 py-3 text-right">
+                                      <td className={`px-4 py-3 text-muted-foreground ${getRoleColorClass(worker.type)}`}>{worker.email || '-'}</td>
+                                      <td className={`px-4 py-3 text-right ${getRoleColorClass(worker.type)}`}>
                                           <div className="flex items-center justify-end gap-2">
                                               <button 
                                                   onClick={() => handleOpenWorkerModal(worker)}

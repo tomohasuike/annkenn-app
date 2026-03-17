@@ -110,7 +110,7 @@ export default function ScheduleManagement() {
     try {
       const [projRes, workerRes, vehicleRes] = await Promise.all([
         supabase.from('projects').select('id, project_name, category, status_flag, project_number, site_name, legacy_id, client_name, client_company_name, folder_url').order('created_at', { ascending: false }),
-        supabase.from('worker_master').select('id, name, type').eq('is_active', true).neq('type', '事務員').order('created_at', { ascending: true }),
+        supabase.from('worker_master').select('id, name, type').eq('is_active', true).neq('type', '事務員').order('display_order', { ascending: true, nullsFirst: false }).order('id', { ascending: true }),
         supabase.from('vehicle_master').select('id, vehicle_name, category').eq('is_active', true).order('created_at', { ascending: true })
       ])
 

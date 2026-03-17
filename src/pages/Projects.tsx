@@ -38,7 +38,10 @@ export default function Projects() {
         const { data, error } = await query
         if (error) throw error
         
-        setProjects(data || [])
+        // 休暇（VACATION）案件は工程管理用のシステム案件のため管理画面から除外
+        const visibleProjects = (data || []).filter(p => p.project_number !== 'VACATION' && p.project_name !== '■ 休暇')
+        
+        setProjects(visibleProjects)
       } catch (err) {
         console.error("Error fetching projects:", err)
       } finally {

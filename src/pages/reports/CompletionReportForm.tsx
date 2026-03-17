@@ -92,7 +92,10 @@ export function CompletionReportForm() {
       
       // Fetch projects for dropdown
       const { data: projData } = await supabase.from('projects').select('id, project_name').order('project_name');
-      if (projData) setProjects(projData.map(p => ({id: p.id, name: p.project_name || '名称未設定'})));
+      if (projData) {
+        // 工程管理用の特別な案件（VACATIONなど）を除外
+        setProjects(projData.filter(p => p.project_name !== '■ 休暇').map(p => ({id: p.id, name: p.project_name || '名称未設定'})));
+      }
       
       const { data: { user } } = await supabase.auth.getUser();
       let currentUserEmailName = user?.email?.split('@')[0] || '';

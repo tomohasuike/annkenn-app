@@ -44,7 +44,15 @@ export default function ProjectForm() {
             .single()
             
           if (error) throw error
-          if (data) setFormData(data)
+          if (data) {
+            // 工程管理用の特別な案件（VACATIONなど）の場合は編集をブロックする
+            if (data.project_number === 'VACATION' || data.project_name === '■ 休暇') {
+              alert("この案件は工程管理専用のため、案件管理画面から編集・削除することはできません。")
+              navigate("/projects")
+              return
+            }
+            setFormData(data)
+          }
         } catch (err) {
           console.error("Error fetching project:", err)
           alert("データの取得に失敗しました")
