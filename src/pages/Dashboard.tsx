@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [tomorrowDailyData, setTomorrowDailyData] = useState<any[]>([]);
   const [activeProjects, setActiveProjects] = useState<any[]>([]);
   const [recentReports, setRecentReports] = useState<any[]>([]);
+  const [submittedTodayReports, setSubmittedTodayReports] = useState<Record<string, string>>({});
   
   // Billing States
   const [expectedBillingAmount, setExpectedBillingAmount] = useState(0);
@@ -107,6 +108,21 @@ export default function Dashboard() {
         .select('id, project_name, site_name, project_number, status_flag')
         .eq('status_flag', '着工中');
       setActiveProjects(projects || []);
+
+      // 3.5 Fetch Today's Daily Reports (作成済の日報)
+      const { data: todayReports } = await supabase
+        .from('daily_reports')
+        .select('id, project_id')
+        .gte('report_date', `${todayStr}T00:00:00`)
+        .lte('report_date', `${todayStr}T23:59:59.999Z`);
+        
+      const submittedMap: Record<string, string> = {};
+      if (todayReports) {
+          todayReports.forEach(r => {
+              if (r.project_id) submittedMap[r.project_id] = r.id;
+          });
+      }
+      setSubmittedTodayReports(submittedMap);
 
       // 4. Fetch Recent Reports (Daily)
       const { data: reports } = await supabase
@@ -359,28 +375,42 @@ export default function Dashboard() {
                   const workers = schedGroup.workers.length > 0 ? schedGroup.workers.join(", ") : '-';
                   const vehicles = schedGroup.vehicles.length > 0 ? schedGroup.vehicles.join(", ") : '-';
                   const isVacation = p.project_number === 'VACATION' || p.project_name?.includes('休暇');
+                  const reportId = submittedTodayReports[p.id];
+                  const isSubmitted = !!reportId;
                   
                   return (
-                    <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 transition-colors cursor-pointer" onClick={() => {
-                        const personnelData = schedGroup.workersRaw ? schedGroup.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
-                        const vehicleData = schedGroup.vehiclesRaw ? schedGroup.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
-                        navigate(`/reports/new`, { 
-                            state: { 
-                                projectId: p.id,
-                                personnel: personnelData,
-                                vehicles: vehicleData,
-                                category: p.category
-                            } 
-                        });
+                    <div key={idx} className={`rounded-xl shadow-sm border p-4 transition-colors cursor-pointer ${isSubmitted ? 'bg-slate-50 border-emerald-200/60 opacity-90 hover:border-emerald-300' : 'bg-white border-slate-200 hover:border-blue-300'}`} onClick={() => {
+                        if (isSubmitted) {
+                            navigate(`/reports/${reportId}/edit`);
+                        } else {
+                            const personnelData = schedGroup.workersRaw ? schedGroup.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
+                            const vehicleData = schedGroup.vehiclesRaw ? schedGroup.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
+                            navigate(`/reports/new`, { 
+                                state: { 
+                                    projectId: p.id,
+                                    personnel: personnelData,
+                                    vehicles: vehicleData,
+                                    category: p.category
+                                } 
+                            });
+                        }
                     }}>
-                      <div className="flex items-center gap-2 mb-3">
-                         <span className="text-[10px] font-bold font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
-                            {p.project_number || '番号なし'}
-                         </span>
-                         <span className="font-bold text-sm text-slate-700 truncate" title={p.project_name}>
-                           {isVacation && <span className="text-slate-800 mr-1">■</span>}
-                           {p.project_name}
-                         </span>
+                      <div className="flex items-center mb-3">
+                         <div className="flex items-center gap-2 max-w-[calc(100%-70px)]">
+                             <span className="text-[10px] font-bold font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                                {p.project_number || '番号なし'}
+                             </span>
+                             <span className="font-bold text-sm text-slate-700 truncate" title={p.project_name}>
+                               {isVacation && <span className="text-slate-800 mr-1">■</span>}
+                               {p.project_name}
+                             </span>
+                         </div>
+                         {isSubmitted && (
+                             <span className="ml-auto shrink-0 flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-200/50">
+                                 <CheckCircle2 className="w-3 h-3" />
+                                 日報済
+                             </span>
+                         )}
                       </div>
                       <div className="space-y-1 mt-2">
                         <div className="flex items-start gap-3">
