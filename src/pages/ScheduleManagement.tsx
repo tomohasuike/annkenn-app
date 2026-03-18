@@ -601,6 +601,145 @@ export default function ScheduleManagement() {
   const activeTodos = todos.filter(t => !t.completed)
   const completedTodos = todos.filter(t => t.completed)
 
+  const renderCellModals = () => (
+    <>
+      {/* Modals for Cell Actions */}
+      {commentModalState.isOpen && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onPointerDown={() => setCommentModalState({ ...commentModalState, isOpen: false })}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in duration-200" onPointerDown={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-slate-700 flex items-center gap-0.5"><MessageSquare className="w-4 h-4 text-amber-500" /> コメント入力</h3>
+              <button type="button" onClick={() => setCommentModalState({ ...commentModalState, isOpen: false })} className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 flex flex-col gap-4">
+              <textarea 
+                className="w-full p-1 text-[0.95em] border border-slate-300 rounded outline-none focus:border-blue-500 min-h-[100px] resize-none focus:ring-1 focus:ring-blue-500"
+                placeholder="コメントを入力してください"
+                value={commentModalState.initialValue}
+                onChange={(e) => setCommentModalState({ ...commentModalState, initialValue: e.target.value })}
+                autoFocus
+              />
+              <div className="flex justify-end gap-0.5 pt-2">
+                <button type="button" onClick={() => setCommentModalState({ ...commentModalState, isOpen: false })} className="px-4 py-2 font-bold text-[0.95em] text-slate-600 border border-slate-300 rounded hover:bg-slate-50 transition-colors">キャンセル</button>
+                <button type="button" onClick={() => {
+                  updateDailyData(commentModalState.projectId, commentModalState.dateStr, { comment: commentModalState.initialValue.trim() || null });
+                  setCommentModalState({ ...commentModalState, isOpen: false });
+                }} className="px-5 py-2 font-bold text-[0.95em] text-white bg-blue-600 rounded hover:bg-blue-700 shadow flex items-center gap-0.5 transition-colors">
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {plannedCountModalState.isOpen && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onPointerDown={() => setPlannedCountModalState({ ...plannedCountModalState, isOpen: false })}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in duration-200" onPointerDown={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-slate-700">予定人員の入力</h3>
+              <button type="button" onClick={() => setPlannedCountModalState({ ...plannedCountModalState, isOpen: false })} className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 flex flex-col gap-4">
+              <input 
+                type="number"
+                min="0"
+                className="w-full p-0.5 text-[0.95em] border border-slate-300 rounded outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                placeholder="半角数字"
+                value={plannedCountModalState.initialValue}
+                onChange={(e) => setPlannedCountModalState({ ...plannedCountModalState, initialValue: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    let parsed: number | null = parseInt(plannedCountModalState.initialValue, 10);
+                    if (isNaN(parsed) || plannedCountModalState.initialValue.trim() === "") parsed = null;
+                    updateDailyData(plannedCountModalState.projectId, plannedCountModalState.dateStr, { planned_count: parsed });
+                    setPlannedCountModalState({ ...plannedCountModalState, isOpen: false });
+                  }
+                }}
+                autoFocus
+              />
+              <div className="flex justify-end gap-0.5 pt-2">
+                <button type="button" onClick={() => setPlannedCountModalState({ ...plannedCountModalState, isOpen: false })} className="px-4 py-2 font-bold text-[0.95em] text-slate-600 border border-slate-300 rounded hover:bg-slate-50 transition-colors">キャンセル</button>
+                <button type="button" onClick={() => {
+                  let parsed: number | null = parseInt(plannedCountModalState.initialValue, 10);
+                  if (isNaN(parsed) || plannedCountModalState.initialValue.trim() === "") parsed = null;
+                  updateDailyData(plannedCountModalState.projectId, plannedCountModalState.dateStr, { planned_count: parsed });
+                  setPlannedCountModalState({ ...plannedCountModalState, isOpen: false });
+                }} className="px-5 py-2 font-bold text-[0.95em] text-white bg-blue-600 rounded hover:bg-blue-700 shadow flex items-center gap-0.5 transition-colors">
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {partnerCountModalState.isOpen && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onPointerDown={() => setPartnerCountModalState({ ...partnerCountModalState, isOpen: false })}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in duration-200" onPointerDown={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-slate-700">協力会社の人数の入力</h3>
+              <button type="button" onClick={() => setPartnerCountModalState({ ...partnerCountModalState, isOpen: false })} className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 flex flex-col gap-4">
+              <input 
+                type="number"
+                min="0"
+                className="w-full p-0.5 text-[0.95em] border border-slate-300 rounded outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                placeholder="半角数字"
+                value={partnerCountModalState.initialValue}
+                onChange={(e) => setPartnerCountModalState({ ...partnerCountModalState, initialValue: parseInt(e.target.value) || 0 })}
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter') {
+                    const parsed = partnerCountModalState.initialValue;
+                    if (isNaN(parsed) || parsed < 0) return;
+                    try {
+                      setAssignments(prev => prev.map(a => a.id === partnerCountModalState.assignmentId ? { ...a, count: parsed } : a));
+                      const { error } = await supabase.from('assignments').update({ count: parsed }).eq('id', partnerCountModalState.assignmentId);
+                      if (error) throw error;
+                    } catch (err) {
+                      console.error("Failed to update partner count:", err);
+                      fetchAssignments();
+                    }
+                    setPartnerCountModalState({ ...partnerCountModalState, isOpen: false });
+                  }
+                }}
+                autoFocus
+              />
+              <div className="flex justify-end gap-0.5 pt-2">
+                <button type="button" onClick={() => setPartnerCountModalState({ ...partnerCountModalState, isOpen: false })} className="px-4 py-2 font-bold text-[0.95em] text-slate-600 border border-slate-300 rounded hover:bg-slate-50 transition-colors">キャンセル</button>
+                <button type="button" onClick={async () => {
+                  const parsed = partnerCountModalState.initialValue;
+                  if (isNaN(parsed) || parsed < 0) return;
+                  try {
+                    setAssignments(prev => prev.map(a => a.id === partnerCountModalState.assignmentId ? { ...a, count: parsed } : a));
+                    const { error } = await supabase.from('assignments').update({ count: parsed }).eq('id', partnerCountModalState.assignmentId);
+                    if (error) throw error;
+                  } catch (err) {
+                    console.error("Failed to update partner count:", err);
+                    fetchAssignments();
+                  }
+                  setPartnerCountModalState({ ...partnerCountModalState, isOpen: false });
+                }} className="px-5 py-2 font-bold text-[0.95em] text-white bg-blue-600 rounded hover:bg-blue-700 shadow flex items-center gap-0.5 transition-colors">
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+
   // --- Render Mobile View (Horizontal 1-Week Scroll) ---
   if (isMobile) {
     const prevWeek = () => setCurrentDate(subDays(currentDate, 7))
@@ -820,6 +959,7 @@ export default function ScheduleManagement() {
          </div>
          {/* ボトムスペーサー代わり */}
          <div className="h-6 shrink-0 bg-slate-50"></div>
+         {renderCellModals()}
       </div>
     )
   }
@@ -1483,140 +1623,8 @@ export default function ScheduleManagement() {
           background: #94a3b8; 
         }
       `}</style>
-      {/* Modals for Cell Actions */}
-      {commentModalState.isOpen && createPortal(
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onPointerDown={() => setCommentModalState({ ...commentModalState, isOpen: false })}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in duration-200" onPointerDown={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-slate-700 flex items-center gap-0.5"><MessageSquare className="w-4 h-4 text-amber-500" /> コメント入力</h3>
-              <button type="button" onClick={() => setCommentModalState({ ...commentModalState, isOpen: false })} className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-5 flex flex-col gap-4">
-              <textarea 
-                className="w-full p-1 text-[0.95em] border border-slate-300 rounded outline-none focus:border-blue-500 min-h-[100px] resize-none focus:ring-1 focus:ring-blue-500"
-                placeholder="コメントを入力してください"
-                value={commentModalState.initialValue}
-                onChange={(e) => setCommentModalState({ ...commentModalState, initialValue: e.target.value })}
-                autoFocus
-              />
-              <div className="flex justify-end gap-0.5 pt-2">
-                <button type="button" onClick={() => setCommentModalState({ ...commentModalState, isOpen: false })} className="px-4 py-2 font-bold text-[0.95em] text-slate-600 border border-slate-300 rounded hover:bg-slate-50 transition-colors">キャンセル</button>
-                <button type="button" onClick={() => {
-                  updateDailyData(commentModalState.projectId, commentModalState.dateStr, { comment: commentModalState.initialValue.trim() || null });
-                  setCommentModalState({ ...commentModalState, isOpen: false });
-                }} className="px-5 py-2 font-bold text-[0.95em] text-white bg-blue-600 rounded hover:bg-blue-700 shadow flex items-center gap-0.5 transition-colors">
-                  保存
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {plannedCountModalState.isOpen && createPortal(
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onPointerDown={() => setPlannedCountModalState({ ...plannedCountModalState, isOpen: false })}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in duration-200" onPointerDown={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-slate-700">予定人員の入力</h3>
-              <button type="button" onClick={() => setPlannedCountModalState({ ...plannedCountModalState, isOpen: false })} className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-5 flex flex-col gap-4">
-              <input 
-                type="number"
-                min="0"
-                className="w-full p-0.5 text-[0.95em] border border-slate-300 rounded outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                placeholder="半角数字"
-                value={plannedCountModalState.initialValue}
-                onChange={(e) => setPlannedCountModalState({ ...plannedCountModalState, initialValue: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    let parsed: number | null = parseInt(plannedCountModalState.initialValue, 10);
-                    if (isNaN(parsed) || plannedCountModalState.initialValue.trim() === "") parsed = null;
-                    updateDailyData(plannedCountModalState.projectId, plannedCountModalState.dateStr, { planned_count: parsed });
-                    setPlannedCountModalState({ ...plannedCountModalState, isOpen: false });
-                  }
-                }}
-                autoFocus
-              />
-              <div className="flex justify-end gap-0.5 pt-2">
-                <button type="button" onClick={() => setPlannedCountModalState({ ...plannedCountModalState, isOpen: false })} className="px-4 py-2 font-bold text-[0.95em] text-slate-600 border border-slate-300 rounded hover:bg-slate-50 transition-colors">キャンセル</button>
-                <button type="button" onClick={() => {
-                  let parsed: number | null = parseInt(plannedCountModalState.initialValue, 10);
-                  if (isNaN(parsed) || plannedCountModalState.initialValue.trim() === "") parsed = null;
-                  updateDailyData(plannedCountModalState.projectId, plannedCountModalState.dateStr, { planned_count: parsed });
-                  setPlannedCountModalState({ ...plannedCountModalState, isOpen: false });
-                }} className="px-5 py-2 font-bold text-[0.95em] text-white bg-blue-600 rounded hover:bg-blue-700 shadow flex items-center gap-0.5 transition-colors">
-                  保存
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {partnerCountModalState.isOpen && createPortal(
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onPointerDown={() => setPartnerCountModalState({ ...partnerCountModalState, isOpen: false })}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in duration-200" onPointerDown={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-slate-700">協力会社の人数の入力</h3>
-              <button type="button" onClick={() => setPartnerCountModalState({ ...partnerCountModalState, isOpen: false })} className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-5 flex flex-col gap-4">
-              <input 
-                type="number"
-                min="0"
-                className="w-full p-0.5 text-[0.95em] border border-slate-300 rounded outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                placeholder="半角数字"
-                value={partnerCountModalState.initialValue}
-                onChange={(e) => setPartnerCountModalState({ ...partnerCountModalState, initialValue: parseInt(e.target.value) || 0 })}
-                onKeyDown={async (e) => {
-                  if (e.key === 'Enter') {
-                    const parsed = partnerCountModalState.initialValue;
-                    if (isNaN(parsed) || parsed < 0) return;
-                    try {
-                      setAssignments(prev => prev.map(a => a.id === partnerCountModalState.assignmentId ? { ...a, count: parsed } : a));
-                      const { error } = await supabase.from('assignments').update({ count: parsed }).eq('id', partnerCountModalState.assignmentId);
-                      if (error) throw error;
-                    } catch (err) {
-                      console.error("Failed to update partner count:", err);
-                      fetchAssignments();
-                    }
-                    setPartnerCountModalState({ ...partnerCountModalState, isOpen: false });
-                  }
-                }}
-                autoFocus
-              />
-              <div className="flex justify-end gap-0.5 pt-2">
-                <button type="button" onClick={() => setPartnerCountModalState({ ...partnerCountModalState, isOpen: false })} className="px-4 py-2 font-bold text-[0.95em] text-slate-600 border border-slate-300 rounded hover:bg-slate-50 transition-colors">キャンセル</button>
-                <button type="button" onClick={async () => {
-                  const parsed = partnerCountModalState.initialValue;
-                  if (isNaN(parsed) || parsed < 0) return;
-                  try {
-                    setAssignments(prev => prev.map(a => a.id === partnerCountModalState.assignmentId ? { ...a, count: parsed } : a));
-                    const { error } = await supabase.from('assignments').update({ count: parsed }).eq('id', partnerCountModalState.assignmentId);
-                    if (error) throw error;
-                  } catch (err) {
-                    console.error("Failed to update partner count:", err);
-                    fetchAssignments();
-                  }
-                  setPartnerCountModalState({ ...partnerCountModalState, isOpen: false });
-                }} className="px-5 py-2 font-bold text-[0.95em] text-white bg-blue-600 rounded hover:bg-blue-700 shadow flex items-center gap-0.5 transition-colors">
-                  保存
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      
+      {renderCellModals()}
 
       {/* Add Resource Modal */}
       {showAddResourceModal && (
