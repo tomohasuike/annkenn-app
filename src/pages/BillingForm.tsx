@@ -48,7 +48,7 @@ export default function BillingForm() {
   const location = useLocation()
   const isEditing = !!id && id !== 'new'
 
-  const [loading, setLoading] = useState(isEditing)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [projectsList, setProjectsList] = useState<ProjectData[]>([])
 
@@ -67,11 +67,50 @@ export default function BillingForm() {
   const [details, setDetails] = useState<InvoiceDetailData[]>([])
 
   useEffect(() => {
-    fetchProjects()
-    if (isEditing) {
-      fetchInvoice()
-    }
+    checkAccessAndLoadData()
   }, [id])
+
+  async function checkAccessAndLoadData() {
+    setLoading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        navigate('/login')
+        return
+      }
+
+      const { data: workerData, error: workerError } = await supabase
+        .from('worker_master')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+
+      if (workerError) {
+        console.error("Failed to fetch worker data:", workerError)
+        navigate('/')
+        return
+      }
+
+      const permissions = workerData?.allowed_apps || []
+      const hasBillingAccess = permissions.includes('billing') || permissions.includes('schedule-admin')
+      
+      if (!hasBillingAccess) {
+        alert("請求管理にアクセスする権限がありません。")
+        navigate('/')
+        return
+      }
+
+      await fetchProjects()
+      if (isEditing) {
+        await fetchInvoice()
+      } else {
+        setLoading(false)
+      }
+    } catch (error) {
+      console.error("Access check error:", error)
+      navigate('/')
+    }
+  }
 
   async function fetchProjects() {
     try {

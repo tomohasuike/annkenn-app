@@ -74,11 +74,47 @@ export default function Billing() {
   }
 
   useEffect(() => {
-    fetchData()
+    checkAccessAndFetchData()
   }, [])
 
-  async function fetchData() {
+  async function checkAccessAndFetchData() {
     setLoading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        navigate('/login')
+        return
+      }
+
+      const { data: workerData, error: workerError } = await supabase
+        .from('worker_master')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+
+      if (workerError) {
+        console.error("Failed to fetch worker data:", workerError)
+        navigate('/')
+        return
+      }
+
+      const permissions = workerData?.allowed_apps || []
+      const hasBillingAccess = permissions.includes('billing') || permissions.includes('schedule-admin')
+      
+      if (!hasBillingAccess) {
+        alert("請求管理にアクセスする権限がありません。")
+        navigate('/')
+        return
+      }
+
+      await fetchData()
+    } catch (error) {
+      console.error("Access check error:", error)
+      navigate('/')
+    }
+  }
+
+  async function fetchData() {
     try {
       // Fetch Invoices
       const { data: invData, error: invError } = await supabase
