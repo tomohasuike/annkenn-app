@@ -39,6 +39,11 @@ export default function Dashboard() {
       return `${num}${name}${site}`;
   };
 
+  const isVacationOrMisc = (p: any) => {
+      if (!p) return false;
+      return p.category === 'その他' || p.project_number === 'VACATION' || (typeof p.project_name === 'string' && p.project_name.includes('休暇'));
+  };
+
   useEffect(() => {
     fetchDashboardData();
   }, []);
@@ -220,8 +225,13 @@ export default function Dashboard() {
   }
 
   // Derived Data
-  const projectsNeedingCompletionReport = activeProjects.filter(() => false);
-  const activeSchedulesCount = new Set(todaySchedules.filter(s => s.project_id).map(s => s.project_id)).size;
+  const realActiveProjects = activeProjects.filter(p => !isVacationOrMisc(p));
+  const projectsNeedingCompletionReport = realActiveProjects.filter(() => false);
+  const activeSchedulesCount = new Set(
+      todaySchedules
+          .filter(s => s.project_id && s.project && !isVacationOrMisc(s.project))
+          .map(s => s.project_id)
+  ).size;
 
   // 翌日の予定があるのに、本日の日報が出ていないアラート
   const currentHour = new Date().getHours();
@@ -284,17 +294,13 @@ export default function Dashboard() {
 
   const missingTomorrowGroups = tomorrowScheduleGroups.filter((group: any) => {
       const p = group.project;
-      if (!p) return false;
-      const isVacationOrMisc = p.category === 'その他' || p.project_number === 'VACATION' || (typeof p.project_name === 'string' && p.project_name.includes('休暇'));
-      if (isVacationOrMisc) return false;
+      if (!p || isVacationOrMisc(p)) return false;
       return !submittedTomorrowReports[p.id];
   });
 
   const missingTodayGroups = todayScheduleGroups.filter((group: any) => {
       const p = group.project;
-      if (!p) return false;
-      const isVacationOrMisc = p.category === 'その他' || p.project_number === 'VACATION' || (typeof p.project_name === 'string' && p.project_name.includes('休暇'));
-      if (isVacationOrMisc) return false;
+      if (!p || isVacationOrMisc(p)) return false;
       return !submittedTodayReports[p.id];
   });
 
@@ -331,7 +337,7 @@ export default function Dashboard() {
           </div>
           <div>
             <p className="text-sm font-bold text-slate-500">稼働中の現場</p>
-            <p className="text-2xl font-black text-slate-800">{activeProjects.length} <span className="text-base font-medium text-slate-500">件</span></p>
+            <p className="text-2xl font-black text-slate-800">{realActiveProjects.length} <span className="text-base font-medium text-slate-500">件</span></p>
           </div>
         </div>
 
