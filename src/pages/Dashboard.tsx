@@ -197,7 +197,7 @@ export default function Dashboard() {
       }
   });
 
-  const showTomorrowScheduleAlert = currentHour >= 12 && missingDailyReportsCount > 0;
+  const showTomorrowScheduleAlert = currentHour >= 15 && missingDailyReportsCount > 0;
 
   return (
     <div className="h-full flex flex-col overflow-y-auto bg-slate-50 p-6 md:p-8 space-y-8">
@@ -294,7 +294,7 @@ export default function Dashboard() {
                   <Clock className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
                   <div>
                     <h3 className="text-sm font-bold text-orange-700">翌日の予定（日報）未作成</h3>
-                    <p className="text-sm text-orange-600 mt-1 mb-2">12時を過ぎましたが、明日の配置スケジュールが組まれている現場のうち、<strong>{missingDailyReportsCount}件</strong>の本日分の日報がまだ提出されていません。</p>
+                    <p className="text-sm text-orange-600 mt-1 mb-2">15時を過ぎましたが、明日の配置スケジュールが組まれている現場のうち、<strong>{missingDailyReportsCount}件</strong>の本日分の日報がまだ提出されていません。</p>
                     <button onClick={() => navigate('/schedule-management')} className="text-xs font-bold text-orange-700 bg-orange-100 px-3 py-1.5 rounded-md hover:bg-orange-200 transition-colors">
                       工程管理を開く
                     </button>
