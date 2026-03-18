@@ -54,14 +54,14 @@ export default function Dashboard() {
 
       // 2. Fetch Assignments for Today
       const { data: schedules } = await supabase
-        .from('personnel_assignments')
+        .from('assignments')
         .select(`
           id,
           project_id,
           date,
           worker_names,
           support_names,
-          project:projects ( id, name, site_name, number )
+          project:projects ( id, project_name, site_name, number )
         `)
         .eq('date', todayStr);
       setTodaySchedules(schedules || []);
@@ -69,7 +69,7 @@ export default function Dashboard() {
       // 3. Fetch Active Projects (着工中, 完了) for warnings
       const { data: projects } = await supabase
         .from('projects')
-        .select('id, name, site_name, number, status_flag, progress_status')
+        .select('id, project_name, site_name, number, status_flag, progress_status')
         .in('status_flag', ['着工中', '完了']);
       setActiveProjects(projects || []);
 
@@ -83,7 +83,7 @@ export default function Dashboard() {
           created_at,
           report_text,
           worker_name,
-          project:projects ( name, site_name )
+          project:projects ( project_name, site_name )
         `)
         .order('created_at', { ascending: false })
         .limit(5);
@@ -93,7 +93,7 @@ export default function Dashboard() {
       if (canViewBilling) {
         // Fetch billing details for current month
         const { data: billingDetails } = await supabase
-          .from('billing_details')
+          .from('invoice_details')
           .select('id, amount, expected_deposit_date, details_status')
           .gte('billing_date', startOfMonthStr)
           .lte('billing_date', endOfMonthStr)
@@ -237,7 +237,7 @@ export default function Dashboard() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       {projectsNeedingCompletionReport.slice(0, 3).map(p => (
                         <span key={p.id} className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 cursor-pointer hover:bg-amber-100" onClick={() => navigate(`/projects/${p.id}/edit`)}>
-                          {p.name}
+                          {p.project_name}
                         </span>
                       ))}
                       {projectsNeedingCompletionReport.length > 3 && (
@@ -282,7 +282,7 @@ export default function Dashboard() {
                          <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
                             {p.number || '番号なし'}
                          </span>
-                         <span className="font-bold text-sm text-slate-800 truncate" title={p.name}>{p.name}</span>
+                         <span className="font-bold text-sm text-slate-800 truncate" title={p.project_name}>{p.project_name}</span>
                       </div>
                       <div className="space-y-1.5 mt-3">
                         <div className="flex items-start gap-2">
@@ -329,7 +329,7 @@ export default function Dashboard() {
                       {report.worker_name || '不明'}
                     </span>
                   </div>
-                  <h4 className="text-sm font-bold text-slate-800 mb-1">{report.project?.name || '案件名不明'}</h4>
+                  <h4 className="text-sm font-bold text-slate-800 mb-1">{report.project?.project_name || '案件名不明'}</h4>
                   <p className="text-xs text-slate-600 line-clamp-2 bg-slate-50 p-2 rounded border border-slate-100">
                     {report.report_text || '本文なし'}
                   </p>
