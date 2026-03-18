@@ -591,7 +591,7 @@ export default function Dashboard() {
                         const subcontractorData = schedGroup.subcontractorsRaw ? schedGroup.subcontractorsRaw.map((s: any) => ({ subcontractor_name: s.name, worker_count: String(s.count) })) : [];
                         const vehicleData = schedGroup.vehiclesRaw ? schedGroup.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
                         if (isSubmitted) {
-                            navigate(`/reports/${reportId}/edit`, {
+                            navigate(`/reports/${reportId}`, {
                                 state: {
                                     personnel: personnelData,
                                     passedSubcontractors: subcontractorData,
@@ -675,7 +675,7 @@ export default function Dashboard() {
                         const personnelData = schedGroup.workersRaw ? schedGroup.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
                         const vehicleData = schedGroup.vehiclesRaw ? schedGroup.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
                         if (isSubmitted) {
-                            navigate(`/tomorrow-schedules/${reportId}/edit`, {
+                            navigate(`/tomorrow-schedules/${reportId}`, {
                                 state: {
                                     personnel: personnelData,
                                     vehicles: vehicleData
