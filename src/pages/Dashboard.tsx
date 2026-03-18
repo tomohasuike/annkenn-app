@@ -68,11 +68,11 @@ export default function Dashboard() {
         .eq('assignment_date', todayStr);
       setTodaySchedules(schedules || []);
 
-      // 3. Fetch Active Projects (着工中, 完了) for warnings
+      // 3. Fetch Active Projects (着工中)
       const { data: projects } = await supabase
         .from('projects')
         .select('id, project_name, site_name, project_number, status_flag')
-        .in('status_flag', ['着工中', '完工']);
+        .eq('status_flag', '着工中');
       setActiveProjects(projects || []);
 
       // 4. Fetch Recent Reports (Daily)
