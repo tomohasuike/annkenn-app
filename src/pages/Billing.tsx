@@ -99,7 +99,7 @@ export default function Billing() {
       }
 
       const permissions = workerData?.allowed_apps || []
-      const hasBillingAccess = permissions.includes('billing') || permissions.includes('schedule-admin')
+      const hasBillingAccess = permissions.includes('billing') || permissions.includes('schedule-admin') || workerData?.is_admin
       
       if (!hasBillingAccess) {
         alert("請求管理にアクセスする権限がありません。")
