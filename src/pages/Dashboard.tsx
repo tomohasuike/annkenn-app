@@ -20,7 +20,7 @@ export default function Dashboard() {
 
   // Data States
   const [todaySchedules, setTodaySchedules] = useState<any[]>([]);
-  const [tomorrowSchedules, setTomorrowSchedules] = useState<any[]>([]);
+  const [tomorrowDailyData, setTomorrowDailyData] = useState<any[]>([]);
   const [activeProjects, setActiveProjects] = useState<any[]>([]);
   const [recentReports, setRecentReports] = useState<any[]>([]);
   
@@ -71,15 +71,18 @@ export default function Dashboard() {
         .eq('assignment_date', todayStr);
       setTodaySchedules(schedules || []);
 
-      // Tomorrow schedules
-      const { data: tomSchedules } = await supabase
-        .from('assignments')
+      // Tomorrow schedules from project_daily_data (工程管理/日報)
+      const { data: tomDailyData } = await supabase
+        .from('project_daily_data')
         .select(`
           id,
+          project_id,
+          planned_count,
+          comment,
           project:projects ( id, project_name, category )
         `)
-        .eq('assignment_date', tomorrowStr);
-      setTomorrowSchedules(tomSchedules || []);
+        .eq('target_date', tomorrowStr);
+      setTomorrowDailyData(tomDailyData || []);
 
       // 3. Fetch Active Projects (着工中)
       const { data: projects } = await supabase
@@ -154,16 +157,17 @@ export default function Dashboard() {
 
   // Tomorrow schedule alert logic (after 12:00 PM)
   const currentHour = new Date().getHours();
-  // Filter out any assignments that belong to "vacation" or "others"
-  const nonVacationTomorrows = tomorrowSchedules.filter(s => {
-    const p = s.project;
-    if (!p) return true;
+  // Filter out any "vacation" or "others" and only keep entries that actually have planned_count or comment
+  const validTomorrowEntries = tomorrowDailyData.filter(d => {
+    const p = d.project;
+    if (!p) return false;
     if (p.category === 'その他' || p.project_name === '■ 休暇' || (typeof p.project_name === 'string' && p.project_name.includes('休暇'))) {
       return false;
     }
-    return true;
+    // Check if some plan is actually entered
+    return d.planned_count > 0 || (d.comment && d.comment.trim() !== '');
   });
-  const showTomorrowScheduleAlert = currentHour >= 12 && nonVacationTomorrows.length === 0;
+  const showTomorrowScheduleAlert = currentHour >= 12 && validTomorrowEntries.length === 0;
 
   return (
     <div className="h-full flex flex-col overflow-y-auto bg-slate-50 p-6 md:p-8 space-y-8">
@@ -259,10 +263,10 @@ export default function Dashboard() {
                 <div className="p-4 flex items-start gap-4 border-b last:border-0 border-slate-100 bg-orange-50/50">
                   <Clock className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
                   <div>
-                    <h3 className="text-sm font-bold text-orange-700">翌日の稼働スケジュール未作成</h3>
-                    <p className="text-sm text-orange-600 mt-1 mb-2">12時を過ぎましたが、明日の配置表（稼働スケジュール）が登録されていません。</p>
+                    <h3 className="text-sm font-bold text-orange-700">翌日の予定（日報）未作成</h3>
+                    <p className="text-sm text-orange-600 mt-1 mb-2">12時を過ぎましたが、工程管理で明日の予定（配置数など）が1件も入力されていません。</p>
                     <button onClick={() => navigate('/schedule')} className="text-xs font-bold text-orange-700 bg-orange-100 px-3 py-1.5 rounded-md hover:bg-orange-200 transition-colors">
-                      配置表を作成する
+                      工程管理を開く
                     </button>
                   </div>
                 </div>
