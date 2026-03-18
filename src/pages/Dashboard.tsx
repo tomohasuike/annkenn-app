@@ -355,11 +355,22 @@ export default function Dashboard() {
                     <ul className="space-y-4">
                         {tomorrowPlans.map((plan: any, idx: number) => {
                             const pName = plan.project?.project_name || '名称未設定';
-                            const time = plan.arrival_time ? plan.arrival_time.substring(0, 5) : '未設定';
+                            
+                            let time = '未設定';
+                            if (plan.arrival_time) {
+                                const tParts = plan.arrival_time.split(':');
+                                if (tParts.length >= 2) {
+                                    time = `${tParts[0].padStart(2, '0')}:${tParts[1]}`;
+                                } else {
+                                    time = plan.arrival_time.substring(0, 5).replace(/:$/, '');
+                                }
+                            }
+
                             const workers = plan.workers || '人員未定';
                             let dateDisplay = '日付不明';
                             if (plan.schedule_date) {
-                                const parts = plan.schedule_date.split('-');
+                                const cleanDateStr = plan.schedule_date.replace(/\//g, '-');
+                                const parts = cleanDateStr.split('-');
                                 if (parts.length === 3) {
                                     const y = parseInt(parts[0], 10);
                                     const m = parseInt(parts[1], 10);
