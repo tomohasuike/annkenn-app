@@ -1148,7 +1148,15 @@ export default function Billing() {
                                  </tr>
                                </thead>
                                <tbody className="divide-y divide-slate-100">
-                                {(activeTab === 'pending' ? inv.invoice_details : inv.invoice_details.filter((d: any) => determineStatusForDetail(d) === "入金済" || determineStatusForDetail(d) === "完了")).map((detail: any) => {
+                               {/* We copy the array with slice() to avoid mutating the original inverse state, then sort by month ascending */}
+                               {(activeTab === 'pending' ? inv.invoice_details : inv.invoice_details.filter((d: any) => determineStatusForDetail(d) === "入金済" || determineStatusForDetail(d) === "完了"))
+                                 .slice()
+                                 .sort((a: any, b: any) => {
+                                    const dateA = a.billing_month || a.billing_date || '';
+                                    const dateB = b.billing_month || b.billing_date || '';
+                                    return dateA.localeCompare(dateB);
+                                 })
+                                 .map((detail: any) => {
                                   const dStatus = determineStatusForDetail(detail)
                                   const isPaid = dStatus === "入金済" || dStatus === "完了"
                                   const isOverdue = !isPaid && activeTab === "pending" && detail.expected_deposit_date && new Date(detail.expected_deposit_date).getTime() < new Date().setHours(0,0,0,0)
