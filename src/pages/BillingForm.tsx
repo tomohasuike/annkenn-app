@@ -99,7 +99,8 @@ export default function BillingForm() {
           const urlProjectId = searchParams.get('project_id')
           if (urlProjectId) {
             console.log("[Auto-Fill Debug] urlProjectId found:", urlProjectId, "Calling handleProjectSelection...");
-            handleProjectSelection(urlProjectId, mappedProjects)
+            // Pass false for autoRedirect to prevent infinite loop on page load
+            handleProjectSelection(urlProjectId, mappedProjects, false)
           } else {
             console.log("[Auto-Fill Debug] No project_id found in URL.");
           }
@@ -190,15 +191,16 @@ export default function BillingForm() {
   }
 
   const handleProjectChange = async (selId: string) => {
-    await handleProjectSelection(selId, projectsList)
+    // User triggered via select, so autoRedirect = true
+    await handleProjectSelection(selId, projectsList, true)
   }
 
-  const handleProjectSelection = async (selId: string, currentProjectsList: ProjectData[]) => {
+  const handleProjectSelection = async (selId: string, currentProjectsList: ProjectData[], autoRedirect: boolean = true) => {
     console.log("[Auto-Fill Debug] handleProjectSelection called with ID:", selId);
     console.log("[Auto-Fill Debug] currentProjectsList length:", currentProjectsList.length);
     
     // Auto-fill logic for new invoices from '完工' or '完了' (completed) projects or if coming from the UI button
-    if (!isEditing) {
+    if (!isEditing && autoRedirect) {
       // **CRITICAL FEATURE: Prevent creating multiple separate invoices for the same project**
       // If an invoice already exists for this project, redirect to editing that invoice to add more details
       const { data: existingInvoices } = await supabase
