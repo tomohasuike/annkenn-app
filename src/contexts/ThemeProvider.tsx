@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react"
 
-export type Theme = "light" | "dark" | "friendly"
+export type Theme = "light" | "dark" | "friendly" | "elegant" | "natural"
 
 type ThemeProviderProps = {
   children: React.ReactNode
@@ -33,12 +33,16 @@ export function ThemeProvider({
   useEffect(() => {
     const root = window.document.documentElement
 
-    root.classList.remove("light", "dark", "theme-dark", "theme-friendly")
+    root.classList.remove("light", "dark", "theme-dark", "theme-friendly", "theme-elegant", "theme-natural")
 
     if (theme === "dark") {
       root.classList.add("theme-dark")
     } else if (theme === "friendly") {
       root.classList.add("theme-friendly")
+    } else if (theme === "elegant") {
+      root.classList.add("theme-elegant")
+    } else if (theme === "natural") {
+      root.classList.add("theme-natural")
     } else {
       root.classList.add("light")
     }

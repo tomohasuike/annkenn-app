@@ -233,19 +233,19 @@ export default function ProjectForm() {
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
+      <div className="bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-slate-200 p-8">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
             <div className="space-y-2 relative">
-              <label className="text-sm font-medium leading-none">工事番号 (自動採番)</label>
+              <label className="text-sm font-bold text-slate-700">工事番号 (自動採番)</label>
               <div className="relative">
                 <input 
                   name="project_number" 
                   value={formData.project_number || ''} 
                   onChange={handleChange}
                   readOnly
-                  className="flex h-10 w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none cursor-not-allowed font-mono font-medium" 
+                  className="flex h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-base text-slate-500 cursor-not-allowed font-mono font-medium focus:outline-none" 
                   placeholder="登録時に自動生成されます"
                 />
                 {isGeneratingNumber && (
@@ -257,12 +257,12 @@ export default function ProjectForm() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium leading-none">ステータス <span className="text-red-500">*</span></label>
+              <label className="text-sm font-bold text-slate-700">ステータス <span className="text-red-500">*</span></label>
               <select 
                 name="status_flag" 
                 value={formData.status_flag} 
                 onChange={handleChange}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                className="flex h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base ring-offset-background focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none"
                 required
               >
                 <option value="着工前">着工前</option>
@@ -278,8 +278,8 @@ export default function ProjectForm() {
             </div>
 
             <div className="space-y-3 md:col-span-2">
-              <label className="text-sm font-medium leading-none text-foreground/80">区分 <span className="text-red-500">*</span></label>
-              <div className="flex bg-muted/40 p-1.5 rounded-lg border shadow-sm">
+              <label className="text-sm font-bold text-slate-700">区分 <span className="text-red-500">*</span></label>
+              <div className="flex bg-slate-100/80 p-1.5 rounded-lg border border-slate-200 shadow-sm">
                 {["一般", "役所", "川北", "BPE"].map((cat) => (
                   <button
                     key={cat}
@@ -296,10 +296,10 @@ export default function ProjectForm() {
                             };
                         });
                     }}
-                    className={`flex-1 text-sm font-semibold py-2.5 rounded-md transition-all ${
+                    className={`flex-1 text-sm font-bold py-2.5 rounded-md transition-all ${
                       formData.category === cat 
-                        ? 'bg-background shadow text-foreground outline outline-1 outline-border' 
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'
+                        ? 'bg-white shadow text-blue-700 outline outline-1 outline-blue-200' 
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
                     }`}
                   >
                     {cat}
@@ -309,12 +309,12 @@ export default function ProjectForm() {
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium leading-none">案件名 / 工事名称 <span className="text-red-500">*</span></label>
+              <label className="text-sm font-bold text-slate-700">案件名 / 工事名称 <span className="text-red-500">*</span></label>
               <input 
                 name="project_name" 
                 value={formData.project_name} 
                 onChange={handleChange}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
+                className="flex h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base ring-offset-background placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" 
                 placeholder="〇〇ビル改修工事"
                 required
               />
@@ -322,7 +322,7 @@ export default function ProjectForm() {
 
             {/* Unified Client / Site Field */}
             <div className="space-y-2 md:col-span-1">
-              <label className="text-sm font-medium leading-none">
+              <label className="text-sm font-bold text-slate-700">
                 {(formData.category === "一般" || formData.category === "役所") ? "発注者" : "現場名"} <span className="text-red-500">*</span>
               </label>
               <SearchableInput 
@@ -340,7 +340,7 @@ export default function ProjectForm() {
 
             {/* 発注先担当者 Field (Repurposing client_company_name column) */}
             <div className="space-y-2">
-              <label className="text-sm font-medium leading-none">発注先担当者</label>
+              <label className="text-sm font-bold text-slate-700">発注先担当者</label>
               <SearchableInput 
                 name="client_company_name" 
                 value={(formData as any).client_company_name || ''} 
@@ -351,15 +351,15 @@ export default function ProjectForm() {
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium leading-none">Google Drive フォルダURL</label>
+              <label className="text-sm font-bold text-slate-700">Google Drive フォルダURL</label>
               <input 
                 name="folder_url" 
                 value={formData.folder_url || ''} 
                 onChange={handleChange}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
+                className="flex h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base ring-offset-background placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" 
                 placeholder="https://drive.google.com/drive/folders/..."
               />
-              <p className="text-xs text-muted-foreground">※将来的には自動生成されるようになります</p>
+              <p className="text-xs text-slate-500">※将来的には自動生成されるようになります</p>
             </div>
             
           </div>
@@ -383,14 +383,14 @@ export default function ProjectForm() {
               <button 
                 type="button"
                 onClick={() => navigate("/projects")}
-                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted h-10 px-4 py-2"
+                className="inline-flex items-center justify-center rounded-lg text-sm font-bold transition-all border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 h-11 px-5 py-2 shadow-sm"
               >
                 キャンセル
               </button>
               <button 
                 type="submit"
                 disabled={loading || deleting}
-                className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 gap-2 disabled:opacity-50"
+                className="inline-flex items-center justify-center rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-sm h-11 px-6 py-2 gap-2 transition-all disabled:opacity-50"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {isEditing ? "更新する" : "登録する"}

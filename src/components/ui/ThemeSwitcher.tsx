@@ -1,6 +1,6 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useTheme, type Theme } from "../../contexts/ThemeProvider"
-import { Palette, Check, Moon, Sun } from "lucide-react"
+import { Palette, Check, Moon, Sun, Heart, Leaf } from "lucide-react"
 
 export function ThemeSwitcher() {
   const { theme, setTheme } = useTheme()
@@ -9,6 +9,8 @@ export function ThemeSwitcher() {
     { id: "light", icon: Sun, label: "クリーン (ライト)" },
     { id: "dark", icon: Moon, label: "リッチ (ダーク)" },
     { id: "friendly", icon: Palette, label: "親しみやすい (ブルー)" },
+    { id: "elegant", icon: Heart, label: "エレガント (ピンク)" },
+    { id: "natural", icon: Leaf, label: "ナチュラル (グリーン)" },
   ]
 
   return (

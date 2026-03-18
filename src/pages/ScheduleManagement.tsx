@@ -37,8 +37,6 @@ export default function ScheduleManagement() {
   const [currentDate, setCurrentDate] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [syncStatus, setSyncStatus] = useState<'同期済み' | '更新中...'>('同期済み')
   const [isAdmin, setIsAdmin] = useState(false)
-  const [showPasswordModal, setShowPasswordModal] = useState(false)
-  const [passwordInput, setPasswordInput] = useState("")
   
   // Settings
   const [cellWidth, setCellWidth] = useState(120)
@@ -95,6 +93,19 @@ export default function ScheduleManagement() {
         }
       )
       .subscribe()
+
+    // Auth and Permission Check
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user && user.email) {
+          supabase.from('worker_master').select('is_admin, allowed_apps').eq('email', user.email).single()
+            .then(({ data, error }) => {
+                if (!error && data) {
+                    const hasAdminApp = data.allowed_apps?.includes('schedule-admin') || false;
+                    setIsAdmin(data.is_admin || hasAdminApp);
+                }
+            });
+      }
+    });
 
     return () => {
       supabase.removeChannel(channel)
@@ -557,11 +568,7 @@ export default function ScheduleManagement() {
 
         <div className="flex items-center gap-0.5">
           <button 
-            onClick={() => {
-              if (isAdmin) setIsAdmin(false)
-              else setShowPasswordModal(true)
-            }}
-            className={`flex items-center gap-0.5 px-1 py-0.5 rounded border font-bold text-[0.95em] shadow-sm transition-colors ${isAdmin ? 'bg-purple-600 text-white border-purple-700 hover:bg-purple-700' : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'}`}
+            className={`flex items-center gap-0.5 px-1 py-0.5 rounded border font-bold text-[0.95em] shadow-sm transition-colors ${isAdmin ? 'bg-purple-600 text-white border-purple-700' : 'bg-white text-slate-700 border-slate-300'}`}
           >
             <Users className="w-4 h-4" /> {isAdmin ? "👑 管理モード" : "👤 閲覧モード"}
           </button>
@@ -1151,65 +1158,15 @@ export default function ScheduleManagement() {
          <span className="flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-500"></span>協力</span>
          <span className="flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>作業車</span>
          <span className="flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded-full bg-teal-500"></span>建設機械</span>
-         <span className="ml-auto flex items-center gap-0.5 font-bold group">
+         <span 
+            className="ml-auto flex items-center gap-0.5 font-bold group px-2 py-1 rounded-md"
+            title={isAdmin ? "管理権限あり" : "閲覧権限のみ"}
+         >
             <div className={`w-2 h-2 rounded-full ${isAdmin ? 'bg-purple-500 animate-pulse' : 'bg-slate-400'}`}></div>
             <span className={isAdmin ? 'text-purple-600' : 'text-slate-500'}>{isAdmin ? '管理モード' : '閲覧モード'}</span>
             <span className="text-slate-400 font-normal ml-2 pl-2 border-l">クラウド自動同期中</span>
          </span>
       </div>
-
-      {/* Password Modal */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 bg-slate-800/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in duration-200">
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                 <h3 className="font-bold text-slate-800 flex items-center gap-0.5">
-                    <Users className="w-5 h-5 text-purple-600" />
-                    管理モードへの切り替え
-                 </h3>
-                 <button onClick={() => { setShowPasswordModal(false); setPasswordInput(""); }} className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-colors">
-                    <X className="w-5 h-5" />
-                 </button>
-              </div>
-              <div className="p-5">
-                 <p className="text-[0.95em] text-slate-500 mb-4 leading-relaxed">編集・編成を行うためには、管理用パスワードを入力してください。</p>
-                 <input 
-                    type="password"
-                    placeholder="パスワード"
-                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 mb-0.5"
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    onKeyDown={(e) => {
-                       if (e.key === 'Enter') {
-                          if (passwordInput === 'koutei2026') {
-                             setIsAdmin(true); setShowPasswordModal(false); setPasswordInput("");
-                          } else {
-                             alert("パスワードが違います");
-                          }
-                       }
-                    }}
-                    autoFocus
-                 />
-                 <div className="text-[0.8em] text-slate-400 mt-1 mb-6">* ヒント: koutei2026</div>
-                 <div className="flex justify-end gap-0.5">
-                    <button onClick={() => { setShowPasswordModal(false); setPasswordInput(""); }} className="px-4 py-2 text-[0.95em] font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">キャンセル</button>
-                    <button 
-                       onClick={() => {
-                          if (passwordInput === 'koutei2026') {
-                             setIsAdmin(true); setShowPasswordModal(false); setPasswordInput("");
-                          } else {
-                             alert("パスワードが違います");
-                          }
-                       }}
-                       className="px-5 py-2 text-[0.95em] font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-sm transition-colors"
-                    >
-                       切り替える
-                    </button>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
 
       {/* グローバルCSS */}
       <style>{`

@@ -44,6 +44,7 @@ const APPS = [
   { id: 'completion-reports', name: '完了報告' },
   { id: 'tomorrow-schedules', name: '翌日予定' },
   { id: 'schedule-management', name: '工程管理' },
+  { id: 'schedule-admin', name: '工程管理(フル)' },
   { id: 'work-summary', name: '作業集計管理' },
   { id: 'billing', name: '請求管理' },
   { id: 'safety-dashboard', name: '安否確認管理' }

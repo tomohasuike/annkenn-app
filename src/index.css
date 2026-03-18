@@ -63,7 +63,7 @@
 
   .theme-friendly {
     /* Theme C: Friendly & オーソドックス (Blue base) */
-    --background: #f0f4f8;
+    --background: #eff6ff; /* Blue 50 */
     --foreground: #334155;
 
     --card: #ffffff;
@@ -72,21 +72,77 @@
     --popover: #ffffff;
     --popover-foreground: #334155;
  
-    --primary: #0284c7; /* Sky 600 */
+    --primary: #60a5fa; /* Blue 400 - paler blue */
     --primary-foreground: #ffffff;
  
-    --secondary: #e0f2fe; /* Sky 100 */
-    --secondary-foreground: #0284c7;
+    --secondary: #dbeafe; /* Blue 100 */
+    --secondary-foreground: #60a5fa;
  
     --muted: #f8fafc;
     --muted-foreground: #64748b;
  
-    --accent: #e0f2fe;
-    --accent-foreground: #0284c7;
+    --accent: #dbeafe;
+    --accent-foreground: #60a5fa;
  
-    --border: #cbd5e1;
-    --input: #cbd5e1;
-    --ring: #0284c7;
+    --border: #bfdbfe; /* Blue 200 */
+    --input: #bfdbfe;
+    --ring: #60a5fa;
+  }
+
+  .theme-elegant {
+    /* Theme D: Elegant & Soft (Pink base) */
+    --background: #fff1f2; /* Rose 50 */
+    --foreground: #3f3f46; /* Zinc 700 */
+
+    --card: #ffffff;
+    --card-foreground: #3f3f46;
+ 
+    --popover: #ffffff;
+    --popover-foreground: #3f3f46;
+ 
+    --primary: #e11d48; /* Rose 600 */
+    --primary-foreground: #ffffff;
+ 
+    --secondary: #ffe4e6; /* Rose 100 */
+    --secondary-foreground: #e11d48;
+ 
+    --muted: #fff1f2;
+    --muted-foreground: #71717a; /* Zinc 500 */
+ 
+    --accent: #ffe4e6;
+    --accent-foreground: #e11d48;
+ 
+    --border: #fecdd3; /* Rose 200 */
+    --input: #fecdd3;
+    --ring: #e11d48;
+  }
+
+  .theme-natural {
+    /* Theme E: Natural & Calm (Teal/Green base) */
+    --background: #f0fdf4; /* Green 50 */
+    --foreground: #1c1917; /* Stone 900 */
+ 
+    --card: #ffffff;
+    --card-foreground: #1c1917;
+ 
+    --popover: #ffffff;
+    --popover-foreground: #1c1917;
+ 
+    --primary: #15803d; /* Green 700 */
+    --primary-foreground: #ffffff;
+ 
+    --secondary: #dcfce7; /* Green 100 */
+    --secondary-foreground: #15803d;
+ 
+    --muted: #f0fdfa;
+    --muted-foreground: #57534e; /* Stone 500 */
+ 
+    --accent: #dcfce7;
+    --accent-foreground: #15803d;
+ 
+    --border: #bbf7d0; /* Green 200 */
+    --input: #bbf7d0;
+    --ring: #15803d;
   }
 }
  
@@ -96,6 +152,9 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }

@@ -36,10 +36,10 @@ export default function AppLayout() {
   const hasAccess = (appId: string) => allowedApps.includes(appId);
 
   const getNavClass = ({ isActive }: { isActive: boolean }) => 
-    `flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors relative ${
+    `flex items-center gap-4 px-5 py-3 text-[15px] font-medium transition-all relative group ${
       isActive 
-        ? "bg-primary/10 text-primary" 
-        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+        ? "text-blue-600" 
+        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50/80"
     }`
 
   return (
@@ -99,9 +99,9 @@ export default function AppLayout() {
             <NavLink to="/" className={getNavClass}>
               {({ isActive }) => (
                 <>
-                  <LayoutDashboard className="w-5 h-5" />
+                  <LayoutDashboard className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
                   ダッシュボード
-                  {isActive && <span className="absolute left-0 top-1 bottom-1 w-1 bg-primary rounded-r-md"></span>}
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
                 </>
               )}
             </NavLink>
@@ -110,9 +110,9 @@ export default function AppLayout() {
             <NavLink to="/projects" className={getNavClass}>
               {({ isActive }) => (
                 <>
-                  <FileText className="w-5 h-5" />
+                  <FileText className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
                   案件管理
-                  {isActive && <span className="absolute left-0 top-1 bottom-1 w-1 bg-primary rounded-r-md"></span>}
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
                 </>
               )}
             </NavLink>
@@ -122,9 +122,9 @@ export default function AppLayout() {
             <NavLink to="/reports" className={getNavClass}>
               {({ isActive }) => (
                 <>
-                  <ClipboardList className="w-5 h-5" />
+                  <ClipboardList className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
                   日報管理
-                  {isActive && <span className="absolute left-0 top-1 bottom-1 w-1 bg-primary rounded-r-md"></span>}
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
                 </>
               )}
             </NavLink>
@@ -133,9 +133,9 @@ export default function AppLayout() {
             <NavLink to="/completion-reports" className={getNavClass}>
               {({ isActive }) => (
                 <>
-                  <CheckSquare className="w-5 h-5" />
+                  <CheckSquare className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
                   完了報告
-                  {isActive && <span className="absolute left-0 top-1 bottom-1 w-1 bg-primary rounded-r-md"></span>}
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
                 </>
               )}
             </NavLink>
@@ -144,9 +144,9 @@ export default function AppLayout() {
             <NavLink to="/tomorrow-schedules" className={getNavClass}>
               {({ isActive }) => (
                 <>
-                  <CalendarClock className="w-5 h-5" />
+                  <CalendarClock className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
                   翌日予定
-                  {isActive && <span className="absolute left-0 top-1 bottom-1 w-1 bg-primary rounded-r-md"></span>}
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
                 </>
               )}
             </NavLink>
@@ -155,9 +155,9 @@ export default function AppLayout() {
             <NavLink to="/schedule-management" className={getNavClass}>
               {({ isActive }) => (
                 <>
-                  <CalendarDays className="w-5 h-5" />
+                  <CalendarDays className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
                   工程管理
-                  {isActive && <span className="absolute left-0 top-1 bottom-1 w-1 bg-primary rounded-r-md"></span>}
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
                 </>
               )}
             </NavLink>
@@ -166,9 +166,9 @@ export default function AppLayout() {
             <NavLink to="/work-summary" className={getNavClass}>
               {({ isActive }) => (
                 <>
-                  <PieChart className="w-5 h-5" />
+                  <PieChart className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
                   作業集計管理
-                  {isActive && <span className="absolute left-0 top-1 bottom-1 w-1 bg-primary rounded-r-md"></span>}
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
                 </>
               )}
             </NavLink>
@@ -177,9 +177,9 @@ export default function AppLayout() {
             <NavLink to="/billing" className={getNavClass}>
               {({ isActive }) => (
                 <>
-                  <FileText className="w-5 h-5" />
+                  <FileText className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
                   請求管理
-                  {isActive && <span className="absolute left-0 top-1 bottom-1 w-1 bg-primary rounded-r-md"></span>}
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
                 </>
               )}
             </NavLink>
@@ -188,9 +188,9 @@ export default function AppLayout() {
             <NavLink to="/settings" className={getNavClass}>
               {({ isActive }) => (
                 <>
-                  <Settings className="w-5 h-5" />
+                  <Settings className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
                   設定
-                  {isActive && <span className="absolute left-0 top-1 bottom-1 w-1 bg-primary rounded-r-md"></span>}
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
                 </>
               )}
             </NavLink>
@@ -199,9 +199,9 @@ export default function AppLayout() {
             <NavLink to="/safety-dashboard" className={getNavClass}>
               {({ isActive }) => (
                 <>
-                  <ShieldAlert className="w-5 h-5 text-red-500" />
+                  <ShieldAlert className={`w-5 h-5 ${isActive ? 'text-red-500' : 'text-red-400 group-hover:text-red-500'}`} />
                   安否確認ダッシュボード
-                  {isActive && <span className="absolute left-0 top-1 bottom-1 w-1 bg-primary rounded-r-md"></span>}
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-red-500 rounded-r-md"></span>}
                 </>
               )}
             </NavLink>

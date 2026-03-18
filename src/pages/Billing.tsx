@@ -199,7 +199,7 @@ export default function Billing() {
 
   // Projects View (案件一覧)
   let filteredProjects = projects.filter(p => {
-    if (p.project_name === '休暇') return false
+    if (p.project_number === 'VACATION' || (p.project_name && p.project_name.includes('休暇'))) return false
     return (p.project_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
            (p.project_number || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
            (p.client_name || "").toLowerCase().includes(searchTerm.toLowerCase())
@@ -298,13 +298,18 @@ export default function Billing() {
     return matchesProj || matchesInv
   }
 
-  const displayPending = pendingInvoices.filter(applySearchToGroup).filter(inv => (inv.primaryProj as Partial<ProjectData>)?.project_name !== '休暇')
-  const displayCompleted = completedInvoices.filter(applySearchToGroup).filter(inv => (inv.primaryProj as Partial<ProjectData>)?.project_name !== '休暇')
+  const isNotVacation = (inv: any) => {
+    const proj = inv.primaryProj as Partial<ProjectData>
+    return proj?.project_number !== 'VACATION' && (!proj?.project_name || !proj.project_name.includes('休暇'))
+  }
+
+  const displayPending = pendingInvoices.filter(applySearchToGroup).filter(isNotVacation)
+  const displayCompleted = completedInvoices.filter(applySearchToGroup).filter(isNotVacation)
 
   // Extract unique months (YYYY-MM) from completed invoices for the filter dropdown
   const availableMonths = Array.from(new Set(
     completedInvoices
-      .filter(inv => (inv.primaryProj as Partial<ProjectData>)?.project_name !== '休暇')
+      .filter(isNotVacation)
       .map(inv => {
         if (!inv.lastDepositDate || inv.lastDepositDate === "-") return null
         const d = inv.lastDepositDateDate
@@ -316,7 +321,7 @@ export default function Billing() {
   // Extract unique expected deposit months from pending invoices
   const availablePendingMonths = Array.from(new Set(
     pendingInvoices
-      .filter(inv => (inv.primaryProj as Partial<ProjectData>)?.project_name !== '休暇')
+      .filter(isNotVacation)
       .flatMap(inv => inv.invoice_details || [])
       .map(d => {
         if (!d.expected_deposit_date) return null
@@ -333,7 +338,7 @@ export default function Billing() {
   // Extract unique categories from completed invoices for the filter dropdown
   const availableCategories = Array.from(new Set(
     completedInvoices
-      .filter(inv => (inv.primaryProj as Partial<ProjectData>)?.project_name !== '休暇')
+      .filter(isNotVacation)
       .map(inv => (inv.primaryProj as any)?.category)
       .filter(Boolean) as string[]
   )).sort((a, b) => {
@@ -348,7 +353,7 @@ export default function Billing() {
   // Extract unique categories from pending invoices
   const availablePendingCategories = Array.from(new Set(
     pendingInvoices
-      .filter(inv => (inv.primaryProj as Partial<ProjectData>)?.project_name !== '休暇')
+      .filter(isNotVacation)
       .map(inv => (inv.primaryProj as any)?.category)
       .filter(Boolean) as string[]
   )).sort((a, b) => {
@@ -619,7 +624,8 @@ export default function Billing() {
                 const categoryTotals: Record<string, CategoryGroup> = {}
 
                 const invoicesToProcess = completedInvoices.filter(inv => {
-                   if ((inv.primaryProj as Partial<ProjectData>)?.project_name === '休暇') return false
+                   const proj = inv.primaryProj as Partial<ProjectData>
+                   if (proj?.project_number === 'VACATION' || (proj?.project_name && proj.project_name.includes('休暇'))) return false
                    
                    // Category Filter
                    if (summaryCategoryFilter !== "ALL" && (inv.primaryProj as any)?.category !== summaryCategoryFilter) {
@@ -788,7 +794,8 @@ export default function Billing() {
                 const monthTotals: Record<string, MonthGroup> = {}
 
                 const invoicesToProcess = pendingInvoices.filter(inv => {
-                   if ((inv.primaryProj as Partial<ProjectData>)?.project_name === '休暇') return false
+                   const proj = inv.primaryProj as Partial<ProjectData>
+                   if (proj?.project_number === 'VACATION' || (proj?.project_name && proj.project_name.includes('休暇'))) return false
                    
                    // Category Filter
                    if (pendingSummaryCategoryFilter !== "ALL" && (inv.primaryProj as any)?.category !== pendingSummaryCategoryFilter) {
@@ -1022,18 +1029,34 @@ export default function Billing() {
                           {cName} <span className="text-xs">御中</span>
                         </div>
                         
-                        <div className={`text-xs flex items-center gap-1.5 ${activeTab === 'pending' ? 'text-slate-400' : 'text-slate-500'}`}>
-                           <span className={`font-mono text-[9px] px-1 py-0.5 rounded ${activeTab === 'pending' ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100'}`}>[{pNum}]</span>
-                           <span className="truncate">{pName}</span>
+                        <div className="flex flex-col gap-1">
+                          <div className={`text-xs flex items-center gap-1.5 ${activeTab === 'pending' ? 'text-slate-400' : 'text-slate-500'}`}>
+                             <span className={`font-mono text-[9px] px-1 py-0.5 rounded ${activeTab === 'pending' ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100'}`}>[{pNum}]</span>
+                             <span className="truncate">{pName}</span>
+                          </div>
+                          {inv.primaryProj?.site_name && (
+                            <div className={`text-[11px] flex items-center gap-1.5 ml-1 ${activeTab === 'pending' ? 'text-slate-400' : 'text-slate-500'}`}>
+                              <MapPin className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">{inv.primaryProj.site_name}</span>
+                            </div>
+                          )}
                         </div>
                         
                         {/* ★ 関連案件（合算されている案件）の明細表示 */}
                         {inv.relatedProjects && inv.relatedProjects.length > 0 && (
                             <div className="mt-2 flex flex-col gap-1">
                                 {inv.relatedProjects.map((rp: any) => (
-                                    <div key={rp.id} className={`text-xs flex items-center gap-1.5 ${activeTab === 'pending' ? 'text-slate-400' : 'text-slate-500'}`}>
-                                        <span className={`font-mono text-[9px] px-1 py-0.5 rounded ${activeTab === 'pending' ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100'}`}>[{rp.project_number}]</span>
-                                        <span className="truncate">{rp.project_name}</span>
+                                    <div key={rp.id} className="flex flex-col gap-1">
+                                      <div className={`text-xs flex items-center gap-1.5 ${activeTab === 'pending' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                          <span className={`font-mono text-[9px] px-1 py-0.5 rounded ${activeTab === 'pending' ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100'}`}>[{rp.project_number}]</span>
+                                          <span className="truncate">{rp.project_name}</span>
+                                      </div>
+                                      {rp.site_name && (
+                                        <div className={`text-[11px] flex items-center gap-1.5 ml-1 ${activeTab === 'pending' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                          <MapPin className="w-3.5 h-3.5 shrink-0" />
+                                          <span className="truncate">{rp.site_name}</span>
+                                        </div>
+                                      )}
                                     </div>
                                 ))}
                             </div>
@@ -1282,7 +1305,7 @@ export default function Billing() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="font-mono text-lg font-bold text-slate-700">
-                            ¥{((inv.allTotalBilled || 0) - (inv.totalBilled || 0)).toLocaleString()}
+                            ¥{(inv.totalBilled || 0).toLocaleString()}
                           </div>
                         </td>
                       </tr>
@@ -1297,7 +1320,7 @@ export default function Billing() {
               <div className="text-right flex items-center gap-4 bg-white px-6 py-3 rounded-xl border shadow-sm">
                 <span className="text-sm text-slate-500 font-bold tracking-widest uppercase">合計金額</span>
                 <span className="text-3xl font-black text-indigo-600 font-mono tracking-tight">
-                  ¥{selectedClientDetails.invoices.reduce((sum, inv) => sum + ((inv.allTotalBilled || 0) - (inv.totalBilled || 0)), 0).toLocaleString()}
+                  ¥{selectedClientDetails.invoices.reduce((sum, inv) => sum + (inv.totalBilled || 0), 0).toLocaleString()}
                 </span>
               </div>
             </div>
