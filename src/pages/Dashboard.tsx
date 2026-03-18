@@ -78,6 +78,7 @@ export default function Dashboard() {
 
       const todayStr = dateFns.format(new Date(), 'yyyy-MM-dd');
       const tomorrowStr = dateFns.format(dateFns.addDays(new Date(), 1), 'yyyy-MM-dd');
+      const isBeforeNoon = new Date().getHours() < 12;
 
       const today = new Date();
   const currentMonth = today.getMonth() + 1;
@@ -210,7 +211,9 @@ export default function Dashboard() {
           const tomorrowReports = tomorrowReportsRaw.filter((r: any) => {
               if (!r.schedule_date) return false;
               const cleanDate = r.schedule_date.replace(/\//g, '-');
-              return cleanDate >= tomorrowStr;
+              if (cleanDate >= tomorrowStr) return true;
+              if (isBeforeNoon && cleanDate === todayStr) return true;
+              return false;
           });
 
           tomorrowReports.forEach((r: any) => {
@@ -631,7 +634,9 @@ export default function Dashboard() {
               <section>
                 <div className="flex items-center gap-2 mb-4">
                   <CalendarClock className="w-5 h-5 text-indigo-600" />
-                  <h2 className="text-lg font-bold text-slate-800">今後の出社時間</h2>
+                  <h2 className="text-lg font-bold text-slate-800">
+                    {currentHour < 12 ? '本日・今後の出社時間' : '今後の出社時間'}
+                  </h2>
                 </div>
                 <div className="bg-white border rounded-xl shadow-sm p-4 sm:p-5">
                     <ul className="space-y-4">
