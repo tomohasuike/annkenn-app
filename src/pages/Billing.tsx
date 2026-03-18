@@ -159,14 +159,54 @@ export default function Billing() {
 
   // Determine computed project state
   const getProjectBillingState = (proj: ProjectData) => {
-    // Check if the project is associated with any invoices
-    const hasInvoices = invoices.some(inv => inv.project_id === proj.id || (inv.project_ids && inv.project_ids.includes(proj.id)))
-    const isCompleted = proj.status_flag === "完工" || proj.status_flag === "完了"
+    const relatedInvoices = invoices.filter(inv => inv.project_id === proj.id || (inv.project_ids && inv.project_ids.includes(proj.id)));
+    const hasInvoices = relatedInvoices.length > 0;
     
-    if (isCompleted) {
-      return hasInvoices ? "請求済・完工" : "完工 (未請求)"
+    let isBillingExplicitlyFinalized = false;
+    let hasUnpaidInvoice = false;
+
+    for (const inv of relatedInvoices) {
+      const details = inv.invoice_details || [];
+      const hasDetails = details.length > 0;
+      let invPaid = true;
+      if (!hasDetails) {
+        invPaid = false;
+      } else {
+        for (const d of details) {
+          const ds = (d as any).details_status;
+          if (ds !== "入金済" && ds !== "完了") {
+            invPaid = false;
+            break;
+          }
+        }
+      }
+
+      if (!invPaid) {
+        hasUnpaidInvoice = true;
+      }
+
+      if (hasDetails && (inv as any).billing_category === "完成" && invPaid) {
+        isBillingExplicitlyFinalized = true;
+      }
+    }
+
+    const isProjectPhysicallyCompleted = proj.status_flag === "完工" || proj.status_flag === "完了";
+
+    // Billing is complete if there is an explicitly finalized invoice OR (project is completed and all invoices are paid)
+    const isBillingFullyCompleted = hasInvoices && (isBillingExplicitlyFinalized || (isProjectPhysicallyCompleted && !hasUnpaidInvoice));
+
+    if (isBillingFullyCompleted) {
+      return "請求済・完工";
+    }
+
+    if (hasInvoices) {
+      return "出来高請求中";
+    }
+
+    if (isProjectPhysicallyCompleted) {
+      return "完工 (未請求)";
     } else {
-      return hasInvoices ? "出来高請求中" : "着工中 (未請求)"
+      return "着工中 (未請求)";
     }
   }
 
@@ -195,6 +235,27 @@ export default function Billing() {
     }
   }
 
+  // Action: mark project as completed to hide from billing list
+  const hideProjectFromBilling = async (projId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm("この案件を一覧から取り消し（非表示）にしますか？\n※案件のステータスが「完工」になります。請求データ自体は削除されません。")) return;
+
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ status_flag: '完工' })
+        .eq('id', projId);
+
+      if (error) throw error;
+      
+      // Optimistic update
+      setProjects(prev => prev.map(p => p.id === projId ? { ...p, status_flag: '完工' } : p));
+    } catch (err) {
+      console.error("Failed to update project status:", err);
+      alert("状態の更新に失敗しました。");
+    }
+  }
+
   // ================= Renders =================
 
   // Projects View (案件一覧)
@@ -211,7 +272,7 @@ export default function Billing() {
     filteredProjects = filteredProjects.filter(p => getProjectBillingState(p) === "完工 (未請求)")
   } else if (projectStatusFilter === "出来高請求中") {
     filteredProjects = filteredProjects.filter(p => getProjectBillingState(p) === "出来高請求中")
-  }
+  } // no extra filter needed for "すべて"
 
   // Invoices View (Grouped by Invoice, not Project)
   const enrichedInvoices = invoices.map(inv => {
@@ -526,7 +587,7 @@ export default function Billing() {
                 {/* Status Pills and Refresh Button */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    {['着工中 (未請求)', '完工 (未請求)', '出来高請求中'].map(filter => (
+                    {['すべて', '着工中 (未請求)', '完工 (未請求)', '出来高請求中'].map(filter => (
                       <button
                         key={filter}
                         onClick={() => setProjectStatusFilter(filter)}
@@ -578,7 +639,7 @@ export default function Billing() {
                             {proj.client_name || ""}
                           </td>
                           <td className="px-5 py-4 align-top">
-                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${
+                             <span className={`inline-flex items-center whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border ${
                                compState.includes('完工') ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-blue-100 text-blue-700 border-blue-200'
                              }`}>
                                {compState}
@@ -587,9 +648,14 @@ export default function Billing() {
                           <td className="px-5 py-4 align-top">
                             <div className="flex items-center justify-end gap-2">
                               {/* 取消 Button */}
-                              <button className="px-3 py-1.5 text-xs text-slate-600 border border-slate-300 rounded hover:bg-slate-50 transition-colors">
-                                取消
-                              </button>
+                              {!compState.includes('(未請求)') && (
+                                <button 
+                                  onClick={(e) => hideProjectFromBilling(proj.id, e)}
+                                  className="px-3 py-1.5 text-xs text-slate-600 border border-slate-300 rounded hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-colors"
+                                >
+                                  取消
+                                </button>
+                              )}
                               <button
                                 onClick={() => {
                                   // Find if an invoice already exists for this project

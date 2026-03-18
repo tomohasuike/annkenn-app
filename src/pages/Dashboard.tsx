@@ -21,7 +21,6 @@ export default function Dashboard() {
   // Data States
   const [todaySchedules, setTodaySchedules] = useState<any[]>([]);
   const [tomorrowSchedules, setTomorrowSchedules] = useState<any[]>([]);
-  const [tomorrowDailyData, setTomorrowDailyData] = useState<any[]>([]);
   const [activeProjects, setActiveProjects] = useState<any[]>([]);
   const [recentReports, setRecentReports] = useState<any[]>([]);
   const [submittedTodayReports, setSubmittedTodayReports] = useState<Record<string, string>>({});
@@ -89,18 +88,7 @@ export default function Dashboard() {
         .eq('assignment_date', tomorrowStr);
       setTomorrowSchedules(tomAssignments || []);
 
-      // Tomorrow schedules from project_daily_data (工程管理/日報)
-      const { data: tomDailyData } = await supabase
-        .from('project_daily_data')
-        .select(`
-          id,
-          project_id,
-          planned_count,
-          comment,
-          project:projects ( id, project_name, category )
-        `)
-        .eq('target_date', tomorrowStr);
-      setTomorrowDailyData(tomDailyData || []);
+
 
       // 3. Fetch Active Projects (着工中)
       const { data: projects } = await supabase
@@ -188,19 +176,28 @@ export default function Dashboard() {
   const projectsNeedingCompletionReport = activeProjects.filter(() => false);
   const activeSchedulesCount = new Set(todaySchedules.filter(s => s.project_id).map(s => s.project_id)).size;
 
-  // Tomorrow schedule alert logic (after 12:00 PM)
+  // 翌日の予定があるのに、本日の日報が出ていないアラート
   const currentHour = new Date().getHours();
-  // Filter out any "vacation" or "others" and only keep entries that actually have planned_count or comment
-  const validTomorrowEntries = tomorrowDailyData.filter(d => {
-    const p = d.project;
-    if (!p) return false;
-    if (p.category === 'その他' || p.project_name === '■ 休暇' || (typeof p.project_name === 'string' && p.project_name.includes('休暇'))) {
-      return false;
+  const tomorrowScheduledProjects = new Set<string>();
+  tomorrowSchedules.forEach(s => {
+    const p = s.project;
+    if (!p) return;
+    if (p.category === 'その他' || p.project_number === 'VACATION' || (typeof p.project_name === 'string' && p.project_name.includes('休暇'))) {
+      return;
     }
-    // Check if some plan is actually entered
-    return d.planned_count > 0 || (d.comment && d.comment.trim() !== '');
+    tomorrowScheduledProjects.add(p.id);
   });
-  const showTomorrowScheduleAlert = currentHour >= 12 && validTomorrowEntries.length === 0;
+  
+  let missingDailyReportsCount = 0;
+  tomorrowScheduledProjects.forEach(projectId => {
+      // 如果 todaySchedules 里面有，但 submittedTodayReports 没有，那也是未提出。
+      // 但用户的意思是：“明日のスケジュール（配置）」が組まれている現場について、『本日分（今日の日付）』の日報（`daily_reports`）がまだ作成/提出されていない場合”
+      if (!submittedTodayReports[projectId]) {
+          missingDailyReportsCount++;
+      }
+  });
+
+  const showTomorrowScheduleAlert = currentHour >= 12 && missingDailyReportsCount > 0;
 
   return (
     <div className="h-full flex flex-col overflow-y-auto bg-slate-50 p-6 md:p-8 space-y-8">
@@ -291,14 +288,14 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* Tomorrow Schedule Reminder */}
+              {/* Tomorrow Schedule Reminder (Missing Today's Report for Tomorrow's Plan) */}
               {showTomorrowScheduleAlert && (
                 <div className="p-4 flex items-start gap-4 border-b last:border-0 border-slate-100 bg-orange-50/50">
                   <Clock className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
                   <div>
                     <h3 className="text-sm font-bold text-orange-700">翌日の予定（日報）未作成</h3>
-                    <p className="text-sm text-orange-600 mt-1 mb-2">12時を過ぎましたが、工程管理で明日の予定（配置数など）が1件も入力されていません。</p>
-                    <button onClick={() => navigate('/schedule')} className="text-xs font-bold text-orange-700 bg-orange-100 px-3 py-1.5 rounded-md hover:bg-orange-200 transition-colors">
+                    <p className="text-sm text-orange-600 mt-1 mb-2">12時を過ぎましたが、明日の配置スケジュールが組まれている現場のうち、<strong>{missingDailyReportsCount}件</strong>の本日分の日報がまだ提出されていません。</p>
+                    <button onClick={() => navigate('/schedule-management')} className="text-xs font-bold text-orange-700 bg-orange-100 px-3 py-1.5 rounded-md hover:bg-orange-200 transition-colors">
                       工程管理を開く
                     </button>
                   </div>
