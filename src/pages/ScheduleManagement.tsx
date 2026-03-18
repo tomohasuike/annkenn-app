@@ -678,10 +678,10 @@ export default function ScheduleManagement() {
                </tr>
 
                {/* 稼働プロジェクト */}
-               {sortedCategories.flatMap(cat => {
+               {sortedCategories.map(cat => {
                  const isCollapsed = collapsedCategories[cat];
                  const currentCatProjects = groupedProjects[cat];
-                 if (!currentCatProjects || currentCatProjects.length === 0) return [];
+                 if (!currentCatProjects || currentCatProjects.length === 0) return null;
 
                  const headerRow = (
                    <tr key={`cat-${cat}`} className="bg-[#eef2f6] border-b border-t border-slate-300 cursor-pointer hover:bg-[#e2e8f0] transition-colors" onClick={() => setCollapsedCategories(prev => ({ ...prev, [cat]: !prev[cat] }))}>
@@ -704,113 +704,116 @@ export default function ScheduleManagement() {
                    </tr>
                  );
 
-                 const projectRows = currentCatProjects.map(p => {
-                    const projectHasData = dates.some(d => {
-                       const dStr = format(d, 'yyyy-MM-dd')
-                       const asg = getAssignmentsForCell(p.id, dStr)
-                       const daily = dailyData.find(dd => dd.project_id === p.id && dd.target_date === dStr)
-                       return asg.length > 0 || !!daily?.planned_count || !!daily?.comment
-                    });
+                 return (
+                   <Fragment key={`mobile-cat-${cat}`}>
+                     {headerRow}
+                     {currentCatProjects.map(p => {
+                        const projectHasData = dates.some(d => {
+                           const dStr = format(d, 'yyyy-MM-dd')
+                           const asg = getAssignmentsForCell(p.id, dStr)
+                           const daily = dailyData.find(dd => dd.project_id === p.id && dd.target_date === dStr)
+                           return asg.length > 0 || !!daily?.planned_count || !!daily?.comment
+                        });
 
-                    if (isCollapsed && !projectHasData) return null;
+                        if (isCollapsed && !projectHasData) return null;
 
-                    return (
-                      <tr key={p.id} className="border-b border-slate-200 hover:bg-blue-50/50 transition-colors bg-white">
-                     {/* 左側ヘッダー（固定） */}
-                     <td className="sticky left-0 z-30 bg-white border-r border-slate-200 p-1.5 align-top shadow-[2px_0_5px_rgba(0,0,0,0.02)] w-[120px] min-w-[120px] max-w-[120px]">
-                        <div className="flex flex-col gap-0.5">
-                           {p.no && <span className="text-[9px] font-bold text-blue-600 leading-none">[{p.no}]</span>}
-                           <div className="font-bold text-[11px] text-slate-800 leading-snug break-all line-clamp-2">{p.name}</div>
-                           <div className="text-[9px] text-slate-500 leading-tight truncate">
-                              {(p.category === '一般' || p.category === '役所') ? (p.client_company_name || p.client_name) : p.site}
-                           </div>
-                        </div>
-                     </td>
-                     {/* 日付セル */}
-                     {dates.map((d, i) => {
-                       const dStr = format(d, 'yyyy-MM-dd');
-                       const asg = getAssignmentsForCell(p.id, dStr);
-                       const daily = dailyData.find(dd => dd.project_id === p.id && dd.target_date === dStr);
-                       
-                       const workers = asg.filter(a => a.worker_id && a.worker_master?.type !== '協力会社');
-                       const partners = asg.filter(a => a.worker_master?.type === '協力会社');
-                       const vehicles = asg.filter(a => a.vehicle_id);
-                       
-                       const sumWorkers = workers.length + partners.reduce((sum, ptr) => sum + (ptr.count || 1), 0);
-                       const isColToday = dStr === format(today, 'yyyy-MM-dd')
-                       
-                       const isShort = daily?.planned_count && sumWorkers < daily.planned_count;
-
-                       return (
-                         <td key={i} className={`group/cell p-1 border-r border-slate-100 align-top w-[100px] min-w-[100px] max-w-[100px] relative ${isColToday ? 'bg-blue-50/20' : ''}`}>
-                           <div className="flex flex-col gap-1 min-h-[40px]">
-                              {/* 予定人数とコメント入力エリア */}
-                              <div className="flex items-start justify-between mb-0.5 border-b border-slate-100 pb-0.5 gap-1">
-                                 {/* 予定人数 */}
-                                 <div 
-                                   className="flex-shrink-0 cursor-pointer"
-                                   onClick={(e) => handlePlannedCountClick(p.id, dStr, daily?.planned_count, e)}
-                                   title="予定人員を入力"
-                                 >
-                                   {(sumWorkers > 0 || !!daily?.planned_count) ? (
-                                     <span className={`text-[9px] font-bold px-1 rounded-sm tracking-tighter ${isShort ? 'bg-red-50 text-red-600' : 'text-emerald-700'} hover:bg-slate-200 transition-colors block leading-none py-0.5`}>
-                                        予:{daily?.planned_count || '-'} / 実:{sumWorkers}
-                                     </span>
-                                   ) : (
-                                     <span className="text-[9px] font-bold px-1 rounded-sm text-slate-300 hover:text-slate-500 hover:bg-slate-100 border border-transparent hover:border-slate-200 block leading-none py-0.5 opacity-0 group-hover/cell:opacity-100 transition-opacity">
-                                        予: +
-                                     </span>
-                                   )}
-                                 </div>
-                                 
-                                 {/* コメント */}
-                                 <div 
-                                   className="flex-1 cursor-pointer min-w-0 flex justify-end"
-                                   onClick={(e) => handleCommentClick(p.id, dStr, daily?.comment, e)}
-                                   title={daily?.comment ? "コメントを編集" : "コメントを追加"}
-                                 >
-                                   {daily?.comment ? (
-                                     <div className="text-[8px] px-1 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 line-clamp-2 leading-tight break-all text-left w-full shadow-[0_1px_1px_rgba(0,0,0,0.02)]">
-                                       {daily.comment}
-                                     </div>
-                                   ) : (
-                                     <div className="p-0.5 rounded text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-opacity opacity-0 group-hover/cell:opacity-100 flex items-center justify-center">
-                                       <MessageSquare className="w-2.5 h-2.5" />
-                                     </div>
-                                   )}
-                                 </div>
-                              </div>
-                              
-                              <div className="flex flex-col gap-0.5">
-                                 {/* 作業員 */}
-                                 {workers.map(w => (
-                                   <div key={w.id} className="text-[10px] font-bold bg-blue-50 text-blue-700 border-l-[2px] border-blue-400 px-1 py-0.5 rounded-sm truncate w-full shadow-[0_1px_1px_rgba(0,0,0,0.02)]">
-                                     {w.worker_master?.name}
-                                   </div>
-                                 ))}
-                                 {/* 協力会社 */}
-                                 {partners.map(w => (
-                                   <div key={w.id} className="text-[10px] font-bold bg-purple-50 text-purple-700 border-l-[2px] border-purple-400 pl-1 pr-0.5 py-0.5 rounded-sm truncate w-full flex justify-between items-center shadow-[0_1px_1px_rgba(0,0,0,0.02)] mt-[1px]">
-                                     <span className="truncate">{w.worker_master?.name}</span>
-                                     <span className="ml-[1px] shrink-0 border border-purple-200 bg-white text-purple-800 rounded px-[2px] text-[8px] leading-none py-[1px] font-black">{w.count||1}</span>
-                                   </div>
-                                 ))}
-                                 {/* 車両 */}
-                                 {vehicles.map(v => (
-                                   <div key={v.id} className="text-[9px] font-bold bg-teal-50 text-teal-700 border-l-[2px] border-teal-400 px-1 py-0.5 rounded-sm truncate w-full shadow-[0_1px_1px_rgba(0,0,0,0.02)] mt-[1px]">
-                                     {v.vehicle_master?.vehicle_name}
-                                   </div>
-                                 ))}
-                              </div>
-                           </div>
+                        return (
+                          <tr key={p.id} className="border-b border-slate-200 hover:bg-blue-50/50 transition-colors bg-white">
+                         {/* 左側ヘッダー（固定） */}
+                         <td className="sticky left-0 z-30 bg-white border-r border-slate-200 p-1.5 align-top shadow-[2px_0_5px_rgba(0,0,0,0.02)] w-[120px] min-w-[120px] max-w-[120px]">
+                            <div className="flex flex-col gap-0.5">
+                               {p.no && <span className="text-[9px] font-bold text-blue-600 leading-none">[{p.no}]</span>}
+                               <div className="font-bold text-[11px] text-slate-800 leading-snug break-all line-clamp-2">{p.name}</div>
+                               <div className="text-[9px] text-slate-500 leading-tight truncate">
+                                  {(p.category === '一般' || p.category === '役所') ? (p.client_company_name || p.client_name) : p.site}
+                               </div>
+                            </div>
                          </td>
-                       );
+                         {/* 日付セル */}
+                         {dates.map((d, i) => {
+                           const dStr = format(d, 'yyyy-MM-dd');
+                           const asg = getAssignmentsForCell(p.id, dStr);
+                           const daily = dailyData.find(dd => dd.project_id === p.id && dd.target_date === dStr);
+                           
+                           const workers = asg.filter(a => a.worker_id && a.worker_master?.type !== '協力会社');
+                           const partners = asg.filter(a => a.worker_master?.type === '協力会社');
+                           const vehicles = asg.filter(a => a.vehicle_id);
+                           
+                           const sumWorkers = workers.length + partners.reduce((sum, ptr) => sum + (ptr.count || 1), 0);
+                           const isColToday = dStr === format(today, 'yyyy-MM-dd')
+                           
+                           const isShort = daily?.planned_count && sumWorkers < daily.planned_count;
+
+                           return (
+                             <td key={i} className={`group/cell p-1 border-r border-slate-100 align-top w-[100px] min-w-[100px] max-w-[100px] relative ${isColToday ? 'bg-blue-50/20' : ''}`}>
+                               <div className="flex flex-col gap-1 min-h-[40px]">
+                                  {/* 予定人数とコメント入力エリア */}
+                                  <div className="flex items-start justify-between mb-0.5 border-b border-slate-100 pb-0.5 gap-1">
+                                     {/* 予定人数 */}
+                                     <div 
+                                       className="flex-shrink-0 cursor-pointer"
+                                       onClick={(e) => handlePlannedCountClick(p.id, dStr, daily?.planned_count, e)}
+                                       title="予定人員を入力"
+                                     >
+                                       {(sumWorkers > 0 || !!daily?.planned_count) ? (
+                                         <span className={`text-[9px] font-bold px-1 rounded-sm tracking-tighter ${isShort ? 'bg-red-50 text-red-600' : 'text-emerald-700'} hover:bg-slate-200 transition-colors block leading-none py-0.5`}>
+                                            予:{daily?.planned_count || '-'} / 実:{sumWorkers}
+                                         </span>
+                                       ) : (
+                                         <span className="text-[9px] font-bold px-1 rounded-sm text-slate-300 hover:text-slate-500 hover:bg-slate-100 border border-transparent hover:border-slate-200 block leading-none py-0.5 opacity-0 group-hover/cell:opacity-100 transition-opacity">
+                                            予: +
+                                         </span>
+                                       )}
+                                     </div>
+                                     
+                                     {/* コメント */}
+                                     <div 
+                                       className="flex-1 cursor-pointer min-w-0 flex justify-end"
+                                       onClick={(e) => handleCommentClick(p.id, dStr, daily?.comment, e)}
+                                       title={daily?.comment ? "コメントを編集" : "コメントを追加"}
+                                     >
+                                       {daily?.comment ? (
+                                         <div className="text-[8px] px-1 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 line-clamp-2 leading-tight break-all text-left w-full shadow-[0_1px_1px_rgba(0,0,0,0.02)]">
+                                           {daily.comment}
+                                         </div>
+                                       ) : (
+                                         <div className="p-0.5 rounded text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-opacity opacity-0 group-hover/cell:opacity-100 flex items-center justify-center">
+                                           <MessageSquare className="w-2.5 h-2.5" />
+                                         </div>
+                                       )}
+                                     </div>
+                                  </div>
+                                  
+                                  <div className="flex flex-col gap-0.5">
+                                     {/* 作業員 */}
+                                     {workers.map(w => (
+                                       <div key={`w-${w.id}`} className="text-[10px] font-bold bg-blue-50 text-blue-700 border-l-[2px] border-blue-400 px-1 py-0.5 rounded-sm truncate w-full shadow-[0_1px_1px_rgba(0,0,0,0.02)]">
+                                         {w.worker_master?.name}
+                                       </div>
+                                     ))}
+                                     {/* 協力会社 */}
+                                     {partners.map(w => (
+                                       <div key={`p-${w.id}`} className="text-[10px] font-bold bg-purple-50 text-purple-700 border-l-[2px] border-purple-400 pl-1 pr-0.5 py-0.5 rounded-sm truncate w-full flex justify-between items-center shadow-[0_1px_1px_rgba(0,0,0,0.02)] mt-[1px]">
+                                         <span className="truncate">{w.worker_master?.name}</span>
+                                         <span className="ml-[1px] shrink-0 border border-purple-200 bg-white text-purple-800 rounded px-[2px] text-[8px] leading-none py-[1px] font-black">{w.count||1}</span>
+                                       </div>
+                                     ))}
+                                     {/* 車両 */}
+                                     {vehicles.map(v => (
+                                       <div key={`v-${v.id}`} className="text-[9px] font-bold bg-teal-50 text-teal-700 border-l-[2px] border-teal-400 px-1 py-0.5 rounded-sm truncate w-full shadow-[0_1px_1px_rgba(0,0,0,0.02)] mt-[1px]">
+                                         {v.vehicle_master?.vehicle_name}
+                                       </div>
+                                     ))}
+                                  </div>
+                               </div>
+                             </td>
+                           );
+                         })}
+                       </tr>
+                     );
                      })}
-                   </tr>
+                   </Fragment>
                  );
-               });
-               
-               return [headerRow, ...projectRows];
                })}
              </tbody>
            </table>
