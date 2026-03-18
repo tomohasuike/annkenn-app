@@ -164,6 +164,7 @@ export default function Billing() {
     
     let isBillingExplicitlyFinalized = false;
     let hasUnpaidInvoice = false;
+    let hasUnpaidProgressInvoice = false;
 
     for (const inv of relatedInvoices) {
       const details = inv.invoice_details || [];
@@ -183,9 +184,12 @@ export default function Billing() {
 
       if (!invPaid) {
         hasUnpaidInvoice = true;
+        if ((inv as any).billing_category === "出来高") {
+          hasUnpaidProgressInvoice = true;
+        }
       }
 
-      if (hasDetails && (inv as any).billing_category === "完成" && invPaid) {
+      if (hasDetails && ((inv as any).billing_category === "完成" || (inv as any).billing_category === "一括") && invPaid) {
         isBillingExplicitlyFinalized = true;
       }
     }
@@ -199,8 +203,12 @@ export default function Billing() {
       return "請求済・完工";
     }
 
-    if (hasInvoices) {
+    if (hasUnpaidProgressInvoice) {
       return "出来高請求中";
+    }
+
+    if (hasUnpaidInvoice) {
+      return "一括請求中";
     }
 
     if (isProjectPhysicallyCompleted) {
@@ -272,6 +280,8 @@ export default function Billing() {
     filteredProjects = filteredProjects.filter(p => getProjectBillingState(p) === "完工 (未請求)")
   } else if (projectStatusFilter === "出来高請求中") {
     filteredProjects = filteredProjects.filter(p => getProjectBillingState(p) === "出来高請求中")
+  } else if (projectStatusFilter === "一括請求中") {
+    filteredProjects = filteredProjects.filter(p => getProjectBillingState(p) === "一括請求中")
   } // no extra filter needed for "すべて"
 
   // Invoices View (Grouped by Invoice, not Project)
@@ -587,7 +597,7 @@ export default function Billing() {
                 {/* Status Pills and Refresh Button */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    {['すべて', '着工中 (未請求)', '完工 (未請求)', '出来高請求中'].map(filter => (
+                    {['すべて', '着工中 (未請求)', '完工 (未請求)', '出来高請求中', '一括請求中'].map(filter => (
                       <button
                         key={filter}
                         onClick={() => setProjectStatusFilter(filter)}
