@@ -174,9 +174,12 @@ export default function CompletionReports() {
                       <div className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5 overflow-hidden">
                         <span className="shrink-0 bg-muted px-1.5 py-0.5 rounded text-[10px] font-medium border border-border/50">現場名/発注者</span>
                         <span className="line-clamp-1">
-                          {Array.isArray(report.projects) 
-                            ? (report.projects[0]?.site_name || report.projects[0]?.client_name || '-') 
-                            : (report.projects?.site_name || report.projects?.client_name || '-')}
+                          {(() => {
+                            const p = Array.isArray(report.projects) ? report.projects[0] : report.projects;
+                            if (!p) return '-';
+                            const siteStr = ['一般', '役所'].includes(p.category) ? (p.client_name || p.site_name) : (p.site_name || p.client_name);
+                            return (typeof siteStr === 'string' ? siteStr : '-').replace(/\s*[\(（]UNION[）\)]?/gi, '');
+                          })()}
                         </span>
                       </div>
 

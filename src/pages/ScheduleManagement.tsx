@@ -70,8 +70,31 @@ export default function ScheduleManagement() {
   const [newResourceName, setNewResourceName] = useState("")
   const [newResourceType, setNewResourceType] = useState<'president'|'employee'|'partner'|'vehicle'|'machine'>('employee')
 
-  // Drag and drop state
-  const [draggedItem, setDraggedItem] = useState<{ id: string, type: 'worker' | 'vehicle', sourceProjectId?: string, sourceDate?: string, assignmentId?: string } | null>(null)
+  // Drag and drop / selection state
+  type SelectedItem = { id: string, type: 'worker' | 'vehicle', sourceProjectId?: string, sourceDate?: string, assignmentId?: string };
+  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([])
+  const [draggedItems, setDraggedItems] = useState<SelectedItem[]>([])
+  
+  const checkIsSelected = (id: string, sourceProjectId?: string, sourceDate?: string, assignmentId?: string) => {
+    return selectedItems.some(i => i.id === id && i.sourceProjectId === sourceProjectId && i.sourceDate === sourceDate && i.assignmentId === assignmentId);
+  }
+
+  const handleItemClick = (e: React.MouseEvent, item: SelectedItem) => {
+    e.stopPropagation()
+    if (!isAdmin) return
+    setSelectedItems(prev => {
+      const isSelected = prev.some(i => i.id === item.id && i.sourceProjectId === item.sourceProjectId && i.sourceDate === item.sourceDate && i.assignmentId === item.assignmentId)
+      if (isSelected) {
+        return prev.filter(i => !(i.id === item.id && i.sourceProjectId === item.sourceProjectId && i.sourceDate === item.sourceDate && i.assignmentId === item.assignmentId))
+      } else {
+        return [...prev, item]
+      }
+    })
+  }
+
+  const clearSelection = () => {
+    if (selectedItems.length > 0) setSelectedItems([])
+  }
 
   useEffect(() => {
     fetchData()
@@ -275,8 +298,17 @@ export default function ScheduleManagement() {
       e.preventDefault();
       return;
     }
-    e.dataTransfer.setData("text/plain", `${type}:${id}`)
-    setDraggedItem({ id, type, sourceProjectId, sourceDate, assignmentId })
+    const isSelected = checkIsSelected(id, sourceProjectId, sourceDate, assignmentId);
+    let itemsToDrag = selectedItems;
+    
+    if (!isSelected) {
+      // 選択されていないアイテムをつかんだ場合は、それが単一の選択（ドラッグ対象）になる
+      itemsToDrag = [{ id, type, sourceProjectId, sourceDate, assignmentId }];
+      setSelectedItems(itemsToDrag);
+    }
+    
+    e.dataTransfer.setData("text/plain", `${type}:${id}`);
+    setDraggedItems(itemsToDrag);
   }
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -286,113 +318,130 @@ export default function ScheduleManagement() {
 
   const handleDrop = async (e: React.DragEvent, targetProjectId: string, targetDate: Date) => {
     e.preventDefault()
-    if (!draggedItem) return
+    if (draggedItems.length === 0) return
     const dateStr = format(targetDate, 'yyyy-MM-dd')
     
-    // 自身へのドロップは何もしない
-    if (draggedItem.sourceProjectId === targetProjectId && draggedItem.sourceDate === dateStr) {
-      setDraggedItem(null)
-      return
-    }
-
-    const sourceAssignment = draggedItem.assignmentId ? assignments.find(a => a.id === draggedItem.assignmentId) : null
-
-    // 協力会社以外の場合、同じ日に既に配置されていないかチェックする
-    if (draggedItem.type === 'worker') {
-      const isPartner = resources.find(r => r.id === draggedItem.id)?.categoryId === 'partner'
-      if (!isPartner && targetProjectId !== "UNASSIGNED_POOL") {
-        const alreadyAssigned = assignments.some(a => 
-          a.assignment_date === dateStr && 
-          a.worker_id === draggedItem.id &&
-          a.id !== draggedItem.assignmentId // 移動元の自分自身は除外
-        )
-        if (alreadyAssigned) {
-          alert("この作業員は既に同じ日に配置されています。")
-          setDraggedItem(null)
-          return
-        }
-      }
-    } else if (draggedItem.type === 'vehicle' && targetProjectId !== "UNASSIGNED_POOL") {
-        const alreadyAssigned = assignments.some(a => 
-          a.assignment_date === dateStr && 
-          a.vehicle_id === draggedItem.id &&
-          a.id !== draggedItem.assignmentId
-        )
-        if (alreadyAssigned) {
-          alert("この車両は既に同じ日に配置されています。")
-          setDraggedItem(null)
-          return
-        }
-    }
-
-    const tempId = `temp-${Date.now()}`
+    const itemsToProcess = [...draggedItems];
+    setDraggedItems([]);
+    setSelectedItems([]); // ドロップ成功（またはリセット）とみなす
     
     // UIを即座に更新する（Optimistic UI）
     setAssignments(prev => {
-        let next = [...prev]
-        
-        // 移動元から削除する (すでにアサイン済みのアイテムを移動する場合)
-        if (sourceAssignment) {
-            next = next.filter(a => a.id !== sourceAssignment.id)
-        }
-        
-        // 移動先に追加する（UNASSIGNED_POOLの場合は追加しない）
-        if (targetProjectId !== "UNASSIGNED_POOL") {
-            const countToUse = sourceAssignment ? sourceAssignment.count : 1;
-            const newAssignment: AssignmentData = {
-                id: tempId,
-                assignment_date: dateStr,
-                project_id: targetProjectId,
-                worker_id: draggedItem.type === 'worker' ? draggedItem.id : null,
-                vehicle_id: draggedItem.type === 'vehicle' ? draggedItem.id : null,
-                count: countToUse,
-                notes: sourceAssignment ? sourceAssignment.notes : null,
-                projects: { project_name: '' },
-                worker_master: draggedItem.type === 'worker' ? (() => {
-                   const r = resources.find(res => res.id === draggedItem.id);
-                   if (!r) return null;
-                   let dbType = '作業員';
-                   if (r.categoryId === 'partner') dbType = '協力会社';
-                   if (r.categoryId === 'president') dbType = '社長';
-                   return { ...r, type: dbType } as any;
-                })() : null,
-                vehicle_master: draggedItem.type === 'vehicle' ? { vehicle_name: resources.find(r => r.id === draggedItem.id)?.name || '' } : null,
+        let next = [...prev];
+        itemsToProcess.forEach((item, index) => {
+            // 自身へのドロップは何もしない
+            if (item.sourceProjectId === targetProjectId && item.sourceDate === dateStr) return;
+            
+            const sourceAssignment = item.assignmentId ? prev.find(a => a.id === item.assignmentId) : null;
+            
+            // 協力会社以外の場合、同じ日に既に配置されていないかチェックする
+            if (item.type === 'worker') {
+              const isPartner = resources.find(r => r.id === item.id)?.categoryId === 'partner'
+              if (!isPartner && targetProjectId !== "UNASSIGNED_POOL") {
+                const alreadyAssigned = next.some(a => 
+                  a.assignment_date === dateStr && 
+                  a.worker_id === item.id &&
+                  a.id !== item.assignmentId
+                )
+                if (alreadyAssigned) return;
+              }
+            } else if (item.type === 'vehicle' && targetProjectId !== "UNASSIGNED_POOL") {
+                const alreadyAssigned = next.some(a => 
+                  a.assignment_date === dateStr && 
+                  a.vehicle_id === item.id &&
+                  a.id !== item.assignmentId
+                )
+                if (alreadyAssigned) return;
             }
-            next.push(newAssignment)
-        }
-        return next
-    })
-
-    const payload = {
-        assignment_date: dateStr,
-        project_id: targetProjectId,
-        worker_id: draggedItem.type === 'worker' ? draggedItem.id : null,
-        vehicle_id: draggedItem.type === 'vehicle' ? draggedItem.id : null,
-        count: sourceAssignment ? sourceAssignment.count : 1
-    }
-
-    try {
-        if (sourceAssignment) {
-            if (targetProjectId === "UNASSIGNED_POOL") {
-                await supabase.from('assignments').delete().eq('id', sourceAssignment.id)
-            } else {
-                await supabase.from('assignments').update(payload).eq('id', sourceAssignment.id)
+            
+            const tempId = `temp-${Date.now()}-${index}`;
+            
+            if (sourceAssignment) {
+                next = next.filter(a => a.id !== sourceAssignment.id);
             }
-        } else {
+            
             if (targetProjectId !== "UNASSIGNED_POOL") {
-                const { data, error } = await supabase.from('assignments').insert([payload]).select().single()
-                if (error) throw error
-                // バックエンドの実IDに更新する
-                setAssignments(prev => prev.map(a => a.id === tempId ? { ...a, id: data.id } : a))
+                const countToUse = sourceAssignment ? sourceAssignment.count : 1;
+                const newAssignment: AssignmentData = {
+                    id: tempId,
+                    assignment_date: dateStr,
+                    project_id: targetProjectId,
+                    worker_id: item.type === 'worker' ? item.id : null,
+                    vehicle_id: item.type === 'vehicle' ? item.id : null,
+                    count: countToUse,
+                    notes: sourceAssignment ? sourceAssignment.notes : null,
+                    projects: { project_name: '' },
+                    worker_master: item.type === 'worker' ? (() => {
+                       const r = resources.find(res => res.id === item.id);
+                       if (!r) return null;
+                       let dbType = '作業員';
+                       if (r.categoryId === 'partner') dbType = '協力会社';
+                       if (r.categoryId === 'president') dbType = '社長';
+                       return { ...r, type: dbType } as any;
+                    })() : null,
+                    vehicle_master: item.type === 'vehicle' ? { vehicle_name: resources.find(r => r.id === item.id)?.name || '' } : null,
+                }
+                next.push(newAssignment);
             }
+        });
+        return next;
+    });
+
+    // DBへの保存
+    for (const item of itemsToProcess) {
+        if (item.sourceProjectId === targetProjectId && item.sourceDate === dateStr) continue;
+        
+        const sourceAssignment = item.assignmentId ? assignments.find(a => a.id === item.assignmentId) : null;
+        
+        let shouldSkip = false;
+        if (item.type === 'worker') {
+          const isPartner = resources.find(r => r.id === item.id)?.categoryId === 'partner'
+          if (!isPartner && targetProjectId !== "UNASSIGNED_POOL") {
+            const alreadyAssigned = assignments.some(a => 
+              a.assignment_date === dateStr && 
+              a.worker_id === item.id &&
+              a.id !== item.assignmentId
+            )
+            if (alreadyAssigned) shouldSkip = true;
+          }
+        } else if (item.type === 'vehicle' && targetProjectId !== "UNASSIGNED_POOL") {
+            const alreadyAssigned = assignments.some(a => 
+              a.assignment_date === dateStr && 
+              a.vehicle_id === item.id &&
+              a.id !== item.assignmentId
+            )
+            if (alreadyAssigned) shouldSkip = true;
         }
-    } catch (err) {
-        console.error("Drag and drop save error:", err)
-        alert('操作の保存に失敗しました。再読み込みしてください。')
-        fetchAssignments()
+        
+        if (shouldSkip) continue;
+        
+        const payload = {
+            assignment_date: dateStr,
+            project_id: targetProjectId,
+            worker_id: item.type === 'worker' ? item.id : null,
+            vehicle_id: item.type === 'vehicle' ? item.id : null,
+            count: sourceAssignment ? sourceAssignment.count : 1
+        };
+
+        try {
+            if (sourceAssignment) {
+                if (targetProjectId === "UNASSIGNED_POOL") {
+                    await supabase.from('assignments').delete().eq('id', sourceAssignment.id);
+                } else {
+                    await supabase.from('assignments').update(payload).eq('id', sourceAssignment.id);
+                }
+            } else {
+                if (targetProjectId !== "UNASSIGNED_POOL") {
+                    await supabase.from('assignments').insert([payload]);
+                }
+            }
+        } catch (err) {
+            console.error("Drag and drop save error:", err);
+        }
     }
     
-    setDraggedItem(null)
+    // 全ての更新が終わったら再取得
+    fetchAssignments();
   }
 
   const handleAddResource = async () => {
@@ -529,7 +578,7 @@ export default function ScheduleManagement() {
   const completedTodos = todos.filter(t => t.completed)
 
   return (
-    <div className="flex flex-col h-full bg-white relative overflow-hidden -m-4 sm:-m-6 md:-m-8 text-slate-800" style={{ fontSize: `${fontSize}px`}}>
+    <div className="flex flex-col h-full bg-white relative overflow-hidden -m-4 sm:-m-6 md:-m-8 text-slate-800" style={{ fontSize: `${fontSize}px`}} onClick={clearSelection}>
       
       {/* ツールバー / ヘッダー */}
       <div className="bg-[#eef2f6] border-b px-4 py-2 flex items-center justify-between shrink-0 z-10 sticky top-0">
@@ -643,7 +692,8 @@ export default function ScheduleManagement() {
                                 key={res.id} 
                                 draggable={isAdmin}
                                 onDragStart={(e) => handleDragStart(e, res.id, res.type as 'worker'|'vehicle')}
-                                className={`px-1 py-0.5 border border-slate-200 rounded-md border-l-4 ${typeBorder} font-bold text-[0.95em] flex items-center justify-between transition-all bg-white shadow-sm ${isAdmin ? 'cursor-grab hover:bg-slate-50 hover:border-slate-300' : 'cursor-default'}`}
+                                onClick={(e) => handleItemClick(e, { id: res.id, type: res.type as 'worker' | 'vehicle' })}
+                                className={`px-1 py-0.5 border border-slate-200 rounded-md border-l-4 ${typeBorder} font-bold text-[0.95em] flex items-center justify-between transition-all bg-white shadow-sm ${checkIsSelected(res.id) ? 'shadow-md ring-2 ring-blue-400 bg-blue-50/50 scale-[1.02] -translate-y-[1px] z-10' : ''} ${isAdmin ? 'cursor-grab hover:bg-slate-50 hover:border-slate-300' : 'cursor-default'}`}
                             >
                                 <span className="truncate">{res.name}</span>
                             </div>
@@ -735,12 +785,13 @@ export default function ScheduleManagement() {
                               {!isCollapsed && (
                                 <div className="flex flex-col gap-0.5 mb-2">
                                   {pool.map(res => (
-                                    <div 
-                                      key={res.id} 
-                                      draggable={isAdmin}
-                                      onDragStart={(e) => handleDragStart(e, res.id, res.type as 'worker'|'vehicle', "UNASSIGNED_POOL", dateStr)}
-                                      className={`px-2 py-0.5 text-[0.85em] bg-white border border-[#c8e6c9] border-l-[3px] ${typeBorder} rounded-md shadow-sm text-slate-700 font-bold whitespace-nowrap flex items-center justify-between w-full ${isAdmin ? 'cursor-grab hover:bg-emerald-50 active:cursor-grabbing' : 'cursor-default'}`}
-                                    >
+                                      <div 
+                                        key={res.id} 
+                                        draggable={isAdmin}
+                                        onDragStart={(e) => handleDragStart(e, res.id, res.type as 'worker'|'vehicle', "UNASSIGNED_POOL", dateStr)}
+                                        onClick={(e) => handleItemClick(e, { id: res.id, type: res.type as 'worker'|'vehicle', sourceProjectId: "UNASSIGNED_POOL", sourceDate: dateStr })}
+                                        className={`px-2 py-0.5 text-[0.85em] bg-white border border-[#c8e6c9] border-l-[3px] ${typeBorder} rounded-md shadow-sm text-slate-700 font-bold whitespace-nowrap flex items-center justify-between w-full transition-all ${checkIsSelected(res.id, "UNASSIGNED_POOL", dateStr) ? 'shadow-md ring-2 ring-blue-400 bg-blue-50/50 scale-[1.02] -translate-y-[1px] z-10' : ''} ${isAdmin ? 'cursor-grab hover:bg-emerald-50 active:cursor-grabbing' : 'cursor-default'}`}
+                                      >
                                       {res.name}
                                       <Info className="w-3 h-3 text-slate-300" />
                                     </div>
@@ -801,8 +852,9 @@ export default function ScheduleManagement() {
                              <div 
                                  key={a.id} 
                                  draggable={isAdmin}
-                                 onDragStart={(e) => handleDragStart(e, a.worker_id || a.vehicle_id || '', a.worker_id ? 'worker' : 'vehicle', vacationProjId, dateStr)}
-                                 className={`group/item px-1 py-0 text-[0.85em] bg-white border border-slate-200 border-l-[3px] ${a.worker_id ? 'border-l-blue-500' : 'border-l-emerald-500'} rounded-md shadow-sm text-slate-700 font-bold flex items-center justify-between transition-colors ${isAdmin ? 'cursor-grab active:cursor-grabbing hover:border-slate-300 hover:shadow' : 'cursor-default'}`}
+                                 onDragStart={(e) => handleDragStart(e, (a.worker_id || a.vehicle_id) as string, a.worker_id ? 'worker' : 'vehicle', vacationProjId, dateStr, a.id)}
+                                 onClick={(e) => handleItemClick(e, { id: (a.worker_id || a.vehicle_id) as string, type: a.worker_id ? 'worker' : 'vehicle', sourceProjectId: vacationProjId, sourceDate: dateStr, assignmentId: a.id })}
+                                 className={`group/item px-1 py-0 text-[0.85em] bg-white border border-slate-200 border-l-[3px] ${a.worker_id ? 'border-l-blue-500' : 'border-l-emerald-500'} rounded-md shadow-sm text-slate-700 font-bold flex items-center justify-between transition-all ${checkIsSelected((a.worker_id || a.vehicle_id) as string, vacationProjId, dateStr, a.id) ? 'shadow-md ring-2 ring-blue-400 bg-blue-50/50 scale-[1.02] -translate-y-[1px] z-10' : ''} ${isAdmin ? 'cursor-grab active:cursor-grabbing hover:border-slate-300 hover:shadow' : 'cursor-default'}`}
                              >
                                  <span className="truncate">{a.worker_id ? a.worker_master?.name : a.vehicle_master?.vehicle_name}</span>
                                  <div className="flex items-center gap-0.5">
@@ -812,7 +864,7 @@ export default function ScheduleManagement() {
                              </div>
                           ))}
                           {/* Drop target visual hint */}
-                          {draggedItem && isAdmin && (
+                          {draggedItems.length > 0 && isAdmin && (
                              <div className="w-full h-6 border-2 border-dashed border-rose-200 rounded-md opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center bg-rose-50/50">
                                  <span className="text-[0.85em] font-bold text-rose-400">配置</span>
                              </div>
@@ -1034,7 +1086,7 @@ export default function ScheduleManagement() {
                                         </>
                                      )
                                   })()}
-                                  {draggedItem && isAdmin && (
+                                  {draggedItems.length > 0 && isAdmin && (
                                      <div className="w-full h-6 border-2 border-dashed border-blue-200 rounded-md opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center bg-blue-50/50">
                                          <span className="text-[0.85em] font-bold text-blue-400">配置</span>
                                      </div>

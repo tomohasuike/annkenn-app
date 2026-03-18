@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ShieldCheck, HardHat, FileText, AlertTriangle, CheckCircle2, FileCheck2, Loader2, Clock, LayoutDashboard, CalendarClock } from "lucide-react"
+import { ShieldCheck, HardHat, FileText, AlertTriangle, CheckCircle2, FileCheck2, Loader2, Clock, LayoutDashboard, CalendarClock, ChevronDown } from "lucide-react"
 import { supabase } from "../lib/supabase"
 import * as dateFns from "date-fns"
 
@@ -20,17 +20,31 @@ export default function Dashboard() {
   const [submittedTodayReports, setSubmittedTodayReports] = useState<Record<string, string>>({});
   const [submittedTomorrowReports, setSubmittedTomorrowReports] = useState<Record<string, string>>({});
   const [tomorrowPlans, setTomorrowPlans] = useState<any[]>([]);
+  const [myWeeklySchedules, setMyWeeklySchedules] = useState<any[]>([]);
   
+  const [isExecutiveOrClerk, setIsExecutiveOrClerk] = useState(false);
+  const [allWorkers, setAllWorkers] = useState<any[]>([]);
+  const [allWorkersWeeklySchedules, setAllWorkersWeeklySchedules] = useState<any[]>([]);
+  const [expandedWorkerId, setExpandedWorkerId] = useState<string | null>(null);
+  const [isWorkersScheduleExpanded, setIsWorkersScheduleExpanded] = useState(false);
+
   // Billing States
   const [fiscalYearSales, setFiscalYearSales] = useState(0);
   const [overdueInvoices, setOverdueInvoices] = useState<any[]>([]);
+
+  const formatSiteName = (p: any) => {
+      if (!p) return '';
+      const name = ['一般', '役所'].includes(p.category) ? (p.client_name || p.site_name) : (p.site_name || p.client_name);
+      return (typeof name === 'string' ? name : '').replace(/\s*[\(（]UNION[）\)]/gi, '');
+  };
 
   const getProjectDisplayName = (p: any) => {
       if (!p) return '名称未設定';
       const num = p.project_number ? `${p.project_number}　` : '';
       const name = p.project_name || p.name || '名称未設定';
-      const site = p.site_name ? `（${p.site_name}）` : (p.client_name ? `（${p.client_name}）` : '');
-      return `${num}${name}${site}`;
+      const clientOrSite = formatSiteName(p);
+      const suffix = clientOrSite ? `（${clientOrSite}）` : '';
+      return `${num}${name}${suffix}`;
   };
 
   const isVacationOrMisc = (p: any) => {
@@ -51,13 +65,16 @@ export default function Dashboard() {
       // 1. Fetch Permissions
       const { data: workerData } = await supabase
         .from('worker_master')
-        .select('allowed_apps, is_admin')
+        .select('id, allowed_apps, is_admin, type')
         .eq('email', user.email)
         .single();
       
       const permissions = workerData?.allowed_apps || [];
       setAllowedApps(permissions);
       const canViewBilling = permissions.includes('billing') || workerData?.is_admin;
+      const currentWorkerId = workerData?.id;
+      const isExecOrClerk = workerData?.type === '社長' || workerData?.type === '事務員';
+      setIsExecutiveOrClerk(isExecOrClerk);
 
       const todayStr = dateFns.format(new Date(), 'yyyy-MM-dd');
       const tomorrowStr = dateFns.format(dateFns.addDays(new Date(), 1), 'yyyy-MM-dd');
@@ -111,7 +128,51 @@ export default function Dashboard() {
         .eq('assignment_date', tomorrowStr);
       setTomorrowSchedules(tomAssignments || []);
 
+      // 2.5 Fetch My Weekly Schedule OR All Workers Weekly Schedule
+      const weeklyEndStr = dateFns.format(dateFns.addDays(new Date(), 6), 'yyyy-MM-dd');
+      
+      if (isExecOrClerk) {
+          const { data: activeWorkersRaw } = await supabase
+              .from('worker_master')
+              .select('id, name, type, display_order')
+              .eq('is_active', true)
+              .order('display_order', { ascending: true })
+              .order('name', { ascending: true });
+          
+          const filteredWorkers = (activeWorkersRaw || []).filter(w => !['社長', '事務員', '協力会社'].includes(w.type));
+          setAllWorkers(filteredWorkers);
 
+          const { data: allAssignments } = await supabase
+              .from('assignments')
+              .select(`
+                  id,
+                  project_id,
+                  assignment_date,
+                  worker_id,
+                  project:projects ( id, project_name, site_name, project_number, category, client_name )
+              `)
+              .gte('assignment_date', todayStr)
+              .lte('assignment_date', weeklyEndStr)
+              .not('worker_id', 'is', null)
+              .order('assignment_date', { ascending: true });
+          
+          setAllWorkersWeeklySchedules(allAssignments || []);
+      } else if (currentWorkerId) {
+          const { data: myAssignments } = await supabase
+              .from('assignments')
+              .select(`
+                  id,
+                  project_id,
+                  assignment_date,
+                  project:projects ( id, project_name, site_name, project_number, category, client_name )
+              `)
+              .eq('worker_id', currentWorkerId)
+              .gte('assignment_date', todayStr)
+              .lte('assignment_date', weeklyEndStr)
+              .order('assignment_date', { ascending: true });
+          
+          setMyWeeklySchedules(myAssignments || []);
+      }
 
       // 3. Fetch Active Projects (着工中)
       const { data: projects } = await supabase
@@ -382,6 +443,189 @@ export default function Dashboard() {
         {/* LEFT COLUMN: Actions & Alerts */}
         <div className="col-span-1 lg:col-span-2 space-y-8">
           
+          {/* あなたの週間予定 / 作業員の週間予定 */}
+          <section>
+            {isExecutiveOrClerk ? (
+              <button 
+                className="flex items-center justify-between w-full gap-2 mb-4 group"
+                onClick={() => setIsWorkersScheduleExpanded(!isWorkersScheduleExpanded)}
+              >
+                <div className="flex items-center gap-2">
+                  <CalendarClock className="w-5 h-5 text-indigo-600" />
+                  <h2 className="text-lg font-bold text-slate-800">作業員の週間予定</h2>
+                </div>
+                <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isWorkersScheduleExpanded ? 'rotate-180' : ''}`} />
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 mb-4">
+                <CalendarClock className="w-5 h-5 text-indigo-600" />
+                <h2 className="text-lg font-bold text-slate-800">あなたの週間予定</h2>
+              </div>
+            )}
+            
+            {isExecutiveOrClerk ? (
+              isWorkersScheduleExpanded && (
+                <div className="bg-white border rounded-xl shadow-sm overflow-hidden divide-y divide-slate-100 mb-6">
+                {allWorkers.map(w => {
+                  const isExpanded = expandedWorkerId === w.id;
+                  return (
+                    <div key={w.id} className="flex flex-col">
+                      <button 
+                         onClick={() => setExpandedWorkerId(isExpanded ? null : w.id)} 
+                         className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors w-full text-left"
+                      >
+                         <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-700 text-base">{w.name}</span>
+                         </div>
+                         <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+                      
+                      {isExpanded && (
+                        <div className="p-4 bg-slate-50/50 border-t border-slate-100 overflow-x-auto">
+                          <div className="flex gap-4 min-w-max pb-2">
+                            {Array.from({ length: 7 }).map((_, i) => {
+                                const date = dateFns.addDays(new Date(), i);
+                                const dateStr = dateFns.format(date, 'yyyy-MM-dd');
+                                const dayStr = ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
+                                const displayDate = i === 0 ? '今日' : i === 1 ? '明日' : `${date.getMonth() + 1}/${date.getDate()}(${dayStr})`;
+                                
+                                const dayAssignments = allWorkersWeeklySchedules.filter(a => a.assignment_date === dateStr && a.worker_id === w.id);
+                                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                                
+                                return (
+                                  <div key={dateStr} className={`flex flex-col w-40 shrink-0 border rounded-lg overflow-hidden ${isWeekend ? 'bg-slate-50' : 'bg-white'}`}>
+                                    <div className={`text-center py-2 text-sm font-bold border-b ${
+                                      i === 0 ? 'bg-indigo-600 text-white border-indigo-700' :
+                                      i === 1 ? 'bg-indigo-100 text-indigo-800 border-indigo-200' :
+                                      date.getDay() === 0 ? 'bg-red-50 text-red-600 border-red-100' :
+                                      date.getDay() === 6 ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                      'bg-slate-100 text-slate-700 border-slate-200'
+                                    }`}>
+                                      {displayDate}
+                                    </div>
+                                    <div className="p-3 flex-1 flex flex-col gap-2 min-h-[90px]">
+                                      {dayAssignments.length > 0 ? (
+                                        dayAssignments.map(assignment => {
+                                          const p = assignment.project;
+                                          const isVacation = isVacationOrMisc(p);
+                                          if (isVacation) {
+                                              return (
+                                                  <div key={assignment.id} className="text-xs font-bold text-center py-2 bg-orange-50 text-orange-700 rounded-md border border-orange-200 shadow-sm mt-auto mb-auto">
+                                                      休暇・その他
+                                                  </div>
+                                              );
+                                          }
+                                          return (
+                                            <div key={assignment.id} 
+                                                 className="text-xs bg-indigo-50 border border-indigo-100 rounded-md p-2 shadow-sm cursor-pointer hover:border-indigo-300 transition-colors flex flex-col gap-1"
+                                                 onClick={() => navigate('/projects/'+p?.id)}
+                                            >
+                                              <div className="flex items-center gap-1 shrink-0 overflow-hidden">
+                                                {p?.project_number && (
+                                                  <span className="text-[9px] font-mono font-bold text-indigo-500 shrink-0">{p.project_number}</span>
+                                                )}
+                                                {formatSiteName(p) && (
+                                                  <span className="text-[9px] font-bold text-slate-400 truncate mt-0.5" title={formatSiteName(p)}>
+                                                    {formatSiteName(p)}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <span className="font-bold text-slate-700 line-clamp-2 leading-tight" title={getProjectDisplayName(p)}>
+                                                {p?.project_name || '未定'}
+                                              </span>
+                                            </div>
+                                          );
+                                        })
+                                      ) : (
+                                        <div className="text-xs text-slate-400 font-medium text-center flex-1 flex flex-col justify-center items-center py-2">
+                                          <span className="opacity-60">未定</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              )
+            ) : (
+              <div className="bg-white border rounded-xl shadow-sm p-4 sm:p-5 overflow-x-auto">
+                <div className="flex gap-4 min-w-max pb-2">
+                  {Array.from({ length: 7 }).map((_, i) => {
+                    const date = dateFns.addDays(new Date(), i);
+                    const dateStr = dateFns.format(date, 'yyyy-MM-dd');
+                    const dayStr = ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
+                    const displayDate = i === 0 ? '今日' : i === 1 ? '明日' : `${date.getMonth() + 1}/${date.getDate()}(${dayStr})`;
+                    
+                    const dayAssignments = myWeeklySchedules.filter(a => a.assignment_date === dateStr);
+                    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                    
+                    return (
+                      <div key={dateStr} className={`flex flex-col w-40 shrink-0 border rounded-lg overflow-hidden ${isWeekend ? 'bg-slate-50' : 'bg-white'}`}>
+                        {/* Date Header */}
+                        <div className={`text-center py-2 text-sm font-bold border-b ${
+                          i === 0 ? 'bg-indigo-600 text-white border-indigo-700' :
+                          i === 1 ? 'bg-indigo-100 text-indigo-800 border-indigo-200' :
+                          date.getDay() === 0 ? 'bg-red-50 text-red-600 border-red-100' :
+                          date.getDay() === 6 ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                          'bg-slate-100 text-slate-700 border-slate-200'
+                        }`}>
+                          {displayDate}
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="p-3 flex-1 flex flex-col gap-2 min-h-[90px]">
+                          {dayAssignments.length > 0 ? (
+                            dayAssignments.map(assignment => {
+                              const p = assignment.project;
+                              const isVacation = isVacationOrMisc(p);
+                              if (isVacation) {
+                                  return (
+                                      <div key={assignment.id} className="text-xs font-bold text-center py-2 bg-orange-50 text-orange-700 rounded-md border border-orange-200 shadow-sm mt-auto mb-auto">
+                                          休暇・その他
+                                      </div>
+                                  );
+                              }
+                              return (
+                                <div key={assignment.id} 
+                                     className="text-xs bg-indigo-50 border border-indigo-100 rounded-md p-2 shadow-sm cursor-pointer hover:border-indigo-300 transition-colors flex flex-col gap-1"
+                                     onClick={() => navigate('/projects/'+p?.id)}
+                                >
+                                  <div className="flex items-center gap-1 shrink-0 overflow-hidden">
+                                    {p?.project_number && (
+                                      <span className="text-[9px] font-mono font-bold text-indigo-500 shrink-0">{p.project_number}</span>
+                                    )}
+                                    {formatSiteName(p) && (
+                                      <span className="text-[9px] font-bold text-slate-400 truncate mt-0.5" title={formatSiteName(p)}>
+                                        {formatSiteName(p)}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="font-bold text-slate-700 line-clamp-2 leading-tight" title={getProjectDisplayName(p)}>
+                                    {p?.project_name || '未定'}
+                                  </span>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-xs text-slate-400 font-medium text-center flex-1 flex flex-col justify-center items-center py-2">
+                              <span className="opacity-60">未定</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </section>
+
           {/* 今後の出社時間 */}
           {tomorrowPlans.length > 0 && (
               <section>
@@ -429,10 +673,13 @@ export default function Dashboard() {
                                             {time}
                                         </div>
                                     </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full mt-1 sm:mt-0 sm:ml-4">
-                                        <div className="font-bold text-slate-800 text-base sm:text-lg flex-1">{pName}</div>
-                                        <div className="text-sm font-bold text-slate-600 mt-2 sm:mt-0 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200 shadow-sm w-fit max-w-full truncate text-right">
-                                            👤 {workers}
+                                    <div className="flex flex-col w-full mt-1 sm:mt-0 sm:ml-4 justify-center">
+                                        <div className="font-bold text-slate-800 text-base sm:text-lg w-full mb-1 flex items-center gap-1.5">
+                                            <span className="text-slate-400 text-sm">👤</span>
+                                            {workers}
+                                        </div>
+                                        <div className="text-xs font-medium text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100 w-fit max-w-full truncate" title={pName}>
+                                            {pName}
                                         </div>
                                     </div>
                                 </li>
