@@ -208,10 +208,9 @@ export default function BillingForm() {
         .limit(1);
 
       if (existingInvoices && existingInvoices.length > 0) {
-        if (confirm("この案件にはすでに進行中の請求データが存在します。追加の請求（出来高・完了等）は、既存の請求データに明細（行）を追加して作成してください。既存のデータの編集画面へ移動しますか？")) {
-          navigate(`/billing/${existingInvoices[0].id}/edit`);
-          return;
-        }
+        // Automatically redirect without asking
+        navigate(`/billing/${existingInvoices[0].id}/edit`);
+        return;
       }
     }
 
