@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ShieldCheck, HardHat, FileText, AlertTriangle, CheckCircle2, FileCheck2, Loader2, Clock, LayoutDashboard, CalendarClock, ChevronDown } from "lucide-react"
+import { ShieldCheck, HardHat, FileText, AlertTriangle, CheckCircle2, FileCheck2, Loader2, Clock, LayoutDashboard, CalendarClock } from "lucide-react"
 import { supabase } from "../lib/supabase"
 import * as dateFns from "date-fns"
 
@@ -25,8 +25,6 @@ export default function Dashboard() {
   const [isExecutiveOrClerk, setIsExecutiveOrClerk] = useState(false);
   const [allWorkers, setAllWorkers] = useState<any[]>([]);
   const [allWorkersWeeklySchedules, setAllWorkersWeeklySchedules] = useState<any[]>([]);
-  const [expandedWorkerId, setExpandedWorkerId] = useState<string | null>(null);
-  const [isWorkersScheduleExpanded, setIsWorkersScheduleExpanded] = useState(false);
 
   // Billing States
   const [fiscalYearSales, setFiscalYearSales] = useState(0);
@@ -448,114 +446,99 @@ export default function Dashboard() {
           
           {/* あなたの週間予定 / 作業員の週間予定 */}
           <section>
-            {isExecutiveOrClerk ? (
-              <button 
-                className="flex items-center justify-between w-full gap-2 mb-4 group"
-                onClick={() => setIsWorkersScheduleExpanded(!isWorkersScheduleExpanded)}
-              >
-                <div className="flex items-center gap-2">
-                  <CalendarClock className="w-5 h-5 text-indigo-600" />
-                  <h2 className="text-lg font-bold text-slate-800">作業員の週間予定</h2>
-                </div>
-                <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isWorkersScheduleExpanded ? 'rotate-180' : ''}`} />
-              </button>
-            ) : (
-              <div className="flex items-center gap-2 mb-4">
-                <CalendarClock className="w-5 h-5 text-indigo-600" />
-                <h2 className="text-lg font-bold text-slate-800">あなたの週間予定</h2>
-              </div>
-            )}
+            <div className="flex items-center gap-2 mb-4">
+              <CalendarClock className="w-5 h-5 text-indigo-600" />
+              <h2 className="text-lg font-bold text-slate-800">
+                {isExecutiveOrClerk ? '作業員の週間予定' : 'あなたの週間予定'}
+              </h2>
+            </div>
             
             {isExecutiveOrClerk ? (
-              isWorkersScheduleExpanded && (
-                <div className="bg-white border rounded-xl shadow-sm overflow-hidden divide-y divide-slate-100 mb-6">
-                {allWorkers.map(w => {
-                  const isExpanded = expandedWorkerId === w.id;
-                  return (
-                    <div key={w.id} className="flex flex-col">
-                      <button 
-                         onClick={() => setExpandedWorkerId(isExpanded ? null : w.id)} 
-                         className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors w-full text-left"
-                      >
-                         <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-700 text-base">{w.name}</span>
-                         </div>
-                         <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                      </button>
-                      
-                      {isExpanded && (
-                        <div className="p-4 bg-slate-50/50 border-t border-slate-100 overflow-x-auto">
-                          <div className="flex gap-4 min-w-max pb-2">
-                            {Array.from({ length: 7 }).map((_, i) => {
-                                const date = dateFns.addDays(new Date(), i);
-                                const dateStr = dateFns.format(date, 'yyyy-MM-dd');
-                                const dayStr = ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
-                                const displayDate = i === 0 ? '今日' : i === 1 ? '明日' : `${date.getMonth() + 1}/${date.getDate()}(${dayStr})`;
-                                
-                                const dayAssignments = allWorkersWeeklySchedules.filter(a => a.assignment_date === dateStr && a.worker_id === w.id);
-                                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                                
-                                return (
-                                  <div key={dateStr} className={`flex flex-col w-40 shrink-0 border rounded-lg overflow-hidden ${isWeekend ? 'bg-slate-50' : 'bg-white'}`}>
-                                    <div className={`text-center py-2 text-sm font-bold border-b ${
-                                      i === 0 ? 'bg-indigo-600 text-white border-indigo-700' :
-                                      i === 1 ? 'bg-indigo-100 text-indigo-800 border-indigo-200' :
-                                      date.getDay() === 0 ? 'bg-red-50 text-red-600 border-red-100' :
-                                      date.getDay() === 6 ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                      'bg-slate-100 text-slate-700 border-slate-200'
-                                    }`}>
-                                      {displayDate}
-                                    </div>
-                                    <div className="p-3 flex-1 flex flex-col gap-2 min-h-[90px]">
-                                      {dayAssignments.length > 0 ? (
-                                        dayAssignments.map(assignment => {
-                                          const p = assignment.project;
-                                          const isVacation = isVacationOrMisc(p);
-                                          if (isVacation) {
-                                              return (
-                                                  <div key={assignment.id} className="text-xs font-bold text-center py-2 bg-orange-50 text-orange-700 rounded-md border border-orange-200 shadow-sm mt-auto mb-auto">
-                                                      休暇・その他
-                                                  </div>
-                                              );
-                                          }
+              <div className="bg-white border rounded-xl shadow-sm overflow-hidden mb-6 flex flex-col">
+                <div className="overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar relative">
+                  <table className="w-max border-collapse bg-white text-sm">
+                    <thead className="sticky top-0 z-20 bg-slate-50 border-b border-slate-200 shadow-sm">
+                      <tr>
+                        <th className="sticky left-0 z-30 bg-slate-50 border-r border-slate-200 p-2 min-w-[120px] max-w-[120px] text-left font-bold text-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.02)] whitespace-nowrap">
+                          氏名
+                        </th>
+                        {Array.from({ length: 7 }).map((_, i) => {
+                          const date = dateFns.addDays(new Date(), i);
+                          const dayStr = ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
+                          const displayDate = i === 0 ? '今日' : i === 1 ? '明日' : `${date.getMonth() + 1}/${date.getDate()}`;
+                          const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                          const colorClass = date.getDay() === 0 ? 'text-red-600' : date.getDay() === 6 ? 'text-blue-600' : 'text-slate-700';
+                          return (
+                            <th key={i} className={`p-1.5 border-r border-slate-200 min-w-[120px] max-w-[120px] text-center ${isWeekend ? 'bg-slate-100/50' : 'bg-transparent'}`}>
+                              <div className="font-bold text-slate-800 text-[13px]">{displayDate}</div>
+                              <div className={`text-[10px] font-medium leading-none mt-0.5 ${colorClass}`}>({dayStr})</div>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {allWorkers.map(w => (
+                        <tr key={w.id} className="hover:bg-slate-50/50 transition-colors group">
+                          <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 border-r border-slate-200 p-2 align-middle min-w-[120px] max-w-[120px] shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                            <div className="font-bold text-slate-700 text-[12px] pl-1 truncate" title={w.name}>{w.name}</div>
+                          </td>
+                          {Array.from({ length: 7 }).map((_, i) => {
+                            const date = dateFns.addDays(new Date(), i);
+                            const dateStr = dateFns.format(date, 'yyyy-MM-dd');
+                            const dayAssignments = allWorkersWeeklySchedules.filter(a => a.assignment_date === dateStr && a.worker_id === w.id);
+                            const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                            
+                            return (
+                              <td key={dateStr} className={`p-1.5 border-r border-slate-100 align-top min-w-[120px] max-w-[120px] ${isWeekend ? 'bg-slate-50/50' : ''}`}>
+                                <div className="flex flex-col gap-1 min-h-[36px]">
+                                  {dayAssignments.length > 0 ? (
+                                    dayAssignments.map(assignment => {
+                                      const p = assignment.project;
+                                      const isVacation = isVacationOrMisc(p);
+                                      if (isVacation) {
                                           return (
-                                            <div key={assignment.id} 
-                                                 className="text-xs bg-indigo-50 border border-indigo-100 rounded-md p-2 shadow-sm cursor-pointer hover:border-indigo-300 transition-colors flex flex-col gap-1"
-                                                 onClick={() => navigate('/projects/'+p?.id)}
-                                            >
-                                              <div className="flex items-center gap-1 shrink-0 overflow-hidden">
-                                                {p?.project_number && (
-                                                  <span className="text-[9px] font-mono font-bold text-indigo-500 shrink-0">{p.project_number}</span>
-                                                )}
-                                                {formatSiteName(p) && (
-                                                  <span className="text-[9px] font-bold text-slate-400 truncate mt-0.5" title={formatSiteName(p)}>
-                                                    {formatSiteName(p)}
-                                                  </span>
-                                                )}
+                                              <div key={assignment.id} className="text-[10px] font-bold text-center py-1.5 px-1 bg-orange-50 text-orange-700 rounded-md border border-orange-200 shadow-[0_1px_1px_rgba(0,0,0,0.02)]">
+                                                  休暇・不在
                                               </div>
-                                              <span className="font-bold text-slate-700 line-clamp-2 leading-tight" title={getProjectDisplayName(p)}>
-                                                {p?.project_name || '未定'}
-                                              </span>
-                                            </div>
                                           );
-                                        })
-                                      ) : (
-                                        <div className="text-xs text-slate-400 font-medium text-center flex-1 flex flex-col justify-center items-center py-2">
-                                          <span className="opacity-60">未定</span>
+                                      }
+                                      return (
+                                        <div key={assignment.id} 
+                                             className="text-[10px] bg-indigo-50 border border-indigo-100 rounded-md p-1.5 shadow-[0_1px_1px_rgba(0,0,0,0.02)] cursor-pointer hover:border-indigo-300 transition-colors flex flex-col gap-0.5"
+                                             onClick={() => navigate('/projects/'+p?.id)}
+                                        >
+                                          <div className="flex items-center gap-1 shrink-0 overflow-hidden">
+                                            {p?.project_number && (
+                                              <span className="text-[8px] font-mono font-bold bg-indigo-100 text-indigo-700 px-1 rounded-[3px] leading-tight shrink-0">{p.project_number}</span>
+                                            )}
+                                            {formatSiteName(p) && (
+                                              <span className="text-[8px] font-bold text-slate-500 truncate mt-[1px]" title={formatSiteName(p)}>
+                                                {formatSiteName(p)}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <span className="font-bold text-slate-800 line-clamp-2 leading-tight mt-0.5" title={getProjectDisplayName(p)}>
+                                            {p?.project_name || '未定'}
+                                          </span>
                                         </div>
-                                      )}
+                                      );
+                                    })
+                                  ) : (
+                                    <div className="h-full flex items-center justify-center p-1 opacity-0 group-hover:opacity-30 transition-opacity">
+                                      <span className="text-[10px] font-bold text-slate-400">-</span>
                                     </div>
-                                  </div>
-                                );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              )
             ) : (
               <div className="bg-white border rounded-xl shadow-sm p-4 sm:p-5 overflow-x-auto">
                 <div className="flex gap-4 min-w-max pb-2">
