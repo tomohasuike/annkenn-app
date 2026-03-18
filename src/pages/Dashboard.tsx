@@ -1,14 +1,8 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ShieldCheck, HardHat, FileText, AlertTriangle, CheckCircle2, FileCheck2, Loader2, JapaneseYen, Clock, LayoutDashboard, CalendarClock } from "lucide-react"
+import { ShieldCheck, HardHat, FileText, AlertTriangle, CheckCircle2, FileCheck2, Loader2, Clock, LayoutDashboard, CalendarClock } from "lucide-react"
 import { supabase } from "../lib/supabase"
 import * as dateFns from "date-fns"
-
-// Utility to format numbers with commas
-const toFormattedString = (num: number | undefined | null) => {
-  if (num === undefined || num === null) return "";
-  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-};
 
 export default function Dashboard() {
   const navigate = useNavigate();
