@@ -31,6 +31,14 @@ export default function Dashboard() {
   const [expectedBillingAmount, setExpectedBillingAmount] = useState(0);
   const [overdueInvoices, setOverdueInvoices] = useState<any[]>([]);
 
+  const getProjectDisplayName = (p: any) => {
+      if (!p) return '名称未設定';
+      const num = p.project_number ? `${p.project_number}　` : '';
+      const name = p.project_name || p.name || '名称未設定';
+      const site = p.site_name ? `（${p.site_name}）` : (p.client_name ? `（${p.client_name}）` : '');
+      return `${num}${name}${site}`;
+  };
+
   useEffect(() => {
     fetchDashboardData();
   }, []);
@@ -69,7 +77,7 @@ export default function Dashboard() {
           vehicle_id,
           worker_master ( name, type ),
           vehicle_master ( vehicle_name ),
-          project:projects ( id, project_name, site_name, project_number, category )
+          project:projects ( id, project_name, site_name, project_number, category, client_name )
         `)
         .eq('assignment_date', todayStr);
       setTodaySchedules(schedules || []);
@@ -85,7 +93,7 @@ export default function Dashboard() {
           vehicle_id,
           worker_master ( name, type ),
           vehicle_master ( vehicle_name ),
-          project:projects ( id, project_name, site_name, project_number, category )
+          project:projects ( id, project_name, site_name, project_number, category, client_name )
         `)
         .eq('assignment_date', tomorrowStr);
       setTomorrowSchedules(tomAssignments || []);
@@ -95,7 +103,7 @@ export default function Dashboard() {
       // 3. Fetch Active Projects (着工中)
       const { data: projects } = await supabase
         .from('projects')
-        .select('id, project_name, site_name, project_number, status_flag')
+        .select('id, project_name, site_name, project_number, status_flag, category, client_name')
         .eq('status_flag', '着工中');
       setActiveProjects(projects || []);
 
@@ -119,7 +127,7 @@ export default function Dashboard() {
         .from('tomorrow_schedules')
         .select(`
             id, project_id, schedule_date, arrival_time, workers,
-            project:projects(project_name)
+            project:projects(project_name, project_number, site_name, client_name, category)
         `);
         
       const submittedTomMap: Record<string, string> = {};
@@ -161,7 +169,7 @@ export default function Dashboard() {
           created_at,
           work_content,
           reporter_name,
-          project:projects ( project_name, site_name )
+          project:projects ( project_name, site_name, project_number, category, client_name )
         `)
         .order('created_at', { ascending: false })
         .limit(5);
@@ -370,7 +378,7 @@ export default function Dashboard() {
                 <div className="bg-white border rounded-xl shadow-sm p-4 sm:p-5">
                     <ul className="space-y-4">
                         {tomorrowPlans.map((plan: any, idx: number) => {
-                            const pName = plan.project?.project_name || '名称未設定';
+                            const pName = getProjectDisplayName(plan.project);
                             
                             let time = '未設定';
                             if (plan.arrival_time) {
@@ -474,7 +482,7 @@ export default function Dashboard() {
                                className="text-left w-full bg-white/70 hover:bg-white border border-red-200/60 hover:border-red-300 rounded-md px-3 py-2 text-sm transition-colors flex items-center justify-between shadow-sm"
                              >
                                 <div className="flex flex-col gap-0.5 overflow-hidden w-full max-w-[calc(100%-80px)] pr-2">
-                                  <span className="font-bold text-slate-700 truncate">{p.project_name}</span>
+                                  <span className="font-bold text-slate-700 truncate" title={getProjectDisplayName(p)}>{getProjectDisplayName(p)}</span>
                                   <span className="text-xs text-slate-500 font-medium truncate">人員: <span className="text-slate-600">{workers}</span></span>
                                 </div>
                                 <span className="text-red-600 font-bold text-[10px] bg-red-100/80 border border-red-200 px-2 py-1 rounded shrink-0 flex items-center gap-1">作成画面<span className="text-lg leading-none transform translate-y-[-1px]">&rarr;</span></span>
@@ -520,7 +528,7 @@ export default function Dashboard() {
                                className="text-left w-full bg-white/70 hover:bg-white border border-orange-200/60 hover:border-orange-300 rounded-md px-3 py-2 text-sm transition-colors flex items-center justify-between shadow-sm"
                              >
                                 <div className="flex flex-col gap-0.5 overflow-hidden w-full max-w-[calc(100%-80px)] pr-2">
-                                  <span className="font-bold text-slate-700 truncate">{p.project_name}</span>
+                                  <span className="font-bold text-slate-700 truncate" title={getProjectDisplayName(p)}>{getProjectDisplayName(p)}</span>
                                   <span className="text-xs text-slate-500 font-medium truncate">人員: <span className="text-slate-600">{workers}</span></span>
                                 </div>
                                 <span className="text-orange-600 font-bold text-[10px] bg-orange-100/80 border border-orange-200 px-2 py-1 rounded shrink-0 flex items-center gap-1">作成画面<span className="text-lg leading-none transform translate-y-[-1px]">&rarr;</span></span>
@@ -543,7 +551,7 @@ export default function Dashboard() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       {projectsNeedingCompletionReport.slice(0, 3).map(p => (
                         <span key={p.id} className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 cursor-pointer hover:bg-amber-100" onClick={() => navigate(`/projects/${p.id}/edit`)}>
-                          {p.project_name}
+                          {getProjectDisplayName(p)}
                         </span>
                       ))}
                       {projectsNeedingCompletionReport.length > 3 && (
@@ -615,9 +623,9 @@ export default function Dashboard() {
                              <span className="text-[10px] font-bold font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
                                 {p.project_number || '番号なし'}
                              </span>
-                             <span className="font-bold text-sm text-slate-700 truncate" title={p.project_name}>
+                             <span className="font-bold text-sm text-slate-700 truncate" title={getProjectDisplayName(p)}>
                                {isVacation && <span className="text-slate-800 mr-1">■</span>}
-                               {p.project_name}
+                               {getProjectDisplayName(p)}
                              </span>
                          </div>
                          {isSubmitted && (
@@ -698,9 +706,9 @@ export default function Dashboard() {
                              <span className="text-[10px] font-bold font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
                                 {p.project_number || '番号なし'}
                              </span>
-                             <span className="font-bold text-sm text-slate-700 truncate" title={p.project_name}>
+                             <span className="font-bold text-sm text-slate-700 truncate" title={getProjectDisplayName(p)}>
                                {isVacation && <span className="text-slate-800 mr-1">■</span>}
-                               {p.project_name}
+                               {getProjectDisplayName(p)}
                              </span>
                          </div>
                          {isSubmitted && (
@@ -755,7 +763,7 @@ export default function Dashboard() {
                       {report.reporter_name || '不明'}
                     </span>
                   </div>
-                  <h4 className="text-sm font-bold text-slate-800 mb-1">{report.project?.project_name || '案件名不明'}</h4>
+                  <h4 className="text-sm font-bold text-slate-800 mb-1">{getProjectDisplayName(report.project)}</h4>
                   <p className="text-xs text-slate-600 line-clamp-2 bg-slate-50 p-2 rounded border border-slate-100">
                     {report.work_content || '本文なし'}
                   </p>
