@@ -590,9 +590,16 @@ export default function Billing() {
                               <button className="px-3 py-1.5 text-xs text-slate-600 border border-slate-300 rounded hover:bg-slate-50 transition-colors">
                                 取消
                               </button>
-                              {/* 追加 / 完了請求 Button */}
                               <button
-                                onClick={() => navigate(`/billing/new?project_id=${proj.id}`)}
+                                onClick={() => {
+                                  // Find if an invoice already exists for this project
+                                  const existingInv = invoices.find(inv => inv.project_id === proj.id || (inv.project_ids && inv.project_ids.includes(proj.id)));
+                                  if (existingInv) {
+                                      navigate(`/billing/${existingInv.id}`);
+                                  } else {
+                                      navigate(`/billing/new?project_id=${proj.id}`);
+                                  }
+                                }}
                                 className="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 rounded shadow hover:bg-blue-700 transition-colors"
                               >
                                 {compState.includes('(未請求)') ? '請求作成' : '追加 / 完了請求'}

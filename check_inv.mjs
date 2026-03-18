@@ -1,12 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
-import fs from 'fs';
-const envContent = fs.readFileSync('.env.local', 'utf8');
-const url = envContent.match(/VITE_SUPABASE_URL=(.*)/)?.[1];
-const key = envContent.match(/VITE_SUPABASE_ANON_KEY=(.*)/)?.[1];
-const supabase = createClient(url, key);
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
-async function run() {
-  const { data: inv } = await supabase.from('invoices').select('*, projects(*), invoice_details(*)').eq('project_number', '96');
-  console.log('Invoice 96:', JSON.stringify(inv, null, 2));
+const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
+
+async function check() {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('id, project_id, billing_category, billing_subject, invoice_details(id, details_status, amount, expected_deposit_date, deposit_date)')
+    .like('billing_subject', '%那須%');
+  
+  if (error) console.error(error);
+  else console.dir(data, { depth: null });
 }
-run();
+check();
