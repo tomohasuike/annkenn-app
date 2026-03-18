@@ -10,6 +10,9 @@ type ProjectData = {
   name: string
   category: string
   status: string
+  project_number?: string
+  site_name?: string
+  client_name?: string
 }
 
 type TomorrowScheduleData = {
@@ -156,7 +159,7 @@ export default function TomorrowScheduleForm() {
     try {
       let query = supabase
         .from('projects')
-        .select('id, project_name, category, status_flag')
+        .select('id, project_name, category, status_flag, project_number, site_name, client_name')
         .order('created_at', { ascending: false })
         
       if (!showCompletedProjects) {
@@ -185,7 +188,10 @@ export default function TomorrowScheduleForm() {
           id: p.id,
           name: p.project_name,
           category: p.category || '未分類',
-          status: p.status_flag || '着工前'
+          status: p.status_flag || '着工前',
+          project_number: p.project_number,
+          site_name: p.site_name,
+          client_name: p.client_name
         })))
       }
       
@@ -489,7 +495,9 @@ export default function TomorrowScheduleForm() {
                         >
                             <option value="">案件を選択してください</option>
                             {projectsList.filter(p => p.category === selectedCategory).map(p => (
-                            <option key={p.id} value={p.id}>{p.name} ({p.status})</option>
+                            <option key={p.id} value={p.id}>
+                                {p.project_number ? `${p.project_number}　` : ''}{p.name}{p.site_name ? `（${p.site_name}）` : (p.client_name ? `（${p.client_name}）` : '')} ({p.status})
+                            </option>
                             ))}
                         </select>
                         {projectsList.filter(p => p.category === selectedCategory).length === 0 && (

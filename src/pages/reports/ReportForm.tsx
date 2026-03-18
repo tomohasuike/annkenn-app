@@ -760,11 +760,11 @@ export default function ReportForm() {
                                 return p.status === '着工前' || p.status === '着工中' || p.id === report.project_id;
                             })
                             .map(p => {
-                                const isGeneralOrGov = p.category === '一般' || p.category === '役所';
-                                const locationOrClient = isGeneralOrGov ? p.client_name : p.site_name;
-                                const labelStr = locationOrClient ? `${p.name} (${locationOrClient})` : p.name;
-                                const fullLabel = p.project_number ? `${p.project_number}: ${labelStr}` : labelStr;
-                                return <option key={p.id} value={p.id}>{fullLabel}</option>;
+                                return (
+                                    <option key={p.id} value={p.id}>
+                                        {p.project_number ? `${p.project_number}　` : ''}{p.name}{p.site_name ? `（${p.site_name}）` : (p.client_name ? `（${p.client_name}）` : '')} ({p.status})
+                                    </option>
+                                );
                             })}
                     </select>
                 </div>
