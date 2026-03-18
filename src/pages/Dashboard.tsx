@@ -58,19 +58,21 @@ export default function Dashboard() {
         .select(`
           id,
           project_id,
-          date,
-          worker_names,
-          support_names,
-          project:projects ( id, project_name, site_name, number )
+          assignment_date,
+          worker_id,
+          vehicle_id,
+          worker_master ( name, type ),
+          vehicle_master ( vehicle_name ),
+          project:projects ( id, project_name, site_name, project_number )
         `)
-        .eq('date', todayStr);
+        .eq('assignment_date', todayStr);
       setTodaySchedules(schedules || []);
 
       // 3. Fetch Active Projects (着工中, 完了) for warnings
       const { data: projects } = await supabase
         .from('projects')
-        .select('id, project_name, site_name, number, status_flag, progress_status')
-        .in('status_flag', ['着工中', '完了']);
+        .select('id, project_name, site_name, project_number, status_flag')
+        .in('status_flag', ['着工中', '完工']);
       setActiveProjects(projects || []);
 
       // 4. Fetch Recent Reports (Daily)
@@ -81,8 +83,8 @@ export default function Dashboard() {
           project_id,
           report_date,
           created_at,
-          report_text,
-          worker_name,
+          work_content,
+          reporter_name,
           project:projects ( project_name, site_name )
         `)
         .order('created_at', { ascending: false })
@@ -135,8 +137,8 @@ export default function Dashboard() {
   }
 
   // Derived Data
-  const projectsNeedingCompletionReport = activeProjects.filter(p => p.progress_status === 100 && p.status_flag === '着工中');
-  const activeSchedulesCount = todaySchedules.length;
+  const projectsNeedingCompletionReport = activeProjects.filter(() => false);
+  const activeSchedulesCount = new Set(todaySchedules.filter(s => s.project_id).map(s => s.project_id)).size;
 
   return (
     <div className="h-full flex flex-col overflow-y-auto bg-slate-50 p-6 md:p-8 space-y-8">
@@ -271,27 +273,35 @@ export default function Dashboard() {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {todaySchedules.length > 0 ? (
-                todaySchedules.map(schedule => {
-                  const p = schedule.project || {};
-                  const workers = Array.isArray(schedule.worker_names) ? schedule.worker_names.join(", ") : schedule.worker_names;
-                  const support = Array.isArray(schedule.support_names) ? schedule.support_names.join(", ") : schedule.support_names;
+                Object.values(todaySchedules.reduce((acc, curr) => {
+                  const pid = curr.project?.id || 'unknown';
+                  if (!acc[pid]) acc[pid] = { project: curr.project, workers: [], vehicles: [] };
+                  const wName = Array.isArray(curr.worker_master) ? curr.worker_master[0]?.name : curr.worker_master?.name;
+                  const vName = Array.isArray(curr.vehicle_master) ? curr.vehicle_master[0]?.vehicle_name : curr.vehicle_master?.vehicle_name;
+                  if (wName) acc[pid].workers.push(wName);
+                  if (vName) acc[pid].vehicles.push(vName);
+                  return acc;
+                }, {} as any)).map((schedGroup: any, idx) => {
+                  const p = schedGroup.project || {};
+                  const workers = schedGroup.workers.length > 0 ? schedGroup.workers.join(", ") : '-';
+                  const vehicles = schedGroup.vehicles.length > 0 ? schedGroup.vehicles.join(", ") : '-';
                   
                   return (
-                    <div key={schedule.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 transition-colors cursor-pointer" onClick={() => navigate(`/projects/${p.id}/edit`)}>
+                    <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 transition-colors cursor-pointer" onClick={() => navigate(`/projects/${p.id}/edit`)}>
                       <div className="flex items-center gap-2 mb-2">
                          <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
-                            {p.number || '番号なし'}
+                            {p.project_number || '番号なし'}
                          </span>
                          <span className="font-bold text-sm text-slate-800 truncate" title={p.project_name}>{p.project_name}</span>
                       </div>
                       <div className="space-y-1.5 mt-3">
                         <div className="flex items-start gap-2">
-                          <span className="text-xs font-bold text-slate-400 w-10 shrink-0">担当:</span>
-                          <span className="text-xs text-slate-700">{workers || '-'}</span>
+                          <span className="text-xs font-bold text-slate-400 w-10 shrink-0">人員:</span>
+                          <span className="text-xs text-slate-700">{workers}</span>
                         </div>
                         <div className="flex items-start gap-2">
-                          <span className="text-xs font-bold text-slate-400 w-10 shrink-0">応援:</span>
-                          <span className="text-xs text-slate-700">{support || '-'}</span>
+                          <span className="text-xs font-bold text-slate-400 w-10 shrink-0">車両:</span>
+                          <span className="text-xs text-slate-700">{vehicles}</span>
                         </div>
                       </div>
                     </div>
@@ -326,12 +336,12 @@ export default function Dashboard() {
                       {dateFns.format(new Date(report.created_at), 'MM/dd HH:mm')}
                     </span>
                     <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                      {report.worker_name || '不明'}
+                      {report.reporter_name || '不明'}
                     </span>
                   </div>
                   <h4 className="text-sm font-bold text-slate-800 mb-1">{report.project?.project_name || '案件名不明'}</h4>
                   <p className="text-xs text-slate-600 line-clamp-2 bg-slate-50 p-2 rounded border border-slate-100">
-                    {report.report_text || '本文なし'}
+                    {report.work_content || '本文なし'}
                   </p>
                 </div>
               ))
