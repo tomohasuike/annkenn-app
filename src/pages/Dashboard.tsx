@@ -115,24 +115,32 @@ export default function Dashboard() {
       setSubmittedTodayReports(submittedMap);
 
       // 3.6 Fetch Future Next Day Plans (今後の予定翌日予定)
-      const { data: tomorrowReports } = await supabase
+      const { data: tomorrowReportsRaw } = await supabase
         .from('tomorrow_schedules')
         .select(`
             id, project_id, schedule_date, arrival_time, workers,
             project:projects(project_name)
-        `)
-        .gte('schedule_date', tomorrowStr);
+        `);
         
       const submittedTomMap: Record<string, string> = {};
-      if (tomorrowReports) {
+      if (tomorrowReportsRaw) {
+          // In-memory filter with sanitized dates (since past dates with `/` could bypass Supabase `.gte` string comparison against `-`)
+          const tomorrowReports = tomorrowReportsRaw.filter((r: any) => {
+              if (!r.schedule_date) return false;
+              const cleanDate = r.schedule_date.replace(/\//g, '-');
+              return cleanDate >= tomorrowStr;
+          });
+
           tomorrowReports.forEach((r: any) => {
-              if (r.project_id && r.schedule_date === tomorrowStr) {
+              const cleanDate = r.schedule_date ? r.schedule_date.replace(/\//g, '-') : '';
+              if (r.project_id && cleanDate === tomorrowStr) {
                   submittedTomMap[r.project_id] = r.id;
               }
           });
+
           setTomorrowPlans(tomorrowReports.sort((a: any, b: any) => {
-              const dateA = a.schedule_date || '9999-12-31';
-              const dateB = b.schedule_date || '9999-12-31';
+              const dateA = (a.schedule_date || '9999-12-31').replace(/\//g, '-');
+              const dateB = (b.schedule_date || '9999-12-31').replace(/\//g, '-');
               const dateCmp = dateA.localeCompare(dateB);
               if (dateCmp !== 0) return dateCmp;
 
