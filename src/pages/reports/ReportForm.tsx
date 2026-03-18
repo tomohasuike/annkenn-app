@@ -76,7 +76,10 @@ export default function ReportForm() {
       } else {
         // Apply initial state from navigation if present
         if (location.state) {
-            const { projectId, personnel: initPersonnel, vehicles: initVehicles } = location.state as any;
+            const { projectId, personnel: initPersonnel, vehicles: initVehicles, category } = location.state as any;
+            if (category) {
+                setSelectedProjectCategory(category);
+            }
             if (projectId) {
                 setReport(prev => ({ ...prev, project_id: projectId }));
             }

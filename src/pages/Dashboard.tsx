@@ -67,7 +67,7 @@ export default function Dashboard() {
           vehicle_id,
           worker_master ( name, type ),
           vehicle_master ( vehicle_name ),
-          project:projects ( id, project_name, site_name, project_number )
+          project:projects ( id, project_name, site_name, project_number, category )
         `)
         .eq('assignment_date', todayStr);
       setTodaySchedules(schedules || []);
@@ -83,7 +83,7 @@ export default function Dashboard() {
           vehicle_id,
           worker_master ( name, type ),
           vehicle_master ( vehicle_name ),
-          project:projects ( id, project_name, site_name, project_number )
+          project:projects ( id, project_name, site_name, project_number, category )
         `)
         .eq('assignment_date', tomorrowStr);
       setTomorrowSchedules(tomAssignments || []);
@@ -368,7 +368,8 @@ export default function Dashboard() {
                             state: { 
                                 projectId: p.id,
                                 personnel: personnelData,
-                                vehicles: vehicleData
+                                vehicles: vehicleData,
+                                category: p.category
                             } 
                         });
                     }}>
