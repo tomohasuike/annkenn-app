@@ -16,6 +16,7 @@ type AssignmentData = {
   vehicle_id: string | null
   count: number
   notes: string | null
+  assigned_by?: string | null
   projects: { project_name: string } | null
   worker_master: { name: string, type?: string } | null
   vehicle_master: { vehicle_name: string } | null
@@ -37,6 +38,7 @@ export default function ScheduleManagement() {
   const [currentDate, setCurrentDate] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [syncStatus, setSyncStatus] = useState<'同期済み' | '更新中...'>('同期済み')
   const [isAdmin, setIsAdmin] = useState(false)
+  const [currentWorkerId, setCurrentWorkerId] = useState<string | null>(null)
   
   // Settings
   const [cellWidth, setCellWidth] = useState(120)
@@ -136,6 +138,7 @@ export default function ScheduleManagement() {
                 if (!error && data) {
                     const hasAdminApp = data.allowed_apps?.includes('schedule-admin') || false;
                     setIsAdmin(data.is_admin || hasAdminApp);
+                    setCurrentWorkerId((data as any).id);
                 }
             });
       }
@@ -222,7 +225,7 @@ export default function ScheduleManagement() {
       const { data, error } = await supabase
         .from('assignments')
         .select(`
-          id, assignment_date, project_id, worker_id, vehicle_id, count, notes,
+          id, assignment_date, project_id, worker_id, vehicle_id, count, notes, assigned_by,
           projects(project_name), worker_master(name, type), vehicle_master(vehicle_name)
         `)
         .gte('assignment_date', startDateStr)
@@ -304,8 +307,16 @@ export default function ScheduleManagement() {
   }
 
   // --- Drag & Drop Handlers ---
+  const canDragItem = (type: 'worker' | 'vehicle', assignmentId?: string) => {
+    if (isAdmin) return true;
+    if (type !== 'vehicle' || !currentWorkerId) return false;
+    if (!assignmentId) return true;
+    const a = assignments.find(x => x.id === assignmentId);
+    return a?.assigned_by === currentWorkerId;
+  };
+
   const handleDragStart = (e: React.DragEvent, id: string, type: 'worker' | 'vehicle', sourceProjectId?: string, sourceDate?: string, assignmentId?: string) => {
-    if (!isAdmin) {
+    if (!canDragItem(type, assignmentId)) {
       e.preventDefault();
       return;
     }
@@ -381,6 +392,7 @@ export default function ScheduleManagement() {
                     vehicle_id: item.type === 'vehicle' ? item.id : null,
                     count: countToUse,
                     notes: sourceAssignment ? sourceAssignment.notes : null,
+                    assigned_by: currentWorkerId,
                     projects: { project_name: '' },
                     worker_master: item.type === 'worker' ? (() => {
                        const r = resources.find(res => res.id === item.id);
@@ -431,7 +443,8 @@ export default function ScheduleManagement() {
             project_id: targetProjectId,
             worker_id: item.type === 'worker' ? item.id : null,
             vehicle_id: item.type === 'vehicle' ? item.id : null,
-            count: sourceAssignment ? sourceAssignment.count : 1
+            count: sourceAssignment ? sourceAssignment.count : 1,
+            assigned_by: currentWorkerId
         };
 
         try {
@@ -666,17 +679,43 @@ export default function ScheduleManagement() {
 
                {/* 稼働プロジェクト */}
                {sortedCategories.flatMap(cat => {
-                 const currentCatProjects = groupedProjects[cat].filter(p => {
-                    return dates.some(d => {
+                 const isCollapsed = collapsedCategories[cat];
+                 const currentCatProjects = groupedProjects[cat];
+                 if (!currentCatProjects || currentCatProjects.length === 0) return [];
+
+                 const headerRow = (
+                   <tr key={`cat-${cat}`} className="bg-[#eef2f6] border-b border-t border-slate-300 cursor-pointer hover:bg-[#e2e8f0] transition-colors" onClick={() => setCollapsedCategories(prev => ({ ...prev, [cat]: !prev[cat] }))}>
+                      <td className="sticky left-0 z-30 bg-[#eef2f6] border-r border-slate-300 p-1.5 font-bold text-slate-700 text-[10px] w-[120px] min-w-[120px] max-w-[120px]">
+                         <div className="flex items-center gap-0.5">
+                            {isCollapsed ? <ChevronRightIcon className="w-3 h-3 text-slate-500" /> : <ChevronDown className="w-3 h-3 text-slate-500" />}
+                            <span className="truncate">【区分：{cat}】</span> 
+                         </div>
+                      </td>
+                      <td colSpan={7} className="px-1 py-0.5 bg-[#eef2f6]">
+                         <span className="text-[9px] font-normal text-slate-400">
+                           {isCollapsed ? `※データありのみ (${currentCatProjects.filter(p => dates.some(d => {
+                               const dStr = format(d, 'yyyy-MM-dd');
+                               const asg = getAssignmentsForCell(p.id, dStr);
+                               const daily = dailyData.find(dd => dd.project_id === p.id && dd.target_date === dStr);
+                               return asg.length > 0 || !!daily?.planned_count || !!daily?.comment;
+                           })).length}件)` : `※すべて表示 (${currentCatProjects.length}件)`}
+                         </span>
+                      </td>
+                   </tr>
+                 );
+
+                 const projectRows = currentCatProjects.map(p => {
+                    const projectHasData = dates.some(d => {
                        const dStr = format(d, 'yyyy-MM-dd')
                        const asg = getAssignmentsForCell(p.id, dStr)
                        const daily = dailyData.find(dd => dd.project_id === p.id && dd.target_date === dStr)
-                       return asg.length > 0 || !!daily?.planned_count
-                    })
-                 });
-                 if (currentCatProjects.length === 0) return [];
-                 return currentCatProjects.map(p => (
-                   <tr key={p.id} className="border-b border-slate-200 hover:bg-blue-50/50 transition-colors bg-white">
+                       return asg.length > 0 || !!daily?.planned_count || !!daily?.comment
+                    });
+
+                    if (isCollapsed && !projectHasData) return null;
+
+                    return (
+                      <tr key={p.id} className="border-b border-slate-200 hover:bg-blue-50/50 transition-colors bg-white">
                      {/* 左側ヘッダー（固定） */}
                      <td className="sticky left-0 z-30 bg-white border-r border-slate-200 p-1.5 align-top shadow-[2px_0_5px_rgba(0,0,0,0.02)] w-[120px] min-w-[120px] max-w-[120px]">
                         <div className="flex flex-col gap-0.5">
@@ -703,16 +742,44 @@ export default function ScheduleManagement() {
                        const isShort = daily?.planned_count && sumWorkers < daily.planned_count;
 
                        return (
-                         <td key={i} className={`p-1 border-r border-slate-100 align-top w-[100px] min-w-[100px] max-w-[100px] relative ${isColToday ? 'bg-blue-50/20' : ''}`}>
+                         <td key={i} className={`group/cell p-1 border-r border-slate-100 align-top w-[100px] min-w-[100px] max-w-[100px] relative ${isColToday ? 'bg-blue-50/20' : ''}`}>
                            <div className="flex flex-col gap-1 min-h-[40px]">
-                              {/* 予定人数 / 実績人数 バッジ */}
-                              {(sumWorkers > 0 || !!daily?.planned_count) && (
-                                <div className="flex justify-between items-center mb-0.5 border-b border-slate-100 pb-0.5">
-                                 <span className={`text-[9px] font-bold px-1 rounded-sm tracking-tighter ${isShort ? 'bg-red-50 text-red-600' : 'text-emerald-700'}`}>
-                                    予:{daily?.planned_count || '-'} / 実:{sumWorkers}
-                                 </span>
-                                </div>
-                              )}
+                              {/* 予定人数とコメント入力エリア */}
+                              <div className="flex items-start justify-between mb-0.5 border-b border-slate-100 pb-0.5 gap-1">
+                                 {/* 予定人数 */}
+                                 <div 
+                                   className="flex-shrink-0 cursor-pointer"
+                                   onClick={(e) => handlePlannedCountClick(p.id, dStr, daily?.planned_count, e)}
+                                   title="予定人員を入力"
+                                 >
+                                   {(sumWorkers > 0 || !!daily?.planned_count) ? (
+                                     <span className={`text-[9px] font-bold px-1 rounded-sm tracking-tighter ${isShort ? 'bg-red-50 text-red-600' : 'text-emerald-700'} hover:bg-slate-200 transition-colors block leading-none py-0.5`}>
+                                        予:{daily?.planned_count || '-'} / 実:{sumWorkers}
+                                     </span>
+                                   ) : (
+                                     <span className="text-[9px] font-bold px-1 rounded-sm text-slate-300 hover:text-slate-500 hover:bg-slate-100 border border-transparent hover:border-slate-200 block leading-none py-0.5 opacity-0 group-hover/cell:opacity-100 transition-opacity">
+                                        予: +
+                                     </span>
+                                   )}
+                                 </div>
+                                 
+                                 {/* コメント */}
+                                 <div 
+                                   className="flex-1 cursor-pointer min-w-0 flex justify-end"
+                                   onClick={(e) => handleCommentClick(p.id, dStr, daily?.comment, e)}
+                                   title={daily?.comment ? "コメントを編集" : "コメントを追加"}
+                                 >
+                                   {daily?.comment ? (
+                                     <div className="text-[8px] px-1 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 line-clamp-2 leading-tight break-all text-left w-full shadow-[0_1px_1px_rgba(0,0,0,0.02)]">
+                                       {daily.comment}
+                                     </div>
+                                   ) : (
+                                     <div className="p-0.5 rounded text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-opacity opacity-0 group-hover/cell:opacity-100 flex items-center justify-center">
+                                       <MessageSquare className="w-2.5 h-2.5" />
+                                     </div>
+                                   )}
+                                 </div>
+                              </div>
                               
                               <div className="flex flex-col gap-0.5">
                                  {/* 作業員 */}
@@ -740,7 +807,10 @@ export default function ScheduleManagement() {
                        );
                      })}
                    </tr>
-                 ))
+                 );
+               });
+               
+               return [headerRow, ...projectRows];
                })}
              </tbody>
            </table>
@@ -864,7 +934,7 @@ export default function ScheduleManagement() {
                             return (
                             <div 
                                 key={res.id} 
-                                draggable={isAdmin}
+                                draggable={canDragItem(res.type as 'worker'|'vehicle')}
                                 onDragStart={(e) => handleDragStart(e, res.id, res.type as 'worker'|'vehicle')}
                                 onClick={(e) => handleItemClick(e, { id: res.id, type: res.type as 'worker' | 'vehicle' })}
                                 className={`px-1 py-0.5 border border-slate-200 rounded-md border-l-4 ${typeBorder} font-bold text-[0.95em] flex items-center justify-between transition-all bg-white shadow-sm ${checkIsSelected(res.id) ? 'shadow-md ring-2 ring-blue-400 bg-blue-50/50 scale-[1.02] -translate-y-[1px] z-10' : ''} ${isAdmin ? 'cursor-grab hover:bg-slate-50 hover:border-slate-300' : 'cursor-default'}`}
@@ -961,7 +1031,7 @@ export default function ScheduleManagement() {
                                   {pool.map(res => (
                                       <div 
                                         key={res.id} 
-                                        draggable={isAdmin}
+                                        draggable={canDragItem(res.type as 'worker'|'vehicle')}
                                         onDragStart={(e) => handleDragStart(e, res.id, res.type as 'worker'|'vehicle', "UNASSIGNED_POOL", dateStr)}
                                         onClick={(e) => handleItemClick(e, { id: res.id, type: res.type as 'worker'|'vehicle', sourceProjectId: "UNASSIGNED_POOL", sourceDate: dateStr })}
                                         className={`px-2 py-0.5 text-[0.85em] bg-white border border-[#c8e6c9] border-l-[3px] ${typeBorder} rounded-md shadow-sm text-slate-700 font-bold whitespace-nowrap flex items-center justify-between w-full transition-all ${checkIsSelected(res.id, "UNASSIGNED_POOL", dateStr) ? 'shadow-md ring-2 ring-blue-400 bg-blue-50/50 scale-[1.02] -translate-y-[1px] z-10' : ''} ${isAdmin ? 'cursor-grab hover:bg-emerald-50 active:cursor-grabbing' : 'cursor-default'}`}
@@ -1025,7 +1095,7 @@ export default function ScheduleManagement() {
                           {assignmentsForCell.map(a => (
                              <div 
                                  key={a.id} 
-                                 draggable={isAdmin}
+                                 draggable={canDragItem(a.worker_id ? 'worker' : 'vehicle', a.id)}
                                  onDragStart={(e) => handleDragStart(e, (a.worker_id || a.vehicle_id) as string, a.worker_id ? 'worker' : 'vehicle', vacationProjId, dateStr, a.id)}
                                  onClick={(e) => handleItemClick(e, { id: (a.worker_id || a.vehicle_id) as string, type: a.worker_id ? 'worker' : 'vehicle', sourceProjectId: vacationProjId, sourceDate: dateStr, assignmentId: a.id })}
                                  className={`group/item px-1 py-0 text-[0.85em] bg-white border border-slate-200 border-l-[3px] ${a.worker_id ? 'border-l-blue-500' : 'border-l-emerald-500'} rounded-md shadow-sm text-slate-700 font-bold flex items-center justify-between transition-all ${checkIsSelected((a.worker_id || a.vehicle_id) as string, vacationProjId, dateStr, a.id) ? 'shadow-md ring-2 ring-blue-400 bg-blue-50/50 scale-[1.02] -translate-y-[1px] z-10' : ''} ${isAdmin ? 'cursor-grab active:cursor-grabbing hover:border-slate-300 hover:shadow' : 'cursor-default'}`}
@@ -1220,7 +1290,7 @@ export default function ScheduleManagement() {
                                             {regularAssignments.map(a => (
                                               <div 
                                                   key={a.id}
-                                                  draggable={isAdmin}
+                                                  draggable={canDragItem(a.worker_id ? 'worker' : 'vehicle', a.id)}
                                                   onDragStart={(e) => handleDragStart(e, (a.worker_id || a.vehicle_id) as string, a.worker_id ? 'worker' : 'vehicle', p.id, dateStr, a.id)}
                                                   className={`group/item flex items-center justify-between px-1 py-0 text-[0.85em] bg-white border rounded shadow-sm hover:shadow ${a.worker_id ? 'border-l-4 border-[#3b82f6] text-slate-700 font-bold border-y-slate-200 border-r-slate-200' : 'border-l-4 border-[#10b981] text-slate-700 font-bold border-y-slate-200 border-r-slate-200'} ${isAdmin ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                               >
@@ -1243,7 +1313,7 @@ export default function ScheduleManagement() {
                                                       <td 
                                                         className={`text-[0.75em] text-purple-700 py-0.5 border-b border-slate-200 font-bold whitespace-nowrap pl-0.5 ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''}`} 
                                                         style={{ width: '40%'}}
-                                                        draggable={isAdmin}
+                                                        draggable={canDragItem('worker', pr.id)}
                                                         onDragStart={(e) => handleDragStart(e, pr.worker_id as string, 'worker', p.id, dateStr, pr.id)}
                                                       >
                                                         協力: {pr.count||1}名
