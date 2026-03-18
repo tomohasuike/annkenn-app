@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams, useNavigate, useLocation } from "react-router-dom"
 import { supabase } from "../lib/supabase"
 import { ArrowLeft, Loader2, Save, CalendarClock, User, Users, Search, Target, Plus, Trash2, Truck, Wrench } from "lucide-react"
 import { format, addDays } from 'date-fns';
@@ -34,6 +34,7 @@ type Subcontractor = {
 export default function TomorrowScheduleForm() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   
@@ -70,15 +71,15 @@ export default function TomorrowScheduleForm() {
   useEffect(() => {
     async function init() {
       setLoading(true)
-      await fetchProjects()
+      const fetched = await fetchProjects()
 
       if (id) {
         await fetchScheduleData(id)
       } else {
         const { data: { session } } = await supabase.auth.getSession()
         const user = session?.user;
+        let defaultReporter = '';
         if (user && user.email) {
-            // Attempt to map email to real name using worker_master
             const { data: workerMatch } = await supabase
               .from('worker_master')
               .select('name')
@@ -86,12 +87,52 @@ export default function TomorrowScheduleForm() {
               .single()
 
             if (workerMatch && workerMatch.name) {
+                defaultReporter = workerMatch.name;
                 setSchedule(prev => ({ ...prev, reporter: workerMatch.name }))
             } else {
-                const reporterName = user.email.split('@')[0];
-                setSchedule(prev => ({ ...prev, reporter: reporterName }))
+                defaultReporter = user.email.split('@')[0];
+                setSchedule(prev => ({ ...prev, reporter: defaultReporter }))
             }
         }
+        
+        if (location.state) {
+            const { projectId, personnel, vehicles: passedVehicles, category, schedule_date } = location.state;
+            
+            setSchedule(prev => ({ 
+                ...prev, 
+                project_id: projectId || '', 
+                category: category || '一般',
+                schedule_date: schedule_date || prev.schedule_date,
+                reporter: defaultReporter || prev.reporter
+            }));
+            
+            if (category) setSelectedCategory(category);
+            
+            if (personnel && Array.isArray(personnel)) {
+                setSelectedWorkers(personnel.map(p => p.worker_name));
+            }
+            
+            if (passedVehicles && Array.isArray(passedVehicles)) {
+                const initVehicles: any[] = [];
+                const initMachinery: any[] = [];
+                const finalVehiclesList = fetched?.finalVehiclesList || [];
+                
+                passedVehicles.forEach(v => {
+                    const match = finalVehiclesList.find(vl => vl.id === v.vehicle_id);
+                    if (match && match.category === '建設機械') {
+                        initMachinery.push(v);
+                    } else if (match && match.category === '作業車') {
+                        initVehicles.push(v);
+                    } else if (!match) {
+                        // fallback if not mapped properly: put in vehicles purely by assumption if not matched
+                        initVehicles.push(v);
+                    }
+                });
+                setVehicles(initVehicles);
+                setMachinery(initMachinery);
+            }
+        }
+
         // Add one empty row by default for a new form
         setSubcontractors([{ subcontractor_name: '', worker_count: '1' }])
         setLoading(false)
@@ -127,7 +168,8 @@ export default function TomorrowScheduleForm() {
       if (wData) setWorkersList(wData.map(w => ({ id: w.id, name: w.name })))
 
       const { data: vData } = await supabase.from('vehicle_master').select('id, vehicle_name, category')
-      if (vData) setVehiclesList(vData.map(v => ({ id: v.id, name: v.vehicle_name, category: v.category })))
+      const finalVehiclesList = vData ? vData.map(v => ({ id: v.id, name: v.vehicle_name, category: v.category })) : [];
+      setVehiclesList(finalVehiclesList)
 
       if (error) throw error
       if (data) {
@@ -138,8 +180,11 @@ export default function TomorrowScheduleForm() {
           status: p.status_flag || '着工前'
         })))
       }
+      
+      return { finalVehiclesList };
     } catch (e) {
       console.error("Error fetching projects:", e)
+      return null;
     }
   }
 

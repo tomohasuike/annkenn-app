@@ -113,12 +113,11 @@ export default function Dashboard() {
       }
       setSubmittedTodayReports(submittedMap);
 
-      // 3.6 Fetch Tomorrow's Daily Reports (明日の予定日報)
+      // 3.6 Fetch Tomorrow's Daily Reports (明日の予定日報 => 翌日予定)
       const { data: tomorrowReports } = await supabase
-        .from('daily_reports')
+        .from('tomorrow_schedules')
         .select('id, project_id')
-        .gte('report_date', `${tomorrowStr}T00:00:00`)
-        .lte('report_date', `${tomorrowStr}T23:59:59.999Z`);
+        .eq('schedule_date', tomorrowStr);
         
       const submittedTomMap: Record<string, string> = {};
       if (tomorrowReports) {
@@ -194,7 +193,33 @@ export default function Dashboard() {
 
   // 翌日の予定があるのに、本日の日報が出ていないアラート
   const currentHour = new Date().getHours();
+  const currentMinutes = new Date().getMinutes();
+  const isPast1730 = currentHour > 17 || (currentHour === 17 && currentMinutes >= 30);
+
   const tomorrowScheduleGroups = Object.values(tomorrowSchedules.reduce((acc, curr) => {
+    const p = curr.project;
+    if (!p) return acc;
+    const pid = p.id;
+    if (!acc[pid]) acc[pid] = { project: p, workers: [], vehicles: [], workersRaw: [], vehiclesRaw: [] };
+    const wRaw = Array.isArray(curr.worker_master) ? curr.worker_master[0] : curr.worker_master;
+    const vRaw = Array.isArray(curr.vehicle_master) ? curr.vehicle_master[0] : curr.vehicle_master;
+    
+    if (wRaw) {
+        acc[pid].workers.push(wRaw.name);
+        acc[pid].workersRaw.push({ id: curr.worker_id, name: wRaw.name });
+    }
+    if (vRaw) {
+        acc[pid].vehicles.push(vRaw.vehicle_name);
+        acc[pid].vehiclesRaw.push({ id: curr.vehicle_id, vehicle_name: vRaw.vehicle_name });
+    }
+    return acc;
+  }, {} as any)).sort((a: any, b: any) => {
+    const isAVac = a.project?.project_number === 'VACATION' || a.project?.project_name?.includes('休暇');
+    const isBVac = b.project?.project_number === 'VACATION' || b.project?.project_name?.includes('休暇');
+    return isAVac === isBVac ? 0 : isAVac ? -1 : 1;
+  });
+
+  const todayScheduleGroups = Object.values(todaySchedules.reduce((acc, curr) => {
     const p = curr.project;
     if (!p) return acc;
     const pid = p.id;
@@ -225,7 +250,16 @@ export default function Dashboard() {
       return !submittedTomorrowReports[p.id];
   });
 
+  const missingTodayGroups = todayScheduleGroups.filter((group: any) => {
+      const p = group.project;
+      if (!p) return false;
+      const isVacationOrMisc = p.category === 'その他' || p.project_number === 'VACATION' || (typeof p.project_name === 'string' && p.project_name.includes('休暇'));
+      if (isVacationOrMisc) return false;
+      return !submittedTodayReports[p.id];
+  });
+
   const showTomorrowScheduleAlert = currentHour >= 15 && missingTomorrowGroups.length > 0;
+  const showTodayScheduleAlert = isPast1730 && missingTodayGroups.length > 0;
 
   return (
     <div className="h-full flex flex-col overflow-y-auto bg-slate-50 p-6 md:p-8 space-y-8">
@@ -316,15 +350,15 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* Tomorrow Schedule Reminder (Missing Today's Report for Tomorrow's Plan) */}
-              {showTomorrowScheduleAlert && (
-                <div className="p-4 flex items-start gap-4 border-b last:border-0 border-slate-100 bg-orange-50/50">
-                  <Clock className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+              {/* Today Schedule Alert */}
+              {showTodayScheduleAlert && (
+                <div className="p-4 flex items-start gap-4 border-b last:border-0 border-slate-100 bg-red-50/50">
+                  <Clock className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                   <div>
-                    <h3 className="text-sm font-bold text-orange-700">明日の予定（日報）未作成</h3>
-                    <p className="text-sm text-orange-600 mt-1 mb-2">15時を過ぎましたが、明日の配置スケジュールが組まれている現場のうち、<strong>{missingTomorrowGroups.length}件</strong>の明日分の予定日報がまだ提出されていません。</p>
+                    <h3 className="text-sm font-bold text-red-700">本日の日報 未提出</h3>
+                    <p className="text-sm text-red-600 mt-1 mb-2">17:30を過ぎましたが、本日の現場スケジュールのうち、<strong>{missingTodayGroups.length}件</strong>の日報がまだ提出されていません。</p>
                     <ul className="mt-3 space-y-2">
-                      {missingTomorrowGroups.map((group: any, idx: number) => {
+                      {missingTodayGroups.map((group: any, idx: number) => {
                          const p = group.project;
                          const workers = group.workers.length > 0 ? group.workers.join(", ") : '人員指定なし';
                          return (
@@ -333,14 +367,56 @@ export default function Dashboard() {
                                onClick={() => {
                                   const personnelData = group.workersRaw ? group.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
                                   const vehicleData = group.vehiclesRaw ? group.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
-                                  const tomorrowStr = dateFns.format(dateFns.addDays(new Date(), 1), "yyyy-MM-dd'T'17:00");
                                   navigate(`/reports/new`, { 
                                       state: { 
                                           projectId: p.id,
                                           personnel: personnelData,
                                           vehicles: vehicleData,
+                                          category: p.category
+                                      } 
+                                  });
+                               }}
+                               className="text-left w-full bg-white/70 hover:bg-white border border-red-200/60 hover:border-red-300 rounded-md px-3 py-2 text-sm transition-colors flex items-center justify-between shadow-sm"
+                             >
+                                <div className="flex flex-col gap-0.5 overflow-hidden w-full max-w-[calc(100%-80px)] pr-2">
+                                  <span className="font-bold text-slate-700 truncate">{p.project_name}</span>
+                                  <span className="text-xs text-slate-500 font-medium truncate">人員: <span className="text-slate-600">{workers}</span></span>
+                                </div>
+                                <span className="text-red-600 font-bold text-[10px] bg-red-100/80 border border-red-200 px-2 py-1 rounded shrink-0 flex items-center gap-1">作成画面<span className="text-lg leading-none transform translate-y-[-1px]">&rarr;</span></span>
+                             </button>
+                           </li>
+                         );
+                      })}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* Tomorrow Schedule Reminder (Missing Next Day Plan for Tomorrow's Schedule) */}
+              {showTomorrowScheduleAlert && (
+                <div className="p-4 flex items-start gap-4 border-b last:border-0 border-slate-100 bg-orange-50/50">
+                  <Clock className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-bold text-orange-700">明日の予定（翌日予定）未作成</h3>
+                    <p className="text-sm text-orange-600 mt-1 mb-2">15時を過ぎましたが、明日の配置スケジュールが組まれている現場のうち、<strong>{missingTomorrowGroups.length}件</strong>の明日分の翌日予定がまだ提出されていません。</p>
+                    <ul className="mt-3 space-y-2">
+                       {missingTomorrowGroups.map((group: any, idx: number) => {
+                         const p = group.project;
+                         const workers = group.workers.length > 0 ? group.workers.join(", ") : '人員指定なし';
+                         return (
+                           <li key={idx}>
+                             <button
+                               onClick={() => {
+                                  const personnelData = group.workersRaw ? group.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
+                                  const vehicleData = group.vehiclesRaw ? group.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
+                                  const tomorrowStr = dateFns.format(dateFns.addDays(new Date(), 1), "yyyy-MM-dd");
+                                  navigate(`/tomorrow-schedules/new`, { 
+                                      state: { 
+                                          projectId: p.id,
+                                          personnel: personnelData,
+                                          vehicles: vehicleData,
                                           category: p.category,
-                                          reportDate: tomorrowStr
+                                          schedule_date: tomorrowStr
                                       } 
                                   });
                                }}
@@ -382,7 +458,7 @@ export default function Dashboard() {
               )}
 
               {/* Empty State for To-Do */}
-              {!((hasBillingAccess && overdueInvoices.length > 0) || projectsNeedingCompletionReport.length > 0 || showTomorrowScheduleAlert) && (
+              {!((hasBillingAccess && overdueInvoices.length > 0) || projectsNeedingCompletionReport.length > 0 || showTomorrowScheduleAlert || showTodayScheduleAlert) && (
                 <div className="p-8 text-center text-slate-500 text-sm">
                   現在、対応が必要なアラートはありません。
                 </div>
@@ -403,29 +479,8 @@ export default function Dashboard() {
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {todaySchedules.length > 0 ? (
-                Object.values(todaySchedules.reduce((acc, curr) => {
-                  const pid = curr.project?.id || 'unknown';
-                  if (!acc[pid]) acc[pid] = { project: curr.project, workers: [], vehicles: [], workersRaw: [], vehiclesRaw: [] };
-                  const wRaw = Array.isArray(curr.worker_master) ? curr.worker_master[0] : curr.worker_master;
-                  const vRaw = Array.isArray(curr.vehicle_master) ? curr.vehicle_master[0] : curr.vehicle_master;
-                  
-                  if (wRaw) {
-                      acc[pid].workers.push(wRaw.name);
-                      acc[pid].workersRaw.push({ id: curr.worker_id, name: wRaw.name });
-                  }
-                  if (vRaw) {
-                      acc[pid].vehicles.push(vRaw.vehicle_name);
-                      acc[pid].vehiclesRaw.push({ id: curr.vehicle_id, vehicle_name: vRaw.vehicle_name });
-                  }
-                  return acc;
-                }, {} as any))
-                .sort((a: any, b: any) => {
-                  const isAVac = a.project?.project_number === 'VACATION' || a.project?.project_name?.includes('休暇');
-                  const isBVac = b.project?.project_number === 'VACATION' || b.project?.project_name?.includes('休暇');
-                  return isAVac === isBVac ? 0 : isAVac ? -1 : 1;
-                })
-                .map((schedGroup: any, idx) => {
+              {todayScheduleGroups.length > 0 ? (
+                todayScheduleGroups.map((schedGroup: any, idx: number) => {
                   const p = schedGroup.project || {};
                   const workers = schedGroup.workers.length > 0 ? schedGroup.workers.join(", ") : '-';
                   const vehicles = schedGroup.vehicles.length > 0 ? schedGroup.vehicles.join(", ") : '-';
@@ -520,21 +575,20 @@ export default function Dashboard() {
                         const personnelData = schedGroup.workersRaw ? schedGroup.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
                         const vehicleData = schedGroup.vehiclesRaw ? schedGroup.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
                         if (isSubmitted) {
-                            navigate(`/reports/${reportId}/edit`, {
+                            navigate(`/tomorrow-schedules/${reportId}/edit`, {
                                 state: {
                                     personnel: personnelData,
                                     vehicles: vehicleData
                                 }
                             });
                         } else {
-                            const tomorrowStr = dateFns.format(dateFns.addDays(new Date(), 1), "yyyy-MM-dd'T'17:00");
-                            navigate(`/reports/new`, { 
+                            navigate(`/tomorrow-schedules/new`, { 
                                 state: { 
                                     projectId: p.id,
                                     personnel: personnelData,
                                     vehicles: vehicleData,
                                     category: p.category,
-                                    reportDate: tomorrowStr
+                                    schedule_date: dateFns.format(dateFns.addDays(new Date(), 1), "yyyy-MM-dd")
                                 } 
                             });
                         }
