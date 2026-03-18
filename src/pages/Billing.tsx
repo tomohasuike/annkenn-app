@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "../lib/supabase"
-import { Plus, Search, FileText, Building2, Loader2, Edit, Trash2, ChevronDown, MapPin, RefreshCw } from "lucide-react"
+import { Plus, Search, FileText, Building2, Loader2, Edit, Trash2, ChevronDown, ChevronRight, MapPin, RefreshCw } from "lucide-react"
 
 type ProjectData = {
   id: string
@@ -47,9 +47,31 @@ export default function Billing() {
   const [projects, setProjects] = useState<ProjectData[]>([]) // For Projects tab
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [activeTab, setActiveTab] = useState<"projects" | "pending" | "completed">("pending")
+  const [activeTab, setActiveTab] = useState<"projects" | "pending" | "completed" | "summary" | "pending_summary">("pending")
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null)
   const [projectStatusFilter, setProjectStatusFilter] = useState("着工中 (未請求)")
+  const [summaryMonthFilter, setSummaryMonthFilter] = useState<string>("ALL")
+  const [summaryCategoryFilter, setSummaryCategoryFilter] = useState<string>("ALL")
+  const [expandedSummaryCategories, setExpandedSummaryCategories] = useState<Record<string, boolean>>({})
+  const [selectedClientDetails, setSelectedClientDetails] = useState<{ clientName: string, categoryName: string, invoices: any[] } | null>(null)
+
+  const [pendingSummaryMonthFilter, setPendingSummaryMonthFilter] = useState<string>("ALL")
+  const [pendingSummaryCategoryFilter, setPendingSummaryCategoryFilter] = useState<string>("ALL")
+  const [expandedPendingSummaryCategories, setExpandedPendingSummaryCategories] = useState<Record<string, boolean>>({})
+
+  const toggleSummaryCategory = (categoryName: string) => {
+    setExpandedSummaryCategories(prev => ({
+      ...prev,
+      [categoryName]: prev[categoryName] !== undefined ? !prev[categoryName] : false
+    }))
+  }
+
+  const togglePendingSummaryCategory = (categoryName: string) => {
+    setExpandedPendingSummaryCategories(prev => ({
+      ...prev,
+      [categoryName]: prev[categoryName] !== undefined ? !prev[categoryName] : false
+    }))
+  }
 
   useEffect(() => {
     fetchData()
@@ -137,14 +159,15 @@ export default function Billing() {
 
   // Determine computed project state
   const getProjectBillingState = (proj: ProjectData) => {
-    const projInvoices = invoices.filter(inv => inv.project_id === proj.id)
-    if (projInvoices.length > 0) {
-      const hasCompleted = projInvoices.some(inv => inv.billing_category === '完成')
-      const hasPartial = projInvoices.some(inv => inv.billing_category === '出来高')
-      if (hasCompleted) return "完工"
-      if (hasPartial) return "出来高請求中"
+    // Check if the project is associated with any invoices
+    const hasInvoices = invoices.some(inv => inv.project_id === proj.id || (inv.project_ids && inv.project_ids.includes(proj.id)))
+    const isCompleted = proj.status_flag === "完工" || proj.status_flag === "完了"
+    
+    if (isCompleted) {
+      return hasInvoices ? "請求済・完工" : "完工 (未請求)"
+    } else {
+      return hasInvoices ? "出来高請求中" : "着工中 (未請求)"
     }
-    return proj.status_flag === "完工" || proj.status_flag === "完了" ? "完工" : (proj.status_flag || "着工前")
   }
 
 
@@ -176,15 +199,16 @@ export default function Billing() {
 
   // Projects View (案件一覧)
   let filteredProjects = projects.filter(p => {
+    if (p.project_name === '休暇') return false
     return (p.project_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
            (p.project_number || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
            (p.client_name || "").toLowerCase().includes(searchTerm.toLowerCase())
   })
   
   if (projectStatusFilter === "着工中 (未請求)") {
-    filteredProjects = filteredProjects.filter(p => p.status_flag === "着工中" || p.status_flag === "着工前")
+    filteredProjects = filteredProjects.filter(p => getProjectBillingState(p) === "着工中 (未請求)")
   } else if (projectStatusFilter === "完工 (未請求)") {
-    filteredProjects = filteredProjects.filter(p => p.status_flag === "完工" || p.status_flag === "完了")
+    filteredProjects = filteredProjects.filter(p => getProjectBillingState(p) === "完工 (未請求)")
   } else if (projectStatusFilter === "出来高請求中") {
     filteredProjects = filteredProjects.filter(p => getProjectBillingState(p) === "出来高請求中")
   }
@@ -274,8 +298,67 @@ export default function Billing() {
     return matchesProj || matchesInv
   }
 
-  const displayPending = pendingInvoices.filter(applySearchToGroup)
-  const displayCompleted = completedInvoices.filter(applySearchToGroup)
+  const displayPending = pendingInvoices.filter(applySearchToGroup).filter(inv => (inv.primaryProj as Partial<ProjectData>)?.project_name !== '休暇')
+  const displayCompleted = completedInvoices.filter(applySearchToGroup).filter(inv => (inv.primaryProj as Partial<ProjectData>)?.project_name !== '休暇')
+
+  // Extract unique months (YYYY-MM) from completed invoices for the filter dropdown
+  const availableMonths = Array.from(new Set(
+    completedInvoices
+      .filter(inv => (inv.primaryProj as Partial<ProjectData>)?.project_name !== '休暇')
+      .map(inv => {
+        if (!inv.lastDepositDate || inv.lastDepositDate === "-") return null
+        const d = inv.lastDepositDateDate
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      })
+      .filter(Boolean) as string[]
+  )).sort().reverse()
+
+  // Extract unique expected deposit months from pending invoices
+  const availablePendingMonths = Array.from(new Set(
+    pendingInvoices
+      .filter(inv => (inv.primaryProj as Partial<ProjectData>)?.project_name !== '休暇')
+      .flatMap(inv => inv.invoice_details || [])
+      .map(d => {
+        if (!d.expected_deposit_date) return null
+        const date = new Date(d.expected_deposit_date)
+        if (isNaN(date.getTime())) return null
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      })
+      .filter(Boolean) as string[]
+  )).sort().reverse()
+
+  // Pre-defined category order
+  const CATEGORY_ORDER = ['一般', '役所', '川北', 'bpe']
+
+  // Extract unique categories from completed invoices for the filter dropdown
+  const availableCategories = Array.from(new Set(
+    completedInvoices
+      .filter(inv => (inv.primaryProj as Partial<ProjectData>)?.project_name !== '休暇')
+      .map(inv => (inv.primaryProj as any)?.category)
+      .filter(Boolean) as string[]
+  )).sort((a, b) => {
+    const indexA = CATEGORY_ORDER.indexOf(a)
+    const indexB = CATEGORY_ORDER.indexOf(b)
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB
+    if (indexA !== -1) return -1
+    if (indexB !== -1) return 1
+    return a.localeCompare(b)
+  })
+
+  // Extract unique categories from pending invoices
+  const availablePendingCategories = Array.from(new Set(
+    pendingInvoices
+      .filter(inv => (inv.primaryProj as Partial<ProjectData>)?.project_name !== '休暇')
+      .map(inv => (inv.primaryProj as any)?.category)
+      .filter(Boolean) as string[]
+  )).sort((a, b) => {
+    const indexA = CATEGORY_ORDER.indexOf(a)
+    const indexB = CATEGORY_ORDER.indexOf(b)
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB
+    if (indexA !== -1) return -1
+    if (indexB !== -1) return 1
+    return a.localeCompare(b)
+  })
 
   return (
     <div className="h-full flex flex-col min-h-0 bg-slate-50/50">
@@ -327,6 +410,22 @@ export default function Billing() {
             >
               入金完了履歴
             </button>
+            <button
+              onClick={() => setActiveTab("summary")}
+              className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 ${
+                activeTab === "summary" ? "border-purple-500 text-purple-600" : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+              }`}
+            >
+              入金集計
+            </button>
+            <button
+              onClick={() => setActiveTab("pending_summary")}
+              className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 ${
+                activeTab === "pending_summary" ? "border-rose-500 text-rose-600" : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+              }`}
+            >
+              未入金集計
+            </button>
           </div>
 
           {/* Filters Area */}
@@ -335,12 +434,74 @@ export default function Billing() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder={activeTab === 'projects' ? "案件名、工事番号(リスト)、発注者で検索..." : "請求先、件名、案件名で検索..."}
+                placeholder={
+                  activeTab === 'projects' ? "案件名、工事番号(リスト)、発注者で検索..." :
+                  (activeTab === 'summary' || activeTab === 'pending_summary') ? "発注者で検索..." :
+                  "請求先、件名、案件名で検索..."
+                }
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-9 h-10 rounded-md border border-input bg-transparent px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               />
             </div>
+            
+            {activeTab === 'summary' && (
+               <>
+                 <div className="w-full md:w-48 shadow-sm">
+                   <select
+                     value={summaryMonthFilter}
+                     onChange={(e) => setSummaryMonthFilter(e.target.value)}
+                     className="w-full h-10 rounded-md border border-input bg-white px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-slate-700 font-medium"
+                   >
+                     <option value="ALL">全ての月</option>
+                     {availableMonths.map(month => (
+                       <option key={month} value={month}>{month.replace('-', '年')}月</option>
+                     ))}
+                   </select>
+                 </div>
+                 <div className="w-full md:w-36 shadow-sm">
+                   <select
+                     value={summaryCategoryFilter}
+                     onChange={(e) => setSummaryCategoryFilter(e.target.value)}
+                     className="w-full h-10 rounded-md border border-input bg-white px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-slate-700 font-medium"
+                   >
+                     <option value="ALL">全区分</option>
+                     {availableCategories.map(cat => (
+                       <option key={cat} value={cat}>{cat}</option>
+                     ))}
+                   </select>
+                 </div>
+               </>
+            )}
+            
+            {activeTab === 'pending_summary' && (
+               <>
+                 <div className="w-full md:w-48 shadow-sm">
+                   <select
+                     value={pendingSummaryMonthFilter}
+                     onChange={(e) => setPendingSummaryMonthFilter(e.target.value)}
+                     className="w-full h-10 rounded-md border border-input bg-white px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-slate-700 font-medium"
+                   >
+                     <option value="ALL">予定月: すべて</option>
+                     {availablePendingMonths.map(month => (
+                       <option key={month} value={month}>{month.replace('-', '年')}月予定</option>
+                     ))}
+                   </select>
+                 </div>
+                 <div className="w-full md:w-36 shadow-sm">
+                   <select
+                     value={pendingSummaryCategoryFilter}
+                     onChange={(e) => setPendingSummaryCategoryFilter(e.target.value)}
+                     className="w-full h-10 rounded-md border border-input bg-white px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-slate-700 font-medium"
+                   >
+                     <option value="ALL">全区分</option>
+                     {availablePendingCategories.map(cat => (
+                       <option key={cat} value={cat}>{cat}</option>
+                     ))}
+                   </select>
+                 </div>
+               </>
+            )}
           </div>
 
           {/* List Area */}
@@ -413,7 +574,7 @@ export default function Billing() {
                           </td>
                           <td className="px-5 py-4 align-top">
                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${
-                               compState === '完工' ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-blue-100 text-blue-700 border-blue-200'
+                               compState.includes('完工') ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-blue-100 text-blue-700 border-blue-200'
                              }`}>
                                {compState}
                              </span>
@@ -429,7 +590,7 @@ export default function Billing() {
                                 onClick={() => navigate(`/billing/new?project_id=${proj.id}`)}
                                 className="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 rounded shadow hover:bg-blue-700 transition-colors"
                               >
-                                {compState === '完工' ? '請求作成' : '追加 / 完了請求'}
+                                {compState.includes('(未請求)') ? '請求作成' : '追加 / 完了請求'}
                               </button>
                             </div>
                           </td>
@@ -444,8 +605,381 @@ export default function Billing() {
             <div className="bg-white border text-center py-16 rounded-xl shadow-sm">
               <FileText className="w-12 h-12 text-slate-200 mx-auto mb-3" />
               <p className="text-slate-500 font-medium">データが見つかりません</p>
-            </div>
-          ) : (
+              </div>
+            ) : activeTab === "summary" ? (
+              /* Summary Tab Content */
+              (() => {
+                // Aggregate data from completedInvoices
+                let grandTotal = 0
+                
+                type CategoryGroup = {
+                  total: number;
+                  clients: Record<string, { total: number; invoices: any[] }>;
+                };
+                const categoryTotals: Record<string, CategoryGroup> = {}
+
+                const invoicesToProcess = completedInvoices.filter(inv => {
+                   if ((inv.primaryProj as Partial<ProjectData>)?.project_name === '休暇') return false
+                   
+                   // Category Filter
+                   if (summaryCategoryFilter !== "ALL" && (inv.primaryProj as any)?.category !== summaryCategoryFilter) {
+                     return false
+                   }
+
+                   // Month Filter
+                   if (summaryMonthFilter !== "ALL") {
+                     if (!inv.lastDepositDate || inv.lastDepositDate === "-") return false
+                     const d = inv.lastDepositDateDate
+                     const invMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+                     if (invMonth !== summaryMonthFilter) return false
+                   }
+
+                   return true
+                })
+
+                invoicesToProcess.forEach(inv => {
+                  const amt = inv.totalBilled // amount paid
+                  grandTotal += amt
+                  
+                  // Priority for client name: billing_destination > primaryProj.client_name > "未設定"
+                  const clientName = (inv.billing_destination || (inv.primaryProj as Partial<ProjectData>)?.client_name || "未設定").trim()
+                  const categoryName = (inv.primaryProj as any)?.category || "未設定"
+                  
+                  if (!categoryTotals[categoryName]) {
+                    categoryTotals[categoryName] = { total: 0, clients: {} }
+                  }
+                  
+                  if (!categoryTotals[categoryName].clients[clientName]) {
+                    categoryTotals[categoryName].clients[clientName] = { total: 0, invoices: [] }
+                  }
+                  
+                  categoryTotals[categoryName].total += amt
+                  categoryTotals[categoryName].clients[clientName].total += amt
+                  categoryTotals[categoryName].clients[clientName].invoices.push(inv)
+                })
+
+                // Sort categories by predefined order, then descending by total amount for unlisted ones
+                const sortedCategories = Object.entries(categoryTotals).sort((a, b) => {
+                  const [catA, groupA] = a
+                  const [catB, groupB] = b
+                  const indexA = CATEGORY_ORDER.indexOf(catA)
+                  const indexB = CATEGORY_ORDER.indexOf(catB)
+                  
+                  if (indexA !== -1 && indexB !== -1) return indexA - indexB
+                  if (indexA !== -1) return -1
+                  if (indexB !== -1) return 1
+                  
+                  // If neither is in the predefined order, sort by total amount descending
+                  return groupB.total - groupA.total
+                })
+
+                return (
+                  <div className="space-y-6">
+                    {/* Grand Total Card */}
+                    <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-lg p-6 text-white flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div>
+                        <h2 className="text-xl font-bold opacity-90 mb-1">総入金完了額</h2>
+                        <p className="text-sm opacity-80">システムに登録されている完了済みの請求合計</p>
+                      </div>
+                      <div className="text-4xl md:text-5xl font-black tracking-tight">
+                        ¥{grandTotal.toLocaleString()}
+                      </div>
+                    </div>
+
+                    {/* Breakdown Table by Category -> Client */}
+                    <div className="space-y-6">
+                      {sortedCategories.length === 0 ? (
+                        <div className="bg-white rounded-xl shadow-sm border p-8 text-center text-slate-500">
+                          {searchTerm ? "検索条件に一致するデータがありません" : "入金完了データがありません"}
+                        </div>
+                      ) : (
+                        sortedCategories.map(([categoryName, groupData]) => {
+                          const displayClients = Object.entries(groupData.clients)
+                            .sort((a, b) => b[1].total - a[1].total)
+                            .filter(([name]) => !searchTerm || name.toLowerCase().includes(searchTerm.toLowerCase()))
+                            
+                          // Skip category if search term filters out all its clients
+                          if (displayClients.length === 0 && searchTerm) return null
+                          
+                          // By default, category is expanded
+                          const isExpanded = expandedSummaryCategories[categoryName] !== false
+                        
+                          return (
+                            <div key={categoryName} className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                              <div 
+                                className="p-4 border-b bg-slate-50 flex items-center justify-between cursor-pointer hover:bg-slate-100 transition-colors"
+                                onClick={() => toggleSummaryCategory(categoryName)}
+                              >
+                                <h3 className="font-bold text-slate-700 text-lg flex items-center gap-2">
+                                  {isExpanded ? (
+                                    <ChevronDown className="w-5 h-5 text-slate-400" />
+                                  ) : (
+                                    <ChevronRight className="w-5 h-5 text-slate-400" />
+                                  )}
+                                  <span className="w-1.5 h-5 bg-slate-400 rounded-full inline-block"></span>
+                                  {categoryName}
+                                </h3>
+                                <div className="text-right">
+                                  <p className="text-xs text-slate-500 mb-0.5 mt-[-4px]">区分合計</p>
+                                  <p className="font-mono font-bold text-lg text-slate-800 leading-none">
+                                    ¥{groupData.total.toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                              {isExpanded && (
+                                <table className="w-full text-sm text-left">
+                                  <thead className="bg-slate-50/50 border-b text-slate-400 font-medium text-xs">
+                                    <tr>
+                                      <th className="px-6 py-2 min-w-[200px] font-normal">発注者 / 請求先</th>
+                                      <th className="px-6 py-2 w-48 text-right font-normal">金額</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {displayClients.map(([clientName, clientData]) => (
+                                      <tr 
+                                        key={clientName} 
+                                        className="hover:bg-blue-50/60 cursor-pointer transition-colors bg-white group"
+                                        onClick={() => setSelectedClientDetails({
+                                          clientName,
+                                          categoryName,
+                                          invoices: clientData.invoices
+                                        })}
+                                      >
+                                        <td className="px-6 py-3 align-top font-semibold text-slate-700 text-[15px] group-hover:text-blue-700">
+                                          {clientName}
+                                        </td>
+                                        <td className="px-6 py-3 align-top text-right font-mono font-medium text-[15px] text-slate-600 group-hover:text-blue-700">
+                                          ¥{clientData.total.toLocaleString()}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                    {displayClients.length === 0 && !searchTerm && (
+                                       <tr>
+                                         <td colSpan={2} className="px-6 py-4 text-center text-slate-400">データなし</td>
+                                       </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              )}
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+                )
+              })()
+            ) : activeTab === "pending_summary" ? (
+              /* Pending Summary Tab Content */
+              (() => {
+                // Aggregate data from pendingInvoices
+                let grandTotal = 0
+                
+                type PendingCategoryGroup = {
+                  total: number;
+                  clients: Record<string, { total: number; invoices: any[] }>;
+                };
+                
+                type MonthGroup = {
+                  total: number;
+                  categories: Record<string, PendingCategoryGroup>;
+                };
+                
+                const monthTotals: Record<string, MonthGroup> = {}
+
+                const invoicesToProcess = pendingInvoices.filter(inv => {
+                   if ((inv.primaryProj as Partial<ProjectData>)?.project_name === '休暇') return false
+                   
+                   // Category Filter
+                   if (pendingSummaryCategoryFilter !== "ALL" && (inv.primaryProj as any)?.category !== pendingSummaryCategoryFilter) {
+                     return false
+                   }
+
+                   return true
+                })
+
+                invoicesToProcess.forEach(inv => {
+                  const details = inv.invoice_details || []
+                  
+                  details.forEach(detail => {
+                    const ds = determineStatusForDetail(detail)
+                    if (ds === "入金済" || ds === "完了") return // Skip paid details
+                    
+                    const amt = Number(detail.amount) || 0
+                    if (amt === 0) return
+
+                    let monthKey = "未定"
+                    if (detail.expected_deposit_date) {
+                      const date = new Date(detail.expected_deposit_date)
+                      if (!isNaN(date.getTime())) {
+                        monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+                      }
+                    }
+
+                    // Month Filter
+                    if (pendingSummaryMonthFilter !== "ALL" && monthKey !== pendingSummaryMonthFilter) {
+                      return
+                    }
+
+                    grandTotal += amt
+                    
+                    // Priority for client name: billing_destination > primaryProj.client_name > "未設定"
+                    const clientName = (inv.billing_destination || (inv.primaryProj as Partial<ProjectData>)?.client_name || "未設定").trim()
+                    const categoryName = (inv.primaryProj as any)?.category || "未設定"
+                    
+                    if (!monthTotals[monthKey]) {
+                      monthTotals[monthKey] = { total: 0, categories: {} }
+                    }
+                    
+                    if (!monthTotals[monthKey].categories[categoryName]) {
+                      monthTotals[monthKey].categories[categoryName] = { total: 0, clients: {} }
+                    }
+                    
+                    if (!monthTotals[monthKey].categories[categoryName].clients[clientName]) {
+                      monthTotals[monthKey].categories[categoryName].clients[clientName] = { total: 0, invoices: [] }
+                    }
+                    
+                    monthTotals[monthKey].total += amt
+                    monthTotals[monthKey].categories[categoryName].total += amt
+                    monthTotals[monthKey].categories[categoryName].clients[clientName].total += amt
+                    
+                    // Add invoice to clients array if not already added for this month
+                    const clientInvoices = monthTotals[monthKey].categories[categoryName].clients[clientName].invoices
+                    // We need to pass the specific detail's amount, but using the whole invoice struct for the modal.
+                    // For simplicity, we just push the invoice (it might contain multiple details, so the modal sum could be off if not handled, but we will pass the invoice).
+                    // To be accurate, we should probably construct a dummy invoice object or just push the invoice if it's not already there.
+                    if (!clientInvoices.find(i => i.id === inv.id)) {
+                       clientInvoices.push(inv)
+                    }
+                  })
+                })
+
+                // Sort months descending (latest first, or '未定' at bottom)
+                const sortedMonths = Object.entries(monthTotals).sort((a, b) => {
+                  if (a[0] === "未定") return 1
+                  if (b[0] === "未定") return -1
+                  return b[0].localeCompare(a[0])
+                })
+
+                return (
+                  <div className="space-y-8">
+                    {/* Grand Total Card */}
+                    <div className="bg-gradient-to-br from-rose-500 to-orange-600 rounded-xl shadow-lg p-6 text-white flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div>
+                        <h2 className="text-xl font-bold opacity-90 mb-1">未入金・請求中総額</h2>
+                        <p className="text-sm opacity-80">システムに登録されている未入金の請求合計</p>
+                      </div>
+                      <div className="text-4xl md:text-5xl font-black tracking-tight border-b-2 border-white/20 pb-1">
+                        ¥{grandTotal.toLocaleString()}
+                      </div>
+                    </div>
+
+                    {/* Breakdown by Month */}
+                    <div className="space-y-8">
+                      {sortedMonths.length === 0 ? (
+                        <div className="bg-white rounded-xl shadow-sm border p-8 text-center text-slate-500">
+                          {searchTerm ? "検索条件に一致するデータがありません" : "未入金データがありません"}
+                        </div>
+                      ) : (
+                        sortedMonths.map(([monthKey, monthData]) => {
+                          const displayMonth = monthKey === "未定" ? "入金予定月 未定" : `${monthKey.replace('-', '年')}月 入金予定`
+
+                          // Sort categories by predefined order
+                          const sortedCategories = Object.entries(monthData.categories).sort((a, b) => {
+                            const [catA, groupA] = a
+                            const [catB, groupB] = b
+                            const indexA = CATEGORY_ORDER.indexOf(catA)
+                            const indexB = CATEGORY_ORDER.indexOf(catB)
+                            
+                            if (indexA !== -1 && indexB !== -1) return indexA - indexB
+                            if (indexA !== -1) return -1
+                            if (indexB !== -1) return 1
+                            return groupB.total - groupA.total
+                          })
+
+                          return (
+                            <div key={monthKey} className="space-y-4">
+                              <h2 className="text-2xl font-black text-slate-700 flex items-center justify-between border-b-2 border-slate-200 pb-2 pl-2 border-l-4 border-l-rose-500">
+                                <span>{displayMonth}</span>
+                                <span className="text-xl text-rose-600 font-mono tracking-tight">¥{monthData.total.toLocaleString()}</span>
+                              </h2>
+                              
+                              <div className="space-y-4 pl-0 md:pl-4">
+                                {sortedCategories.map(([categoryName, groupData]) => {
+                                  const displayClients = Object.entries(groupData.clients)
+                                    .sort((a, b) => b[1].total - a[1].total)
+                                    .filter(([name]) => !searchTerm || name.toLowerCase().includes(searchTerm.toLowerCase()))
+                                    
+                                  if (displayClients.length === 0 && searchTerm) return null
+                                  
+                                  const catKey = `${monthKey}-${categoryName}`
+                                  const isExpanded = expandedPendingSummaryCategories[catKey] !== false
+                                
+                                  return (
+                                    <div key={categoryName} className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                                      <div 
+                                        className="p-3 md:p-4 border-b bg-slate-50 flex items-center justify-between cursor-pointer hover:bg-slate-100 transition-colors"
+                                        onClick={() => togglePendingSummaryCategory(catKey)}
+                                      >
+                                        <h3 className="font-bold text-slate-700 text-base md:text-lg flex items-center gap-2">
+                                          {isExpanded ? (
+                                            <ChevronDown className="w-5 h-5 text-slate-400" />
+                                          ) : (
+                                            <ChevronRight className="w-5 h-5 text-slate-400" />
+                                          )}
+                                          <span className="w-1.5 h-5 bg-slate-400 rounded-full inline-block"></span>
+                                          {categoryName}
+                                        </h3>
+                                        <div className="text-right">
+                                          <p className="text-[10px] md:text-xs text-slate-500 mb-0.5 mt-[-2px]">区分合計</p>
+                                          <p className="font-mono font-bold text-base md:text-lg text-slate-800 leading-none">
+                                            ¥{groupData.total.toLocaleString()}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      {isExpanded && (
+                                        <table className="w-full text-sm text-left">
+                                          <thead className="bg-slate-50/50 border-b text-slate-400 font-medium text-xs">
+                                            <tr>
+                                              <th className="px-4 md:px-6 py-2 min-w-[150px] font-normal">発注者 / 請求先</th>
+                                              <th className="px-4 md:px-6 py-2 w-32 md:w-48 text-right font-normal">未入金額</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-slate-100">
+                                            {displayClients.map(([clientName, clientData]) => (
+                                              <tr 
+                                                key={clientName} 
+                                                className="hover:bg-rose-50/60 cursor-pointer transition-colors bg-white group"
+                                                onClick={() => setSelectedClientDetails({
+                                                  clientName,
+                                                  categoryName: `${monthKey === '未定' ? '未定' : monthKey.replace('-', '年') + '月'} / ${categoryName}`,
+                                                  invoices: clientData.invoices
+                                                })}
+                                              >
+                                                <td className="px-4 md:px-6 py-3 align-top font-semibold text-slate-700 text-[14px] md:text-[15px] group-hover:text-rose-700">
+                                                  {clientName}
+                                                </td>
+                                                <td className="px-4 md:px-6 py-3 align-top text-right font-mono font-medium text-[14px] md:text-[15px] text-slate-600 group-hover:text-rose-700">
+                                                  ¥{clientData.total.toLocaleString()}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+                )
+              })()
+            ) : (
             <div className="space-y-3">
               {(activeTab === "pending" ? displayPending : displayCompleted).map((inv: any) => {
                 const isExpanded = expandedInvoiceId === inv.id
@@ -666,6 +1200,110 @@ export default function Billing() {
           )}
         </div>
       </div>
+
+      {/* Client Details Modal */}
+      {selectedClientDetails && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-[2px] animate-in fade-in duration-200"
+          onClick={() => setSelectedClientDetails(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b bg-slate-50/80">
+              <div>
+                <h3 className="text-2xl font-black text-slate-800 mb-1 tracking-tight">
+                  {selectedClientDetails.clientName} <span className="text-lg font-bold text-slate-500 font-normal ml-1">御中</span>
+                </h3>
+                <p className="text-sm text-slate-500 flex items-center gap-3">
+                  <span className="flex items-center gap-1.5"><Building2 className="w-4 h-4 text-slate-400"/> 対象区分: <strong className="text-slate-700">{selectedClientDetails.categoryName}</strong></span>
+                  <span className="text-slate-300">|</span>
+                  <span className="flex items-center gap-1.5"><FileText className="w-4 h-4 text-slate-400"/> 対象件数: <strong className="text-slate-700">{selectedClientDetails.invoices.length}件</strong></span>
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedClientDetails(null)}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors flex shrink-0"
+              >
+                <Plus className="w-7 h-7 rotate-45" />
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-0 overflow-y-auto bg-white flex-1 relative">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-[#f8fafc] sticky top-0 z-10 shadow-sm text-slate-500 font-bold text-xs whitespace-nowrap">
+                  <tr>
+                    <th className="px-6 py-4 border-b border-slate-200">対象工事 / 案件名</th>
+                    <th className="px-6 py-4 border-b border-slate-200">請求項目</th>
+                    <th className="px-6 py-4 border-b border-slate-200 text-center">入金日</th>
+                    <th className="px-6 py-4 border-b border-slate-200 text-right">請求額</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {selectedClientDetails.invoices.map((inv, idx) => {
+                    const pName = inv.primaryProj?.project_name || "案件名未設定"
+                    const pNum = inv.primaryProj?.project_number
+                    const legacyId = inv.primaryProj?.legacy_id
+                    
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50/80 transition-colors group">
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1">
+                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex gap-2">
+                               {legacyId && <span>ID: <span className="bg-slate-100 text-slate-600 px-1 py-0.5 rounded">{legacyId}</span></span>}
+                               {pNum && <span>NO: <span className="bg-slate-100 text-slate-600 px-1 py-0.5 rounded">{pNum}</span></span>}
+                            </div>
+                            <div 
+                              className="font-bold text-slate-700 group-hover:text-blue-700 transition-colors cursor-pointer hover:underline"
+                              onClick={() => {
+                                setSelectedClientDetails(null)
+                                navigate(`/billing/${inv.id}`)
+                              }}
+                            >
+                              {pName}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                           <div className="text-slate-600 font-medium">
+                             {inv.billing_subject || "---"}
+                           </div>
+                           <div className="text-xs text-slate-400 mt-1">
+                             {inv.billing_category}
+                           </div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded bg-slate-100 text-slate-600 font-mono text-xs font-medium">
+                            {inv.lastDepositDate || "---"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="font-mono text-lg font-bold text-slate-700">
+                            ¥{((inv.allTotalBilled || 0) - (inv.totalBilled || 0)).toLocaleString()}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="px-6 py-5 border-t bg-slate-50 flex justify-end items-center relative z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+              <div className="text-right flex items-center gap-4 bg-white px-6 py-3 rounded-xl border shadow-sm">
+                <span className="text-sm text-slate-500 font-bold tracking-widest uppercase">合計金額</span>
+                <span className="text-3xl font-black text-indigo-600 font-mono tracking-tight">
+                  ¥{selectedClientDetails.invoices.reduce((sum, inv) => sum + ((inv.allTotalBilled || 0) - (inv.totalBilled || 0)), 0).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
