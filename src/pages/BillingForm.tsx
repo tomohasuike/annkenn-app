@@ -74,7 +74,7 @@ export default function BillingForm() {
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
+      if (!user?.email) {
         navigate('/login')
         return
       }
@@ -82,7 +82,7 @@ export default function BillingForm() {
       const { data: workerData, error: workerError } = await supabase
         .from('worker_master')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('email', user.email)
         .single()
 
       if (workerError) {
