@@ -760,7 +760,7 @@ export default function ScheduleManagement() {
                                             予:{daily?.planned_count || '-'} / 実:{sumWorkers}
                                          </span>
                                        ) : (
-                                         <span className="text-[9px] font-bold px-1 rounded-sm text-slate-300 hover:text-slate-500 hover:bg-slate-100 border border-transparent hover:border-slate-200 block leading-none py-0.5 opacity-0 group-hover/cell:opacity-100 transition-opacity">
+                                         <span className="text-[9px] font-bold px-1 rounded-sm text-slate-300 hover:text-slate-500 bg-slate-50 hover:bg-slate-100 border border-slate-200 border-dashed block leading-none py-0.5 transition-colors">
                                             予: +
                                          </span>
                                        )}
@@ -777,7 +777,7 @@ export default function ScheduleManagement() {
                                            {daily.comment}
                                          </div>
                                        ) : (
-                                         <div className="p-0.5 rounded text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-opacity opacity-0 group-hover/cell:opacity-100 flex items-center justify-center">
+                                         <div className="p-0.5 bg-slate-50 rounded text-slate-300 hover:text-slate-500 hover:bg-slate-100 border border-slate-200 border-dashed transition-colors flex items-center justify-center">
                                            <MessageSquare className="w-2.5 h-2.5" />
                                          </div>
                                        )}
