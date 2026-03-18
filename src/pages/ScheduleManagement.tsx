@@ -48,6 +48,18 @@ export default function ScheduleManagement() {
   const [collapsedResources, setCollapsedResources] = useState<Record<string, boolean>>({})
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({})
   
+  // Mobile UI States
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileDate, setMobileDate] = useState<Date>(new Date());
+  
+  useEffect(() => {
+    // Check initial width and set listener
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
   // Data
   const [projectsList, setProjectsList] = useState<ProjectData[]>([])
   const [resources, setResources] = useState<ResourceData[]>([])
@@ -576,6 +588,155 @@ export default function ScheduleManagement() {
 
   const activeTodos = todos.filter(t => !t.completed)
   const completedTodos = todos.filter(t => t.completed)
+
+  // --- Render Mobile View ---
+  if (isMobile) {
+    const mDateStr = format(mobileDate, 'yyyy-MM-dd')
+    const nextDay = () => setMobileDate(addDays(mobileDate, 1))
+    const prevDay = () => setMobileDate(subDays(mobileDate, 1))
+    const isToday = mDateStr === format(today, 'yyyy-MM-dd')
+    
+    // 稼働プロジェクトの絞り込み
+    const activeProjects = projectsList.filter(p => {
+       if (p.id === vacationProjId) return false;
+       const pDaily = dailyData.find(d => d.project_id === p.id && d.target_date === mDateStr);
+       const pAssigned = assignments.some(a => a.project_id === p.id && a.assignment_date === mDateStr);
+       return !!(pDaily?.planned_count) || pAssigned;
+    });
+
+    const vacationAssignments = assignments.filter(a => a.project_id === vacationProjId && a.assignment_date === mDateStr);
+
+    return (
+      <div className="flex flex-col h-[calc(100vh-64px)] overflow-y-auto bg-slate-50 font-sans text-slate-800 -m-4 sm:-m-8 custom-scrollbar">
+         {/* モバイルヘッダー */}
+         <div className="bg-white border-b px-4 py-3 sticky top-0 z-50 flex flex-col gap-3 shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
+            <div className="flex items-center justify-between">
+               <h1 className="text-lg font-bold flex items-center gap-1.5 text-slate-800 tracking-wide">
+                  <CalendarDays className="w-5 h-5 text-blue-600" /> 工程管理 <span className="text-xs font-normal text-slate-400 ml-1 border pl-1.5 pr-2 py-0.5 rounded-full bg-slate-50">モバイル版</span>
+               </h1>
+               <button onClick={fetchData} className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors">
+                 <RefreshCw className={`w-4 h-4 ${syncStatus === '更新中...' ? 'animate-spin text-blue-500' : ''}`} />
+               </button>
+            </div>
+            
+            <div className="flex items-center justify-between bg-white border border-slate-200 shadow-sm rounded-xl p-1.5">
+               <button onClick={prevDay} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-500"><ChevronLeft className="w-6 h-6"/></button>
+               <div className="font-extrabold text-lg text-slate-700 cursor-pointer select-none" onClick={() => setMobileDate(new Date())}>
+                 {format(mobileDate, 'M/d')} <span className="text-sm">({['日', '月', '火', '水', '木', '金', '土'][mobileDate.getDay()]})</span>
+                 {isToday && <span className="ml-2 text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full align-middle">今日</span>}
+               </div>
+               <button onClick={nextDay} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-500"><ChevronRight className="w-6 h-6"/></button>
+            </div>
+         </div>
+         
+         {/* 休暇・不在 */}
+         {vacationAssignments.length > 0 && (
+           <div className="px-4 py-3 bg-rose-50 border-b border-rose-100 mb-2">
+             <h3 className="text-sm font-black text-rose-800 mb-2 tracking-wider flex items-center gap-1"><Info className="w-4 h-4"/> 休暇・不在</h3>
+             <div className="flex flex-wrap gap-2">
+               {vacationAssignments.map(a => (
+                 <span key={a.id} className="text-xs bg-white text-rose-700 font-bold px-2.5 py-1.5 rounded-md shadow-sm border border-rose-200">
+                   {a.worker_id ? a.worker_master?.name : a.vehicle_master?.vehicle_name}
+                 </span>
+               ))}
+             </div>
+           </div>
+         )}
+         
+         {/* プロジェクトリスト */}
+         <div className="p-4 space-y-4">
+            {activeProjects.length === 0 ? (
+               <div className="text-center py-16 bg-white rounded-xl border border-dashed border-slate-300">
+                  <CalendarDays className="w-10 h-10 mx-auto text-slate-300 mb-3" />
+                  <div className="text-slate-500 font-bold">この日の稼働予定はありません</div>
+                  <div className="text-xs text-slate-400 mt-1">※モバイル版では稼働現場のみ表示されます</div>
+               </div>
+            ) : (
+               activeProjects.map(p => {
+                 const cellAssignments = assignments.filter(a => a.project_id === p.id && a.assignment_date === mDateStr);
+                 const workers = cellAssignments.filter(a => a.worker_id && a.worker_master?.type !== '協力会社');
+                 const partners = cellAssignments.filter(a => a.worker_master?.type === '協力会社');
+                 const vehicles = cellAssignments.filter(a => a.vehicle_id);
+                 
+                 const pDaily = dailyData.find(d => d.project_id === p.id && d.target_date === mDateStr);
+                 const sumWorkers = workers.length + partners.reduce((sum, ptr) => sum + (ptr.count || 1), 0);
+                 const isShort = pDaily?.planned_count && sumWorkers < pDaily.planned_count;
+
+                 return (
+                   <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                      <div className="p-3.5 bg-slate-50/50 border-b border-slate-100">
+                         <div className="flex gap-2 items-start mb-1.5">
+                            {p.no && <span className="text-[10px] font-black font-mono bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded mt-1 shrink-0">{p.no}</span>}
+                            <h3 className="font-bold text-slate-800 text-lg leading-snug">{p.name}</h3>
+                         </div>
+                         <div className="text-xs text-slate-500 font-medium">
+                            {(p.category === '一般' || p.category === '役所') ? (p.client_company_name || p.client_name) : p.site}
+                         </div>
+                      </div>
+                      <div className="p-3.5">
+                         <div className="flex justify-between items-center mb-3">
+                            <span className="text-xs font-black text-slate-400 tracking-widest uppercase">配置状況</span>
+                            <span className={`font-bold px-2 py-1 rounded-md text-[11px] shadow-sm border ${isShort ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                               予定: {pDaily?.planned_count || '-'}人 / 現在: <span className="text-[13px]">{sumWorkers}</span>人
+                            </span>
+                         </div>
+                         
+                         <div className="space-y-3 mt-4">
+                           {/* 作業員 */}
+                           {workers.length > 0 && (
+                              <div>
+                                <div className="text-[10px] font-bold text-slate-400 mb-1.5 flex items-center gap-1"><Users className="w-3 h-3"/> 社員・作業員</div>
+                                <div className="flex flex-wrap gap-2">
+                                   {workers.map(w => (
+                                     <span key={w.id} className="text-sm font-bold bg-white text-blue-700 border border-slate-200 border-l-4 border-l-blue-500 px-2.5 py-1.5 rounded-md shadow-sm">
+                                        {w.worker_master?.name}
+                                     </span>
+                                   ))}
+                                </div>
+                              </div>
+                           )}
+                           {/* 協力会社 */}
+                           {partners.length > 0 && (
+                              <div className="mt-3">
+                                <div className="text-[10px] font-bold text-slate-400 mb-1.5 flex items-center gap-1"><Users className="w-3 h-3"/> 協力会社</div>
+                                <div className="flex flex-col gap-2">
+                                   {partners.map(w => (
+                                     <div key={w.id} className="text-sm font-bold bg-white text-purple-700 border border-slate-200 border-l-4 border-l-purple-500 px-3 py-2 rounded-md shadow-sm flex justify-between items-center">
+                                        <span>{w.worker_master?.name}</span>
+                                        <span className="bg-purple-50 text-purple-900 border border-purple-200 px-2 py-0.5 rounded text-xs">{w.count||1}名</span>
+                                     </div>
+                                   ))}
+                                </div>
+                              </div>
+                           )}
+                           {/* 車両 */}
+                           {vehicles.length > 0 && (
+                              <div className="mt-3">
+                                <div className="text-[10px] font-bold text-slate-400 mb-1.5 flex items-center gap-1"><Truck className="w-3 h-3"/> 車両・機械</div>
+                                <div className="flex flex-wrap gap-2">
+                                   {vehicles.map(v => (
+                                     <span key={v.id} className="text-xs font-bold bg-white text-teal-700 border border-slate-200 border-l-4 border-l-teal-500 px-2 py-1 rounded-md shadow-sm">
+                                        {v.vehicle_master?.vehicle_name}
+                                     </span>
+                                   ))}
+                                </div>
+                              </div>
+                           )}
+                           
+                           {sumWorkers === 0 && vehicles.length === 0 && (
+                             <div className="text-xs font-bold text-slate-400 text-center py-3 bg-slate-50 border border-dashed border-slate-200 rounded-lg">この日の人員・車両は未設定です</div>
+                           )}
+                         </div>
+                      </div>
+                   </div>
+                 )
+               })
+            )}
+            <div className="h-20"></div>
+         </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full bg-white relative overflow-hidden -m-4 sm:-m-6 md:-m-8 text-slate-800" style={{ fontSize: `${fontSize}px`}} onClick={clearSelection}>
