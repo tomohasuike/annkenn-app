@@ -76,7 +76,7 @@ export default function ReportForm() {
       } else {
         // Apply initial state from navigation if present
         if (location.state) {
-            const { projectId, personnel: initPersonnel, vehicles: initVehicles, category, reportDate } = location.state as any;
+            const { projectId, personnel: initPersonnel, vehicles: initVehicles, category, reportDate, passedSubcontractors: initSubcontractors } = location.state as any;
             if (category) {
                 setSelectedProjectCategory(category);
             }
@@ -88,6 +88,14 @@ export default function ReportForm() {
             }
             if (initVehicles && Array.isArray(initVehicles)) {
                 setVehicles(initVehicles);
+            }
+            if (initSubcontractors && Array.isArray(initSubcontractors) && initSubcontractors.length > 0) {
+                setSubcontractors(initSubcontractors.map((s: any) => ({
+                    company_name: s.subcontractor_name || '',
+                    headcount: s.worker_count || '1'
+                })));
+            } else {
+                setSubcontractors([{ company_name: '', headcount: '1' }]);
             }
             if (reportDate) {
                 const parsedTarget = new Date(reportDate);

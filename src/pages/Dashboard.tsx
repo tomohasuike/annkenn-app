@@ -224,13 +224,17 @@ export default function Dashboard() {
     const p = curr.project;
     if (!p) return acc;
     const pid = p.id;
-    if (!acc[pid]) acc[pid] = { project: p, workers: [], vehicles: [], workersRaw: [], vehiclesRaw: [] };
+    if (!acc[pid]) acc[pid] = { project: p, workers: [], vehicles: [], workersRaw: [], vehiclesRaw: [], subcontractorsRaw: [] };
     const wRaw = Array.isArray(curr.worker_master) ? curr.worker_master[0] : curr.worker_master;
     const vRaw = Array.isArray(curr.vehicle_master) ? curr.vehicle_master[0] : curr.vehicle_master;
     
     if (wRaw) {
-        acc[pid].workers.push(wRaw.name);
-        acc[pid].workersRaw.push({ id: curr.worker_id, name: wRaw.name });
+        if (wRaw.type === '協力会社') {
+            acc[pid].subcontractorsRaw.push({ id: curr.worker_id, name: wRaw.name, count: curr.count || 1 });
+        } else {
+            acc[pid].workers.push(wRaw.name);
+            acc[pid].workersRaw.push({ id: curr.worker_id, name: wRaw.name });
+        }
     }
     if (vRaw) {
         acc[pid].vehicles.push(vRaw.vehicle_name);
@@ -247,13 +251,17 @@ export default function Dashboard() {
     const p = curr.project;
     if (!p) return acc;
     const pid = p.id;
-    if (!acc[pid]) acc[pid] = { project: p, workers: [], vehicles: [], workersRaw: [], vehiclesRaw: [] };
+    if (!acc[pid]) acc[pid] = { project: p, workers: [], vehicles: [], workersRaw: [], vehiclesRaw: [], subcontractorsRaw: [] };
     const wRaw = Array.isArray(curr.worker_master) ? curr.worker_master[0] : curr.worker_master;
     const vRaw = Array.isArray(curr.vehicle_master) ? curr.vehicle_master[0] : curr.vehicle_master;
     
     if (wRaw) {
-        acc[pid].workers.push(wRaw.name);
-        acc[pid].workersRaw.push({ id: curr.worker_id, name: wRaw.name });
+        if (wRaw.type === '協力会社') {
+            acc[pid].subcontractorsRaw.push({ id: curr.worker_id, name: wRaw.name, count: curr.count || 1 });
+        } else {
+            acc[pid].workers.push(wRaw.name);
+            acc[pid].workersRaw.push({ id: curr.worker_id, name: wRaw.name });
+        }
     }
     if (vRaw) {
         acc[pid].vehicles.push(vRaw.vehicle_name);
@@ -451,11 +459,13 @@ export default function Dashboard() {
                              <button
                                onClick={() => {
                                   const personnelData = group.workersRaw ? group.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
+                                  const subcontractorData = group.subcontractorsRaw ? group.subcontractorsRaw.map((s: any) => ({ subcontractor_name: s.name, worker_count: String(s.count) })) : [];
                                   const vehicleData = group.vehiclesRaw ? group.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
                                   navigate(`/reports/new`, { 
                                       state: { 
                                           projectId: p.id,
                                           personnel: personnelData,
+                                          passedSubcontractors: subcontractorData,
                                           vehicles: vehicleData,
                                           category: p.category
                                       } 
@@ -493,12 +503,14 @@ export default function Dashboard() {
                              <button
                                onClick={() => {
                                   const personnelData = group.workersRaw ? group.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
+                                  const subcontractorData = group.subcontractorsRaw ? group.subcontractorsRaw.map((s: any) => ({ subcontractor_name: s.name, worker_count: String(s.count) })) : [];
                                   const vehicleData = group.vehiclesRaw ? group.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
                                   const tomorrowStr = dateFns.format(dateFns.addDays(new Date(), 1), "yyyy-MM-dd");
                                   navigate(`/tomorrow-schedules/new`, { 
                                       state: { 
                                           projectId: p.id,
                                           personnel: personnelData,
+                                          passedSubcontractors: subcontractorData,
                                           vehicles: vehicleData,
                                           category: p.category,
                                           schedule_date: tomorrowStr
@@ -576,11 +588,13 @@ export default function Dashboard() {
                   return (
                     <div key={idx} className={`rounded-xl shadow-sm border p-4 transition-colors cursor-pointer ${isSubmitted ? 'bg-slate-50 border-emerald-200/60 opacity-90 hover:border-emerald-300' : 'bg-white border-slate-200 hover:border-blue-300'}`} onClick={() => {
                         const personnelData = schedGroup.workersRaw ? schedGroup.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
+                        const subcontractorData = schedGroup.subcontractorsRaw ? schedGroup.subcontractorsRaw.map((s: any) => ({ subcontractor_name: s.name, worker_count: String(s.count) })) : [];
                         const vehicleData = schedGroup.vehiclesRaw ? schedGroup.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
                         if (isSubmitted) {
                             navigate(`/reports/${reportId}/edit`, {
                                 state: {
                                     personnel: personnelData,
+                                    passedSubcontractors: subcontractorData,
                                     vehicles: vehicleData
                                 }
                             });
@@ -589,6 +603,7 @@ export default function Dashboard() {
                                 state: { 
                                     projectId: p.id,
                                     personnel: personnelData,
+                                    passedSubcontractors: subcontractorData,
                                     vehicles: vehicleData,
                                     category: p.category
                                 } 

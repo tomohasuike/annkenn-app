@@ -96,7 +96,7 @@ export default function TomorrowScheduleForm() {
         }
         
         if (location.state) {
-            const { projectId, personnel, vehicles: passedVehicles, category, schedule_date } = location.state;
+            const { projectId, personnel, vehicles: passedVehicles, category, schedule_date, passedSubcontractors } = location.state;
             
             setSchedule(prev => ({ 
                 ...prev, 
@@ -110,6 +110,13 @@ export default function TomorrowScheduleForm() {
             
             if (personnel && Array.isArray(personnel)) {
                 setSelectedWorkers(personnel.map(p => p.worker_name));
+            }
+            
+            if (passedSubcontractors && Array.isArray(passedSubcontractors) && passedSubcontractors.length > 0) {
+                setSubcontractors(passedSubcontractors.map((s: any) => ({
+                    subcontractor_name: s.subcontractor_name || '',
+                    worker_count: s.worker_count || '1'
+                })));
             }
             
             if (passedVehicles && Array.isArray(passedVehicles)) {
