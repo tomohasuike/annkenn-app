@@ -20,6 +20,7 @@ export default function Dashboard() {
 
   // Data States
   const [todaySchedules, setTodaySchedules] = useState<any[]>([]);
+  const [tomorrowSchedules, setTomorrowSchedules] = useState<any[]>([]);
   const [tomorrowDailyData, setTomorrowDailyData] = useState<any[]>([]);
   const [activeProjects, setActiveProjects] = useState<any[]>([]);
   const [recentReports, setRecentReports] = useState<any[]>([]);
@@ -70,6 +71,22 @@ export default function Dashboard() {
         `)
         .eq('assignment_date', todayStr);
       setTodaySchedules(schedules || []);
+
+      // Tomorrow assignments (for display)
+      const { data: tomAssignments } = await supabase
+        .from('assignments')
+        .select(`
+          id,
+          project_id,
+          assignment_date,
+          worker_id,
+          vehicle_id,
+          worker_master ( name, type ),
+          vehicle_master ( vehicle_name ),
+          project:projects ( id, project_name, site_name, project_number )
+        `)
+        .eq('assignment_date', tomorrowStr);
+      setTomorrowSchedules(tomAssignments || []);
 
       // Tomorrow schedules from project_daily_data (工程管理/日報)
       const { data: tomDailyData } = await supabase
@@ -331,20 +348,20 @@ export default function Dashboard() {
                   
                   return (
                     <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 transition-colors cursor-pointer" onClick={() => navigate(`/projects/${p.id}/edit`)}>
-                      <div className="flex items-center gap-2 mb-2">
-                         <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
+                      <div className="flex items-center gap-2 mb-3">
+                         <span className="text-[10px] font-bold font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
                             {p.project_number || '番号なし'}
                          </span>
-                         <span className="font-bold text-sm text-slate-800 truncate" title={p.project_name}>{p.project_name}</span>
+                         <span className="font-bold text-sm text-slate-700 truncate" title={p.project_name}>{p.project_name}</span>
                       </div>
-                      <div className="space-y-1.5 mt-3">
-                        <div className="flex items-start gap-2">
-                          <span className="text-xs font-bold text-slate-400 w-10 shrink-0">人員:</span>
-                          <span className="text-xs text-slate-700">{workers}</span>
+                      <div className="space-y-1 mt-2">
+                        <div className="flex items-start gap-3">
+                          <span className="text-xs font-bold text-slate-400 w-8 shrink-0">人員:</span>
+                          <span className="text-xs text-slate-600 font-medium">{workers}</span>
                         </div>
-                        <div className="flex items-start gap-2">
-                          <span className="text-xs font-bold text-slate-400 w-10 shrink-0">車両:</span>
-                          <span className="text-xs text-slate-700">{vehicles}</span>
+                        <div className="flex items-start gap-3">
+                          <span className="text-xs font-bold text-slate-400 w-8 shrink-0">車両:</span>
+                          <span className="text-xs text-slate-600 font-medium">{vehicles}</span>
                         </div>
                       </div>
                     </div>
@@ -353,6 +370,62 @@ export default function Dashboard() {
               ) : (
                 <div className="col-span-1 sm:col-span-2 bg-white rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
                   本日のスケジュールは登録されていません。
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* TOMORROW'S SCHEDULE */}
+          <section className="mt-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-blue-600" />
+                明日の現場スケジュール
+              </h2>
+              <button onClick={() => navigate('/schedule-management')} className="text-sm font-bold text-blue-600 hover:text-blue-800 underline underline-offset-2">
+                配員表を見る
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {tomorrowSchedules.length > 0 ? (
+                Object.values(tomorrowSchedules.reduce((acc, curr) => {
+                  const pid = curr.project?.id || 'unknown';
+                  if (!acc[pid]) acc[pid] = { project: curr.project, workers: [], vehicles: [] };
+                  const wName = Array.isArray(curr.worker_master) ? curr.worker_master[0]?.name : curr.worker_master?.name;
+                  const vName = Array.isArray(curr.vehicle_master) ? curr.vehicle_master[0]?.vehicle_name : curr.vehicle_master?.vehicle_name;
+                  if (wName) acc[pid].workers.push(wName);
+                  if (vName) acc[pid].vehicles.push(vName);
+                  return acc;
+                }, {} as any)).map((schedGroup: any, idx) => {
+                  const p = schedGroup.project || {};
+                  const workers = schedGroup.workers.length > 0 ? schedGroup.workers.join(", ") : '-';
+                  const vehicles = schedGroup.vehicles.length > 0 ? schedGroup.vehicles.join(", ") : '-';
+                  
+                  return (
+                    <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 transition-colors cursor-pointer" onClick={() => navigate(`/projects/${p.id}/edit`)}>
+                      <div className="flex items-center gap-2 mb-3">
+                         <span className="text-[10px] font-bold font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
+                            {p.project_number || '番号なし'}
+                         </span>
+                         <span className="font-bold text-sm text-slate-700 truncate" title={p.project_name}>{p.project_name}</span>
+                      </div>
+                      <div className="space-y-1 mt-2">
+                        <div className="flex items-start gap-3">
+                          <span className="text-xs font-bold text-slate-400 w-8 shrink-0">人員:</span>
+                          <span className="text-xs text-slate-600 font-medium">{workers}</span>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <span className="text-xs font-bold text-slate-400 w-8 shrink-0">車両:</span>
+                          <span className="text-xs text-slate-600 font-medium">{vehicles}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="col-span-1 sm:col-span-2 bg-white rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
+                  明日のスケジュールはまだ登録されていません。
                 </div>
               )}
             </div>
