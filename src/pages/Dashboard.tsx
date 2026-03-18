@@ -393,11 +393,16 @@ export default function Dashboard() {
                   
                   return (
                     <div key={idx} className={`rounded-xl shadow-sm border p-4 transition-colors cursor-pointer ${isSubmitted ? 'bg-slate-50 border-emerald-200/60 opacity-90 hover:border-emerald-300' : 'bg-white border-slate-200 hover:border-blue-300'}`} onClick={() => {
+                        const personnelData = schedGroup.workersRaw ? schedGroup.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
+                        const vehicleData = schedGroup.vehiclesRaw ? schedGroup.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
                         if (isSubmitted) {
-                            navigate(`/reports/${reportId}/edit`);
+                            navigate(`/reports/${reportId}/edit`, {
+                                state: {
+                                    personnel: personnelData,
+                                    vehicles: vehicleData
+                                }
+                            });
                         } else {
-                            const personnelData = schedGroup.workersRaw ? schedGroup.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
-                            const vehicleData = schedGroup.vehiclesRaw ? schedGroup.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
                             navigate(`/reports/new`, { 
                                 state: { 
                                     projectId: p.id,
@@ -491,11 +496,16 @@ export default function Dashboard() {
                   
                   return (
                     <div key={idx} className={`rounded-xl shadow-sm border p-4 transition-colors cursor-pointer ${isSubmitted ? 'bg-slate-50 border-emerald-200/60 opacity-90 hover:border-emerald-300' : 'bg-white border-slate-200 hover:border-blue-300'}`} onClick={() => {
+                        const personnelData = schedGroup.workersRaw ? schedGroup.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
+                        const vehicleData = schedGroup.vehiclesRaw ? schedGroup.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
                         if (isSubmitted) {
-                            navigate(`/reports/${reportId}/edit`);
+                            navigate(`/reports/${reportId}/edit`, {
+                                state: {
+                                    personnel: personnelData,
+                                    vehicles: vehicleData
+                                }
+                            });
                         } else {
-                            const personnelData = schedGroup.workersRaw ? schedGroup.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
-                            const vehicleData = schedGroup.vehiclesRaw ? schedGroup.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
                             const tomorrowStr = dateFns.format(dateFns.addDays(new Date(), 1), "yyyy-MM-dd'T'17:00");
                             navigate(`/reports/new`, { 
                                 state: { 

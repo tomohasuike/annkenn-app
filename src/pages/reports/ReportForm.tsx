@@ -267,7 +267,7 @@ export default function ReportForm() {
       let dynamicVehiclesList = [...masters.vehicles];
 
       const { data: pData } = await supabase.from('report_personnel').select('worker_id, worker_master(name), worker_name').eq('report_id', reportId)
-      if (pData) {
+      if (pData && pData.length > 0) {
           setPersonnel(pData.map((p: any) => {
               let wId = p.worker_id || '';
               let wName = Array.isArray(p.worker_master) ? p.worker_master[0]?.name : p.worker_master?.name || p.worker_name || '';
@@ -282,10 +282,12 @@ export default function ReportForm() {
               }
               return { worker_id: wId, worker_name: wName };
           }))
+      } else if (location.state?.personnel && Array.isArray(location.state.personnel) && location.state.personnel.length > 0) {
+          setPersonnel(location.state.personnel);
       }
 
       const { data: vData } = await supabase.from('report_vehicles').select('vehicle_id, vehicle_master(vehicle_name), vehicle_name').eq('report_id', reportId)
-      if (vData) {
+      if (vData && vData.length > 0) {
           setVehicles(vData.map((v: any) => {
               let vId = v.vehicle_id || '';
               let vName = Array.isArray(v.vehicle_master) ? v.vehicle_master[0]?.vehicle_name : v.vehicle_master?.vehicle_name || v.vehicle_name || '';
@@ -300,10 +302,12 @@ export default function ReportForm() {
               }
               return { vehicle_id: vId, vehicle_name: vName };
           }))
+      } else if (location.state?.vehicles && Array.isArray(location.state.vehicles) && location.state.vehicles.length > 0) {
+          setVehicles(location.state.vehicles);
       }
 
       const { data: mData } = await supabase.from('report_machinery').select('machinery_id, vehicle_master(vehicle_name), machinery_name').eq('report_id', reportId)
-      if (mData) {
+      if (mData && mData.length > 0) {
           setMachinery(mData.map((m: any) => {
               let mId = m.machinery_id || '';
               let mName = Array.isArray(m.vehicle_master) ? m.vehicle_master[0]?.vehicle_name : m.vehicle_master?.vehicle_name || m.machinery_name || '';
