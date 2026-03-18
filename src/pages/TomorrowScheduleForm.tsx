@@ -169,6 +169,7 @@ export default function TomorrowScheduleForm() {
         .from('worker_master')
         .select('id, name')
         .neq('type', '事務員')
+        .neq('type', '協力会社')
         .order('display_order', { ascending: true, nullsFirst: false })
         .order('id', { ascending: true })
         

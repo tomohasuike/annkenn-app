@@ -149,7 +149,7 @@ export default function ReportForm() {
       const { data: pData, error: pErr } = await supabase.from('projects').select('id, project_name, category, status_flag, project_number, client_name, site_name').order('created_at', { ascending: false })
       if (pErr) console.error("Error fetching projects:", pErr)
       
-      const { data: wData } = await supabase.from('worker_master').select('id, name, type, display_order').neq('type', '事務員')
+      const { data: wData } = await supabase.from('worker_master').select('id, name, type, display_order').neq('type', '事務員').neq('type', '協力会社')
       
       const sortedWData = (wData || []).slice().sort((a, b) => {
           const orderA = a.display_order ?? 999;
