@@ -614,10 +614,19 @@ export default function Dashboard() {
                   const isSubmitted = !!reportId;
                   
                   return (
-                    <div key={idx} className={`rounded-xl shadow-sm border p-4 transition-colors cursor-pointer ${isSubmitted ? 'bg-slate-50 border-emerald-200/60 opacity-90 hover:border-emerald-300' : 'bg-white border-slate-200 hover:border-blue-300'}`} onClick={() => {
+                    <div key={idx} 
+                      className={`rounded-xl shadow-sm border p-4 transition-colors cursor-pointer ${
+                        isVacation 
+                          ? 'bg-orange-50/80 border-orange-200 hover:border-orange-300'
+                          : isSubmitted 
+                            ? 'bg-slate-50 border-emerald-200/60 opacity-90 hover:border-emerald-300' 
+                            : 'bg-white border-slate-200 hover:border-blue-300'
+                      }`} 
+                      onClick={() => {
                         const personnelData = schedGroup.workersRaw ? schedGroup.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
                         const subcontractorData = schedGroup.subcontractorsRaw ? schedGroup.subcontractorsRaw.map((s: any) => ({ subcontractor_name: s.name, worker_count: String(s.count) })) : [];
                         const vehicleData = schedGroup.vehiclesRaw ? schedGroup.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
+                        
                         if (isSubmitted) {
                             navigate(`/reports/${reportId}`, {
                                 state: {
@@ -640,11 +649,11 @@ export default function Dashboard() {
                     }}>
                       <div className="flex items-center mb-3">
                          <div className="flex items-center gap-2 max-w-[calc(100%-70px)]">
-                             <span className="text-[10px] font-bold font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                             <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${isVacation ? 'bg-orange-100/70 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
                                 {p.project_number || '番号なし'}
                              </span>
-                             <span className="font-bold text-sm text-slate-700 truncate" title={getProjectDisplayName(p)}>
-                               {isVacation && <span className="text-slate-800 mr-1">■</span>}
+                             <span className={`font-bold text-sm truncate ${isVacation ? 'text-orange-900' : 'text-slate-700'}`} title={getProjectDisplayName(p)}>
+                               {isVacation && <span className="text-orange-500 mr-1">■</span>}
                                {getProjectDisplayName(p)}
                              </span>
                          </div>
@@ -699,7 +708,15 @@ export default function Dashboard() {
                   const isSubmitted = !!reportId;
                   
                   return (
-                    <div key={idx} className={`rounded-xl shadow-sm border p-4 transition-colors cursor-pointer ${isSubmitted ? 'bg-slate-50 border-emerald-200/60 opacity-90 hover:border-emerald-300' : 'bg-white border-slate-200 hover:border-blue-300'}`} onClick={() => {
+                    <div key={idx} 
+                      className={`rounded-xl shadow-sm border p-4 transition-colors cursor-pointer ${
+                        isVacation 
+                          ? 'bg-orange-50/80 border-orange-200 hover:border-orange-300'
+                          : isSubmitted 
+                            ? 'bg-slate-50 border-emerald-200/60 opacity-90 hover:border-emerald-300' 
+                            : 'bg-white border-slate-200 hover:border-blue-300'
+                      }`} 
+                      onClick={() => {
                         const personnelData = schedGroup.workersRaw ? schedGroup.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
                         const vehicleData = schedGroup.vehiclesRaw ? schedGroup.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
                         if (isSubmitted) {
@@ -723,11 +740,11 @@ export default function Dashboard() {
                     }}>
                       <div className="flex items-center mb-3">
                          <div className="flex items-center gap-2 max-w-[calc(100%-70px)]">
-                             <span className="text-[10px] font-bold font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                             <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${isVacation ? 'bg-orange-100/70 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
                                 {p.project_number || '番号なし'}
                              </span>
-                             <span className="font-bold text-sm text-slate-700 truncate" title={getProjectDisplayName(p)}>
-                               {isVacation && <span className="text-slate-800 mr-1">■</span>}
+                             <span className={`font-bold text-sm truncate ${isVacation ? 'text-orange-900' : 'text-slate-700'}`} title={getProjectDisplayName(p)}>
+                               {isVacation && <span className="text-orange-500 mr-1">■</span>}
                                {getProjectDisplayName(p)}
                              </span>
                          </div>
@@ -740,12 +757,12 @@ export default function Dashboard() {
                       </div>
                       <div className="space-y-1 mt-2">
                         <div className="flex items-start gap-3">
-                          <span className="text-xs font-bold text-slate-400 w-8 shrink-0">人員:</span>
-                          <span className="text-xs text-slate-600 font-medium">{workers}</span>
+                          <span className={`text-xs font-bold w-8 shrink-0 ${isVacation ? 'text-orange-600/70' : 'text-slate-400'}`}>人員:</span>
+                          <span className={`text-xs font-medium ${isVacation ? 'text-orange-900' : 'text-slate-600'}`}>{workers}</span>
                         </div>
                         <div className="flex items-start gap-3">
-                          <span className="text-xs font-bold text-slate-400 w-8 shrink-0">車両:</span>
-                          <span className="text-xs text-slate-600 font-medium">{vehicles}</span>
+                          <span className={`text-xs font-bold w-8 shrink-0 ${isVacation ? 'text-orange-600/70' : 'text-slate-400'}`}>車両:</span>
+                          <span className={`text-xs font-medium ${isVacation ? 'text-orange-900' : 'text-slate-600'}`}>{vehicles}</span>
                         </div>
                       </div>
                     </div>
