@@ -114,21 +114,28 @@ export default function Dashboard() {
       }
       setSubmittedTodayReports(submittedMap);
 
-      // 3.6 Fetch Tomorrow's Daily Reports (明日の予定日報 => 翌日予定)
+      // 3.6 Fetch Future Next Day Plans (今後の予定翌日予定)
       const { data: tomorrowReports } = await supabase
         .from('tomorrow_schedules')
         .select(`
-            id, project_id, arrival_time, workers,
+            id, project_id, schedule_date, arrival_time, workers,
             project:projects(project_name)
         `)
-        .eq('schedule_date', tomorrowStr);
+        .gte('schedule_date', tomorrowStr);
         
       const submittedTomMap: Record<string, string> = {};
       if (tomorrowReports) {
           tomorrowReports.forEach((r: any) => {
-              if (r.project_id) submittedTomMap[r.project_id] = r.id;
+              if (r.project_id && r.schedule_date === tomorrowStr) {
+                  submittedTomMap[r.project_id] = r.id;
+              }
           });
           setTomorrowPlans(tomorrowReports.sort((a: any, b: any) => {
+              const dateA = a.schedule_date || '9999-12-31';
+              const dateB = b.schedule_date || '9999-12-31';
+              const dateCmp = dateA.localeCompare(dateB);
+              if (dateCmp !== 0) return dateCmp;
+
               const timeA = a.arrival_time || '99:99';
               const timeB = b.arrival_time || '99:99';
               return timeA.localeCompare(timeB);
@@ -204,10 +211,6 @@ export default function Dashboard() {
   const currentHour = new Date().getHours();
   const currentMinutes = new Date().getMinutes();
   const isPast1730 = currentHour > 17 || (currentHour === 17 && currentMinutes >= 30);
-  
-  const tomorrowDateObj = dateFns.addDays(new Date(), 1);
-  const days = ['日', '月', '火', '水', '木', '金', '土'];
-  const tomorrowDisplay = `${dateFns.format(tomorrowDateObj, "M/d")} (${days[tomorrowDateObj.getDay()]})`;
 
   const tomorrowScheduleGroups = Object.values(tomorrowSchedules.reduce((acc, curr) => {
     const p = curr.project;
@@ -341,29 +344,32 @@ export default function Dashboard() {
         {/* LEFT COLUMN: Actions & Alerts */}
         <div className="col-span-1 lg:col-span-2 space-y-8">
           
-          {/* 明日の出社時間 */}
+          {/* 今後の出社時間 */}
           {tomorrowPlans.length > 0 && (
               <section>
                 <div className="flex items-center gap-2 mb-4">
                   <CalendarClock className="w-5 h-5 text-indigo-600" />
-                  <h2 className="text-lg font-bold text-slate-800">
-                      明日の出社時間<span className="text-sm font-bold text-indigo-600 ml-3 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">{tomorrowDisplay}</span>
-                  </h2>
+                  <h2 className="text-lg font-bold text-slate-800">今後の出社時間</h2>
                 </div>
-                <div className="bg-white border rounded-xl shadow-sm p-5">
+                <div className="bg-white border rounded-xl shadow-sm p-4 sm:p-5">
                     <ul className="space-y-4">
                         {tomorrowPlans.map((plan: any, idx: number) => {
                             const pName = plan.project?.project_name || '名称未設定';
                             const time = plan.arrival_time ? plan.arrival_time.substring(0, 5) : '未設定';
                             const workers = plan.workers || '人員未定';
+                            const schedDateObj = plan.schedule_date ? new Date(plan.schedule_date) : null;
+                            const dayStr = schedDateObj ? ['日', '月', '火', '水', '木', '金', '土'][schedDateObj.getDay()] : '';
+                            const dateDisplay = schedDateObj ? `${dateFns.format(schedDateObj, "M/d")}(${dayStr})` : '';
+
                             return (
                                 <li key={idx} className="flex flex-col sm:flex-row sm:items-center gap-3 pb-4 border-b border-slate-100 last:border-0 last:pb-0">
-                                    <div className="flex items-center">
-                                        <div className="bg-indigo-600 text-white font-black px-4 py-2 rounded-lg text-xl sm:text-2xl w-fit shrink-0 tracking-widest shadow-md ring-2 ring-indigo-200 ring-offset-2">
+                                    <div className="flex flex-col items-center min-w-[90px] shrink-0">
+                                        <div className="text-xs font-bold text-slate-500 mb-1 tracking-wide">{dateDisplay}</div>
+                                        <div className="bg-indigo-600 text-white font-black px-4 py-2 rounded-lg text-xl sm:text-2xl w-full text-center tracking-widest shadow-md ring-2 ring-indigo-200 ring-offset-2">
                                             {time}
                                         </div>
                                     </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full mt-2 sm:mt-0 ml-1 sm:ml-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full mt-1 sm:mt-0 sm:ml-4">
                                         <div className="font-bold text-slate-800 text-base sm:text-lg flex-1">{pName}</div>
                                         <div className="text-sm font-bold text-slate-600 mt-2 sm:mt-0 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200 shadow-sm w-fit max-w-full truncate text-right">
                                             👤 {workers}
