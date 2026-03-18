@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams, useNavigate, useLocation } from "react-router-dom"
 import { supabase } from "../../lib/supabase"
 import { ArrowLeft, Loader2, Save, Users, Truck, Wrench, Package, Building, ClipboardList, Plus, Trash2, Camera, X } from "lucide-react"
 import imageCompression from 'browser-image-compression';
@@ -32,6 +32,7 @@ type Subcontractor = { company_name: string; headcount: string }
 export default function ReportForm() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -73,6 +74,19 @@ export default function ReportForm() {
       if (id) {
         await fetchReportData(id, masters)
       } else {
+        // Apply initial state from navigation if present
+        if (location.state) {
+            const { projectId, personnel: initPersonnel, vehicles: initVehicles } = location.state as any;
+            if (projectId) {
+                setReport(prev => ({ ...prev, project_id: projectId }));
+            }
+            if (initPersonnel && Array.isArray(initPersonnel)) {
+                setPersonnel(initPersonnel);
+            }
+            if (initVehicles && Array.isArray(initVehicles)) {
+                setVehicles(initVehicles);
+            }
+        }
         setLoading(false)
       }
     }

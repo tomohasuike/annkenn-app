@@ -335,11 +335,18 @@ export default function Dashboard() {
               {todaySchedules.length > 0 ? (
                 Object.values(todaySchedules.reduce((acc, curr) => {
                   const pid = curr.project?.id || 'unknown';
-                  if (!acc[pid]) acc[pid] = { project: curr.project, workers: [], vehicles: [] };
-                  const wName = Array.isArray(curr.worker_master) ? curr.worker_master[0]?.name : curr.worker_master?.name;
-                  const vName = Array.isArray(curr.vehicle_master) ? curr.vehicle_master[0]?.vehicle_name : curr.vehicle_master?.vehicle_name;
-                  if (wName) acc[pid].workers.push(wName);
-                  if (vName) acc[pid].vehicles.push(vName);
+                  if (!acc[pid]) acc[pid] = { project: curr.project, workers: [], vehicles: [], workersRaw: [], vehiclesRaw: [] };
+                  const wRaw = Array.isArray(curr.worker_master) ? curr.worker_master[0] : curr.worker_master;
+                  const vRaw = Array.isArray(curr.vehicle_master) ? curr.vehicle_master[0] : curr.vehicle_master;
+                  
+                  if (wRaw) {
+                      acc[pid].workers.push(wRaw.name);
+                      acc[pid].workersRaw.push({ id: curr.worker_id, name: wRaw.name });
+                  }
+                  if (vRaw) {
+                      acc[pid].vehicles.push(vRaw.vehicle_name);
+                      acc[pid].vehiclesRaw.push({ id: curr.vehicle_id, vehicle_name: vRaw.vehicle_name });
+                  }
                   return acc;
                 }, {} as any))
                 .sort((a: any, b: any) => {
@@ -354,7 +361,17 @@ export default function Dashboard() {
                   const isVacation = p.project_number === 'VACATION' || p.project_name?.includes('休暇');
                   
                   return (
-                    <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 transition-colors cursor-pointer" onClick={() => navigate(`/projects/${p.id}/edit`)}>
+                    <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 transition-colors cursor-pointer" onClick={() => {
+                        const personnelData = schedGroup.workersRaw ? schedGroup.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
+                        const vehicleData = schedGroup.vehiclesRaw ? schedGroup.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
+                        navigate(`/reports/new`, { 
+                            state: { 
+                                projectId: p.id,
+                                personnel: personnelData,
+                                vehicles: vehicleData
+                            } 
+                        });
+                    }}>
                       <div className="flex items-center gap-2 mb-3">
                          <span className="text-[10px] font-bold font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
                             {p.project_number || '番号なし'}
