@@ -28,7 +28,7 @@ export default function Dashboard() {
   const [tomorrowPlans, setTomorrowPlans] = useState<any[]>([]);
   
   // Billing States
-  const [expectedBillingAmount, setExpectedBillingAmount] = useState(0);
+  const [fiscalYearSales, setFiscalYearSales] = useState(0);
   const [overdueInvoices, setOverdueInvoices] = useState<any[]>([]);
 
   const getProjectDisplayName = (p: any) => {
@@ -67,10 +67,24 @@ export default function Dashboard() {
 
       const todayStr = dateFns.format(new Date(), 'yyyy-MM-dd');
       const tomorrowStr = dateFns.format(dateFns.addDays(new Date(), 1), 'yyyy-MM-dd');
-      const startOfMonthStr = dateFns.format(dateFns.startOfMonth(new Date()), 'yyyy-MM-dd');
-      const endOfMonthStr = dateFns.format(dateFns.endOfMonth(new Date()), 'yyyy-MM-dd');
 
-      // 2. Fetch Assignments for Today and Tomorrow
+      const today = new Date();
+  const currentMonth = today.getMonth() + 1;
+  const currentYear = today.getFullYear();
+  
+  let fiscalStart, fiscalEnd;
+  if (currentMonth >= 5) {
+      fiscalStart = new Date(currentYear, 4, 1); // May 1st
+      fiscalEnd = new Date(currentYear + 1, 3, 30); // April 30th next year
+  } else {
+      fiscalStart = new Date(currentYear - 1, 4, 1); // May 1st last year
+      fiscalEnd = new Date(currentYear, 3, 30); // April 30th
+  }
+
+  const fiscalYearStartStr = dateFns.format(fiscalStart, 'yyyy-MM-dd');
+  const fiscalYearEndStr = dateFns.format(fiscalEnd, 'yyyy-MM-dd');
+
+  // 2. Fetch Assignments for Today and Tomorrow
       // Today schedules
       const { data: schedules } = await supabase
         .from('assignments')
@@ -182,21 +196,21 @@ export default function Dashboard() {
 
       // 5. Fetch Billing Data if authorized
       if (canViewBilling) {
-        // Fetch all open billing details
+        // Fetch all billing details except unbilled (未請求)
         const { data: billingDetails } = await supabase
           .from('invoice_details')
           .select('id, amount, billing_date, expected_deposit_date, details_status')
-          .not('details_status', 'eq', '完了')
-          .not('details_status', 'eq', '入金済');
+          .neq('details_status', '未請求');
         
-        let expectedAmount = 0;
+        let fiscalYearSalesTotal = 0;
         let overdue: any[] = [];
 
         if (billingDetails) {
           billingDetails.forEach(bd => {
-            // Add to expected amount only if it's billed in the current month
-            if (bd.billing_date >= startOfMonthStr && bd.billing_date <= endOfMonthStr) {
-              expectedAmount += bd.amount || 0;
+            // Add to fiscal year sales if billing date is within the fiscal year and status is '請求済', '入金済', or '完了'
+            const isBilledOrPaid = ['請求済', '入金済', '完了'].includes(bd.details_status);
+            if (isBilledOrPaid && bd.billing_date >= fiscalYearStartStr && bd.billing_date <= fiscalYearEndStr) {
+              fiscalYearSalesTotal += bd.amount || 0;
             }
 
             // Check if overdue: status is 請求済 and expected deposit date has passed
@@ -205,7 +219,7 @@ export default function Dashboard() {
             }
           });
         }
-        setExpectedBillingAmount(expectedAmount);
+        setFiscalYearSales(fiscalYearSalesTotal);
         setOverdueInvoices(overdue);
       }
 
@@ -354,11 +368,11 @@ export default function Dashboard() {
         {hasBillingAccess ? (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center gap-4 cursor-pointer hover:border-orange-300 transition-colors" onClick={() => navigate('/billing')}>
             <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center shrink-0">
-              <JapaneseYen className="w-6 h-6 text-orange-600" />
+              <span className="text-xl font-bold text-orange-600">¥</span>
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-500">今月の請求予定額</p>
-              <p className="text-2xl font-black text-slate-800">¥ {toFormattedString(expectedBillingAmount)}</p>
+              <p className="text-sm font-bold text-slate-500">今年度の売上額</p>
+              <p className="text-2xl font-black text-slate-800">¥ {fiscalYearSales.toLocaleString()}</p>
             </div>
           </div>
         ) : (
