@@ -20,6 +20,7 @@ export default function Dashboard() {
 
   // Data States
   const [todaySchedules, setTodaySchedules] = useState<any[]>([]);
+  const [tomorrowSchedules, setTomorrowSchedules] = useState<any[]>([]);
   const [activeProjects, setActiveProjects] = useState<any[]>([]);
   const [recentReports, setRecentReports] = useState<any[]>([]);
   
@@ -49,10 +50,12 @@ export default function Dashboard() {
       const canViewBilling = permissions.includes('billing') || workerData?.is_admin;
 
       const todayStr = dateFns.format(new Date(), 'yyyy-MM-dd');
+      const tomorrowStr = dateFns.format(dateFns.addDays(new Date(), 1), 'yyyy-MM-dd');
       const startOfMonthStr = dateFns.format(dateFns.startOfMonth(new Date()), 'yyyy-MM-dd');
       const endOfMonthStr = dateFns.format(dateFns.endOfMonth(new Date()), 'yyyy-MM-dd');
 
-      // 2. Fetch Assignments for Today
+      // 2. Fetch Assignments for Today and Tomorrow
+      // Today schedules
       const { data: schedules } = await supabase
         .from('assignments')
         .select(`
@@ -67,6 +70,16 @@ export default function Dashboard() {
         `)
         .eq('assignment_date', todayStr);
       setTodaySchedules(schedules || []);
+
+      // Tomorrow schedules
+      const { data: tomSchedules } = await supabase
+        .from('assignments')
+        .select(`
+          id,
+          project:projects ( id, project_name, category )
+        `)
+        .eq('assignment_date', tomorrowStr);
+      setTomorrowSchedules(tomSchedules || []);
 
       // 3. Fetch Active Projects (着工中)
       const { data: projects } = await supabase
@@ -138,6 +151,19 @@ export default function Dashboard() {
   // Derived Data
   const projectsNeedingCompletionReport = activeProjects.filter(() => false);
   const activeSchedulesCount = new Set(todaySchedules.filter(s => s.project_id).map(s => s.project_id)).size;
+
+  // Tomorrow schedule alert logic (after 12:00 PM)
+  const currentHour = new Date().getHours();
+  // Filter out any assignments that belong to "vacation" or "others"
+  const nonVacationTomorrows = tomorrowSchedules.filter(s => {
+    const p = s.project;
+    if (!p) return true;
+    if (p.category === 'その他' || p.project_name === '■ 休暇' || (typeof p.project_name === 'string' && p.project_name.includes('休暇'))) {
+      return false;
+    }
+    return true;
+  });
+  const showTomorrowScheduleAlert = currentHour >= 12 && nonVacationTomorrows.length === 0;
 
   return (
     <div className="h-full flex flex-col overflow-y-auto bg-slate-50 p-6 md:p-8 space-y-8">
@@ -228,6 +254,20 @@ export default function Dashboard() {
                 </div>
               )}
 
+              {/* Tomorrow Schedule Reminder */}
+              {showTomorrowScheduleAlert && (
+                <div className="p-4 flex items-start gap-4 border-b last:border-0 border-slate-100 bg-orange-50/50">
+                  <Clock className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-bold text-orange-700">翌日の稼働スケジュール未作成</h3>
+                    <p className="text-sm text-orange-600 mt-1 mb-2">12時を過ぎましたが、明日の配置表（稼働スケジュール）が登録されていません。</p>
+                    <button onClick={() => navigate('/schedule')} className="text-xs font-bold text-orange-700 bg-orange-100 px-3 py-1.5 rounded-md hover:bg-orange-200 transition-colors">
+                      配置表を作成する
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Completion Report Reminder */}
               {projectsNeedingCompletionReport.length > 0 && (
                 <div className="p-4 flex items-start gap-4">
@@ -250,7 +290,7 @@ export default function Dashboard() {
               )}
 
               {/* Empty State for To-Do */}
-              {!((hasBillingAccess && overdueInvoices.length > 0) || projectsNeedingCompletionReport.length > 0) && (
+              {!((hasBillingAccess && overdueInvoices.length > 0) || projectsNeedingCompletionReport.length > 0 || showTomorrowScheduleAlert) && (
                 <div className="p-8 text-center text-slate-500 text-sm">
                   現在、対応が必要なアラートはありません。
                 </div>
