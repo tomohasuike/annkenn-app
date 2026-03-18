@@ -194,26 +194,38 @@ export default function Dashboard() {
 
   // 翌日の予定があるのに、本日の日報が出ていないアラート
   const currentHour = new Date().getHours();
-  const tomorrowScheduledProjects = new Set<string>();
-  tomorrowSchedules.forEach(s => {
-    const p = s.project;
-    if (!p) return;
-    if (p.category === 'その他' || p.project_number === 'VACATION' || (typeof p.project_name === 'string' && p.project_name.includes('休暇'))) {
-      return;
+  const tomorrowScheduleGroups = Object.values(tomorrowSchedules.reduce((acc, curr) => {
+    const p = curr.project;
+    if (!p) return acc;
+    const pid = p.id;
+    if (!acc[pid]) acc[pid] = { project: p, workers: [], vehicles: [], workersRaw: [], vehiclesRaw: [] };
+    const wRaw = Array.isArray(curr.worker_master) ? curr.worker_master[0] : curr.worker_master;
+    const vRaw = Array.isArray(curr.vehicle_master) ? curr.vehicle_master[0] : curr.vehicle_master;
+    
+    if (wRaw) {
+        acc[pid].workers.push(wRaw.name);
+        acc[pid].workersRaw.push({ id: curr.worker_id, name: wRaw.name });
     }
-    tomorrowScheduledProjects.add(p.id);
-  });
-  
-  let missingTomorrowReportsCount = 0;
-  tomorrowScheduledProjects.forEach(projectId => {
-      // 如果 todaySchedules 里面有，但 submittedTodayReports 没有，那也是未提出。
-      // 但用户的意思是：“明日のスケジュール（配置）」が組まれている現場について、『本日分（今日の日付）』の日報（`daily_reports`）がまだ作成/提出されていない場合”
-      if (!submittedTomorrowReports[projectId]) {
-          missingTomorrowReportsCount++;
-      }
+    if (vRaw) {
+        acc[pid].vehicles.push(vRaw.vehicle_name);
+        acc[pid].vehiclesRaw.push({ id: curr.vehicle_id, vehicle_name: vRaw.vehicle_name });
+    }
+    return acc;
+  }, {} as any)).sort((a: any, b: any) => {
+    const isAVac = a.project?.project_number === 'VACATION' || a.project?.project_name?.includes('休暇');
+    const isBVac = b.project?.project_number === 'VACATION' || b.project?.project_name?.includes('休暇');
+    return isAVac === isBVac ? 0 : isAVac ? -1 : 1;
   });
 
-  const showTomorrowScheduleAlert = currentHour >= 15 && missingTomorrowReportsCount > 0;
+  const missingTomorrowGroups = tomorrowScheduleGroups.filter((group: any) => {
+      const p = group.project;
+      if (!p) return false;
+      const isVacationOrMisc = p.category === 'その他' || p.project_number === 'VACATION' || (typeof p.project_name === 'string' && p.project_name.includes('休暇'));
+      if (isVacationOrMisc) return false;
+      return !submittedTomorrowReports[p.id];
+  });
+
+  const showTomorrowScheduleAlert = currentHour >= 15 && missingTomorrowGroups.length > 0;
 
   return (
     <div className="h-full flex flex-col overflow-y-auto bg-slate-50 p-6 md:p-8 space-y-8">
@@ -310,10 +322,40 @@ export default function Dashboard() {
                   <Clock className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
                   <div>
                     <h3 className="text-sm font-bold text-orange-700">明日の予定（日報）未作成</h3>
-                    <p className="text-sm text-orange-600 mt-1 mb-2">15時を過ぎましたが、明日の配置スケジュールが組まれている現場のうち、<strong>{missingTomorrowReportsCount}件</strong>の明日分の予定日報がまだ提出されていません。</p>
-                    <button onClick={() => navigate('/schedule-management')} className="text-xs font-bold text-orange-700 bg-orange-100 px-3 py-1.5 rounded-md hover:bg-orange-200 transition-colors">
-                      工程管理を開く
-                    </button>
+                    <p className="text-sm text-orange-600 mt-1 mb-2">15時を過ぎましたが、明日の配置スケジュールが組まれている現場のうち、<strong>{missingTomorrowGroups.length}件</strong>の明日分の予定日報がまだ提出されていません。</p>
+                    <ul className="mt-3 space-y-2">
+                      {missingTomorrowGroups.map((group: any, idx: number) => {
+                         const p = group.project;
+                         const workers = group.workers.length > 0 ? group.workers.join(", ") : '人員指定なし';
+                         return (
+                           <li key={idx}>
+                             <button
+                               onClick={() => {
+                                  const personnelData = group.workersRaw ? group.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
+                                  const vehicleData = group.vehiclesRaw ? group.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
+                                  const tomorrowStr = dateFns.format(dateFns.addDays(new Date(), 1), "yyyy-MM-dd'T'17:00");
+                                  navigate(`/reports/new`, { 
+                                      state: { 
+                                          projectId: p.id,
+                                          personnel: personnelData,
+                                          vehicles: vehicleData,
+                                          category: p.category,
+                                          reportDate: tomorrowStr
+                                      } 
+                                  });
+                               }}
+                               className="text-left w-full bg-white/70 hover:bg-white border border-orange-200/60 hover:border-orange-300 rounded-md px-3 py-2 text-sm transition-colors flex items-center justify-between shadow-sm"
+                             >
+                                <div className="flex flex-col gap-0.5 overflow-hidden w-full max-w-[calc(100%-80px)] pr-2">
+                                  <span className="font-bold text-slate-700 truncate">{p.project_name}</span>
+                                  <span className="text-xs text-slate-500 font-medium truncate">人員: <span className="text-slate-600">{workers}</span></span>
+                                </div>
+                                <span className="text-orange-600 font-bold text-[10px] bg-orange-100/80 border border-orange-200 px-2 py-1 rounded shrink-0 flex items-center gap-1">作成画面<span className="text-lg leading-none transform translate-y-[-1px]">&rarr;</span></span>
+                             </button>
+                           </li>
+                         );
+                      })}
+                    </ul>
                   </div>
                 </div>
               )}
@@ -464,29 +506,8 @@ export default function Dashboard() {
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {tomorrowSchedules.length > 0 ? (
-                Object.values(tomorrowSchedules.reduce((acc, curr) => {
-                  const pid = curr.project?.id || 'unknown';
-                  if (!acc[pid]) acc[pid] = { project: curr.project, workers: [], vehicles: [], workersRaw: [], vehiclesRaw: [] };
-                  const wRaw = Array.isArray(curr.worker_master) ? curr.worker_master[0] : curr.worker_master;
-                  const vRaw = Array.isArray(curr.vehicle_master) ? curr.vehicle_master[0] : curr.vehicle_master;
-                  
-                  if (wRaw) {
-                      acc[pid].workers.push(wRaw.name);
-                      acc[pid].workersRaw.push({ id: curr.worker_id, name: wRaw.name });
-                  }
-                  if (vRaw) {
-                      acc[pid].vehicles.push(vRaw.vehicle_name);
-                      acc[pid].vehiclesRaw.push({ id: curr.vehicle_id, vehicle_name: vRaw.vehicle_name });
-                  }
-                  return acc;
-                }, {} as any))
-                .sort((a: any, b: any) => {
-                  const isAVac = a.project?.project_number === 'VACATION' || a.project?.project_name?.includes('休暇');
-                  const isBVac = b.project?.project_number === 'VACATION' || b.project?.project_name?.includes('休暇');
-                  return isAVac === isBVac ? 0 : isAVac ? -1 : 1;
-                })
-                .map((schedGroup: any, idx) => {
+              {tomorrowScheduleGroups.length > 0 ? (
+                tomorrowScheduleGroups.map((schedGroup: any, idx: number) => {
                   const p = schedGroup.project || {};
                   const workers = schedGroup.workers.length > 0 ? schedGroup.workers.join(", ") : '-';
                   const vehicles = schedGroup.vehicles.length > 0 ? schedGroup.vehicles.join(", ") : '-';
