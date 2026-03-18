@@ -357,15 +357,26 @@ export default function Dashboard() {
                             const pName = plan.project?.project_name || '名称未設定';
                             const time = plan.arrival_time ? plan.arrival_time.substring(0, 5) : '未設定';
                             const workers = plan.workers || '人員未定';
-                            const schedDateObj = plan.schedule_date ? new Date(plan.schedule_date) : null;
-                            const dayStr = schedDateObj ? ['日', '月', '火', '水', '木', '金', '土'][schedDateObj.getDay()] : '';
-                            const dateDisplay = schedDateObj ? `${dateFns.format(schedDateObj, "M/d")}(${dayStr})` : '';
+                            let dateDisplay = '日付不明';
+                            if (plan.schedule_date) {
+                                const parts = plan.schedule_date.split('-');
+                                if (parts.length === 3) {
+                                    const y = parseInt(parts[0], 10);
+                                    const m = parseInt(parts[1], 10);
+                                    const d = parseInt(parts[2], 10);
+                                    const dateObj = new Date(y, m - 1, d);
+                                    const dayStr = ['日', '月', '火', '水', '木', '金', '土'][dateObj.getDay()];
+                                    dateDisplay = `${m}/${d}(${dayStr})`;
+                                }
+                            }
 
                             return (
                                 <li key={idx} className="flex flex-col sm:flex-row sm:items-center gap-3 pb-4 border-b border-slate-100 last:border-0 last:pb-0">
-                                    <div className="flex flex-col items-center min-w-[90px] shrink-0">
-                                        <div className="text-xs font-bold text-slate-500 mb-1 tracking-wide">{dateDisplay}</div>
-                                        <div className="bg-indigo-600 text-white font-black px-4 py-2 rounded-lg text-xl sm:text-2xl w-full text-center tracking-widest shadow-md ring-2 ring-indigo-200 ring-offset-2">
+                                    <div className="flex flex-col items-center min-w-[95px] shrink-0">
+                                        <div className="text-sm font-black text-indigo-800 mb-1 tracking-wide bg-indigo-100 px-2.5 py-0.5 rounded-t-md w-full text-center border-b-2 border-indigo-200">
+                                            {dateDisplay}
+                                        </div>
+                                        <div className="bg-indigo-600 text-white font-black px-4 py-2 rounded-b-lg text-xl sm:text-2xl w-full text-center tracking-widest shadow-md ring-1 ring-indigo-300">
                                             {time}
                                         </div>
                                     </div>
