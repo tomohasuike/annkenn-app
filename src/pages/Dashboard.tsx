@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ShieldCheck, HardHat, FileText, AlertTriangle, CheckCircle2, FileCheck2, Loader2, JapaneseYen, Clock, LayoutDashboard } from "lucide-react"
+import { ShieldCheck, HardHat, FileText, AlertTriangle, CheckCircle2, FileCheck2, Loader2, JapaneseYen, Clock, LayoutDashboard, CalendarClock } from "lucide-react"
 import { supabase } from "../lib/supabase"
 import * as dateFns from "date-fns"
 
@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [recentReports, setRecentReports] = useState<any[]>([]);
   const [submittedTodayReports, setSubmittedTodayReports] = useState<Record<string, string>>({});
   const [submittedTomorrowReports, setSubmittedTomorrowReports] = useState<Record<string, string>>({});
+  const [tomorrowPlans, setTomorrowPlans] = useState<any[]>([]);
   
   // Billing States
   const [expectedBillingAmount, setExpectedBillingAmount] = useState(0);
@@ -116,14 +117,22 @@ export default function Dashboard() {
       // 3.6 Fetch Tomorrow's Daily Reports (明日の予定日報 => 翌日予定)
       const { data: tomorrowReports } = await supabase
         .from('tomorrow_schedules')
-        .select('id, project_id')
+        .select(`
+            id, project_id, arrival_time, workers,
+            project:projects(project_name)
+        `)
         .eq('schedule_date', tomorrowStr);
         
       const submittedTomMap: Record<string, string> = {};
       if (tomorrowReports) {
-          tomorrowReports.forEach(r => {
+          tomorrowReports.forEach((r: any) => {
               if (r.project_id) submittedTomMap[r.project_id] = r.id;
           });
+          setTomorrowPlans(tomorrowReports.sort((a: any, b: any) => {
+              const timeA = a.arrival_time || '99:99';
+              const timeB = b.arrival_time || '99:99';
+              return timeA.localeCompare(timeB);
+          }));
       }
       setSubmittedTomorrowReports(submittedTomMap);
 
@@ -323,11 +332,43 @@ export default function Dashboard() {
       </div>
 
       {/* MAIN CONTENT SPLIT */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
         
         {/* LEFT COLUMN: Actions & Alerts */}
         <div className="col-span-1 lg:col-span-2 space-y-8">
           
+          {/* 明日の出社時間 */}
+          {tomorrowPlans.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <CalendarClock className="w-5 h-5 text-indigo-600" />
+                  <h2 className="text-lg font-bold text-slate-800">明日の出社時間</h2>
+                </div>
+                <div className="bg-white border rounded-xl shadow-sm p-4">
+                    <ul className="space-y-3">
+                        {tomorrowPlans.map((plan: any, idx: number) => {
+                            const pName = plan.project?.project_name || '名称未設定';
+                            const time = plan.arrival_time ? plan.arrival_time.substring(0, 5) : '未設定';
+                            const workers = plan.workers || '人員未定';
+                            return (
+                                <li key={idx} className="flex flex-col gap-1 pb-3 border-b border-slate-100 last:border-0 last:pb-0">
+                                    <div className="flex items-center gap-2">
+                                        <div className="bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded text-xs w-fit shrink-0 tracking-wider">
+                                            {time}
+                                        </div>
+                                        <div className="font-bold text-slate-700 leading-tight flex-1">{pName}</div>
+                                    </div>
+                                    <div className="text-xs font-medium text-slate-500 pl-11">
+                                        {workers}
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+              </section>
+          )}
+
           {/* TO-DO & ALERTS */}
           <section>
             <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
