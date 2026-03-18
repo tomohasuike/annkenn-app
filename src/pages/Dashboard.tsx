@@ -341,10 +341,17 @@ export default function Dashboard() {
                   if (wName) acc[pid].workers.push(wName);
                   if (vName) acc[pid].vehicles.push(vName);
                   return acc;
-                }, {} as any)).map((schedGroup: any, idx) => {
+                }, {} as any))
+                .sort((a: any, b: any) => {
+                  const isAVac = a.project?.project_number === 'VACATION' || a.project?.project_name?.includes('休暇');
+                  const isBVac = b.project?.project_number === 'VACATION' || b.project?.project_name?.includes('休暇');
+                  return isAVac === isBVac ? 0 : isAVac ? -1 : 1;
+                })
+                .map((schedGroup: any, idx) => {
                   const p = schedGroup.project || {};
                   const workers = schedGroup.workers.length > 0 ? schedGroup.workers.join(", ") : '-';
                   const vehicles = schedGroup.vehicles.length > 0 ? schedGroup.vehicles.join(", ") : '-';
+                  const isVacation = p.project_number === 'VACATION' || p.project_name?.includes('休暇');
                   
                   return (
                     <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 transition-colors cursor-pointer" onClick={() => navigate(`/projects/${p.id}/edit`)}>
@@ -352,7 +359,10 @@ export default function Dashboard() {
                          <span className="text-[10px] font-bold font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
                             {p.project_number || '番号なし'}
                          </span>
-                         <span className="font-bold text-sm text-slate-700 truncate" title={p.project_name}>{p.project_name}</span>
+                         <span className="font-bold text-sm text-slate-700 truncate" title={p.project_name}>
+                           {isVacation && <span className="text-slate-800 mr-1">■</span>}
+                           {p.project_name}
+                         </span>
                       </div>
                       <div className="space-y-1 mt-2">
                         <div className="flex items-start gap-3">
@@ -397,10 +407,17 @@ export default function Dashboard() {
                   if (wName) acc[pid].workers.push(wName);
                   if (vName) acc[pid].vehicles.push(vName);
                   return acc;
-                }, {} as any)).map((schedGroup: any, idx) => {
+                }, {} as any))
+                .sort((a: any, b: any) => {
+                  const isAVac = a.project?.project_number === 'VACATION' || a.project?.project_name?.includes('休暇');
+                  const isBVac = b.project?.project_number === 'VACATION' || b.project?.project_name?.includes('休暇');
+                  return isAVac === isBVac ? 0 : isAVac ? -1 : 1;
+                })
+                .map((schedGroup: any, idx) => {
                   const p = schedGroup.project || {};
                   const workers = schedGroup.workers.length > 0 ? schedGroup.workers.join(", ") : '-';
                   const vehicles = schedGroup.vehicles.length > 0 ? schedGroup.vehicles.join(", ") : '-';
+                  const isVacation = p.project_number === 'VACATION' || p.project_name?.includes('休暇');
                   
                   return (
                     <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 transition-colors cursor-pointer" onClick={() => navigate(`/projects/${p.id}/edit`)}>
@@ -408,7 +425,10 @@ export default function Dashboard() {
                          <span className="text-[10px] font-bold font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
                             {p.project_number || '番号なし'}
                          </span>
-                         <span className="font-bold text-sm text-slate-700 truncate" title={p.project_name}>{p.project_name}</span>
+                         <span className="font-bold text-sm text-slate-700 truncate" title={p.project_name}>
+                           {isVacation && <span className="text-slate-800 mr-1">■</span>}
+                           {p.project_name}
+                         </span>
                       </div>
                       <div className="space-y-1 mt-2">
                         <div className="flex items-start gap-3">
