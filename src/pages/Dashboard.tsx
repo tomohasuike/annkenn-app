@@ -93,25 +93,24 @@ export default function Dashboard() {
 
       // 5. Fetch Billing Data if authorized
       if (canViewBilling) {
-        // Fetch billing details for current month
+        // Fetch all open billing details
         const { data: billingDetails } = await supabase
           .from('invoice_details')
-          .select('id, amount, expected_deposit_date, details_status')
-          .gte('billing_date', startOfMonthStr)
-          .lte('billing_date', endOfMonthStr)
-          .not('details_status', 'eq', '完了');
+          .select('id, amount, billing_date, expected_deposit_date, details_status')
+          .not('details_status', 'eq', '完了')
+          .not('details_status', 'eq', '入金済');
         
         let expectedAmount = 0;
         let overdue: any[] = [];
 
         if (billingDetails) {
           billingDetails.forEach(bd => {
-            // Add to expected amount if it's not fully paid/completed
-            if (bd.details_status !== '入金済' && bd.details_status !== '完了') {
+            // Add to expected amount only if it's billed in the current month
+            if (bd.billing_date >= startOfMonthStr && bd.billing_date <= endOfMonthStr) {
               expectedAmount += bd.amount || 0;
             }
 
-            // Check if overdue
+            // Check if overdue: status is 請求済 and expected deposit date has passed
             if (bd.expected_deposit_date && bd.expected_deposit_date < todayStr && bd.details_status === '請求済') {
               overdue.push(bd);
             }
