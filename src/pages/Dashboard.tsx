@@ -106,7 +106,7 @@ export default function Dashboard() {
           assignment_date,
           worker_id,
           vehicle_id,
-          worker_master ( name, type ),
+          worker_master!assignments_worker_id_fkey ( name, type ),
           vehicle_master ( vehicle_name ),
           project:projects ( id, project_name, site_name, project_number, category, client_name )
         `)
@@ -122,7 +122,7 @@ export default function Dashboard() {
           assignment_date,
           worker_id,
           vehicle_id,
-          worker_master ( name, type ),
+          worker_master!assignments_worker_id_fkey ( name, type ),
           vehicle_master ( vehicle_name ),
           project:projects ( id, project_name, site_name, project_number, category, client_name )
         `)

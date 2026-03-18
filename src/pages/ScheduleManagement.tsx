@@ -226,7 +226,7 @@ export default function ScheduleManagement() {
         .from('assignments')
         .select(`
           id, assignment_date, project_id, worker_id, vehicle_id, count, notes, assigned_by,
-          projects(project_name), worker_master(name, type), vehicle_master(vehicle_name)
+          projects(project_name), worker_master!assignments_worker_id_fkey(name, type), vehicle_master(vehicle_name)
         `)
         .gte('assignment_date', startDateStr)
         .lte('assignment_date', endDateStr)
