@@ -76,7 +76,7 @@ export default function ReportForm() {
       } else {
         // Apply initial state from navigation if present
         if (location.state) {
-            const { projectId, personnel: initPersonnel, vehicles: initVehicles, category } = location.state as any;
+            const { projectId, personnel: initPersonnel, vehicles: initVehicles, category, reportDate } = location.state as any;
             if (category) {
                 setSelectedProjectCategory(category);
             }
@@ -88,6 +88,17 @@ export default function ReportForm() {
             }
             if (initVehicles && Array.isArray(initVehicles)) {
                 setVehicles(initVehicles);
+            }
+            if (reportDate) {
+                const parsedTarget = new Date(reportDate);
+                const start = new Date(parsedTarget); start.setHours(8, 0, 0, 0);
+                const end = new Date(parsedTarget); end.setHours(17, 0, 0, 0);
+                setReport(prev => ({ 
+                    ...prev, 
+                    보고日時: reportDate,
+                    作業開始時間: format(start, "yyyy-MM-dd'T'HH:mm"),
+                    作業終了時間: format(end, "yyyy-MM-dd'T'HH:mm")
+                }));
             }
         }
         setLoading(false)

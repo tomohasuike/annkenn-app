@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [activeProjects, setActiveProjects] = useState<any[]>([]);
   const [recentReports, setRecentReports] = useState<any[]>([]);
   const [submittedTodayReports, setSubmittedTodayReports] = useState<Record<string, string>>({});
+  const [submittedTomorrowReports, setSubmittedTomorrowReports] = useState<Record<string, string>>({});
   
   // Billing States
   const [expectedBillingAmount, setExpectedBillingAmount] = useState(0);
@@ -112,6 +113,21 @@ export default function Dashboard() {
       }
       setSubmittedTodayReports(submittedMap);
 
+      // 3.6 Fetch Tomorrow's Daily Reports (明日の予定日報)
+      const { data: tomorrowReports } = await supabase
+        .from('daily_reports')
+        .select('id, project_id')
+        .gte('report_date', `${tomorrowStr}T00:00:00`)
+        .lte('report_date', `${tomorrowStr}T23:59:59.999Z`);
+        
+      const submittedTomMap: Record<string, string> = {};
+      if (tomorrowReports) {
+          tomorrowReports.forEach(r => {
+              if (r.project_id) submittedTomMap[r.project_id] = r.id;
+          });
+      }
+      setSubmittedTomorrowReports(submittedTomMap);
+
       // 4. Fetch Recent Reports (Daily)
       const { data: reports } = await supabase
         .from('daily_reports')
@@ -188,16 +204,16 @@ export default function Dashboard() {
     tomorrowScheduledProjects.add(p.id);
   });
   
-  let missingDailyReportsCount = 0;
+  let missingTomorrowReportsCount = 0;
   tomorrowScheduledProjects.forEach(projectId => {
       // 如果 todaySchedules 里面有，但 submittedTodayReports 没有，那也是未提出。
       // 但用户的意思是：“明日のスケジュール（配置）」が組まれている現場について、『本日分（今日の日付）』の日報（`daily_reports`）がまだ作成/提出されていない場合”
-      if (!submittedTodayReports[projectId]) {
-          missingDailyReportsCount++;
+      if (!submittedTomorrowReports[projectId]) {
+          missingTomorrowReportsCount++;
       }
   });
 
-  const showTomorrowScheduleAlert = currentHour >= 15 && missingDailyReportsCount > 0;
+  const showTomorrowScheduleAlert = currentHour >= 15 && missingTomorrowReportsCount > 0;
 
   return (
     <div className="h-full flex flex-col overflow-y-auto bg-slate-50 p-6 md:p-8 space-y-8">
@@ -293,8 +309,8 @@ export default function Dashboard() {
                 <div className="p-4 flex items-start gap-4 border-b last:border-0 border-slate-100 bg-orange-50/50">
                   <Clock className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
                   <div>
-                    <h3 className="text-sm font-bold text-orange-700">翌日の予定（日報）未作成</h3>
-                    <p className="text-sm text-orange-600 mt-1 mb-2">15時を過ぎましたが、明日の配置スケジュールが組まれている現場のうち、<strong>{missingDailyReportsCount}件</strong>の本日分の日報がまだ提出されていません。</p>
+                    <h3 className="text-sm font-bold text-orange-700">明日の予定（日報）未作成</h3>
+                    <p className="text-sm text-orange-600 mt-1 mb-2">15時を過ぎましたが、明日の配置スケジュールが組まれている現場のうち、<strong>{missingTomorrowReportsCount}件</strong>の明日分の予定日報がまだ提出されていません。</p>
                     <button onClick={() => navigate('/schedule-management')} className="text-xs font-bold text-orange-700 bg-orange-100 px-3 py-1.5 rounded-md hover:bg-orange-200 transition-colors">
                       工程管理を開く
                     </button>
@@ -446,11 +462,18 @@ export default function Dashboard() {
               {tomorrowSchedules.length > 0 ? (
                 Object.values(tomorrowSchedules.reduce((acc, curr) => {
                   const pid = curr.project?.id || 'unknown';
-                  if (!acc[pid]) acc[pid] = { project: curr.project, workers: [], vehicles: [] };
-                  const wName = Array.isArray(curr.worker_master) ? curr.worker_master[0]?.name : curr.worker_master?.name;
-                  const vName = Array.isArray(curr.vehicle_master) ? curr.vehicle_master[0]?.vehicle_name : curr.vehicle_master?.vehicle_name;
-                  if (wName) acc[pid].workers.push(wName);
-                  if (vName) acc[pid].vehicles.push(vName);
+                  if (!acc[pid]) acc[pid] = { project: curr.project, workers: [], vehicles: [], workersRaw: [], vehiclesRaw: [] };
+                  const wRaw = Array.isArray(curr.worker_master) ? curr.worker_master[0] : curr.worker_master;
+                  const vRaw = Array.isArray(curr.vehicle_master) ? curr.vehicle_master[0] : curr.vehicle_master;
+                  
+                  if (wRaw) {
+                      acc[pid].workers.push(wRaw.name);
+                      acc[pid].workersRaw.push({ id: curr.worker_id, name: wRaw.name });
+                  }
+                  if (vRaw) {
+                      acc[pid].vehicles.push(vRaw.vehicle_name);
+                      acc[pid].vehiclesRaw.push({ id: curr.vehicle_id, vehicle_name: vRaw.vehicle_name });
+                  }
                   return acc;
                 }, {} as any))
                 .sort((a: any, b: any) => {
@@ -463,17 +486,44 @@ export default function Dashboard() {
                   const workers = schedGroup.workers.length > 0 ? schedGroup.workers.join(", ") : '-';
                   const vehicles = schedGroup.vehicles.length > 0 ? schedGroup.vehicles.join(", ") : '-';
                   const isVacation = p.project_number === 'VACATION' || p.project_name?.includes('休暇');
+                  const reportId = submittedTomorrowReports[p.id];
+                  const isSubmitted = !!reportId;
                   
                   return (
-                    <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-blue-300 transition-colors cursor-pointer" onClick={() => navigate(`/projects/${p.id}/edit`)}>
-                      <div className="flex items-center gap-2 mb-3">
-                         <span className="text-[10px] font-bold font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
-                            {p.project_number || '番号なし'}
-                         </span>
-                         <span className="font-bold text-sm text-slate-700 truncate" title={p.project_name}>
-                           {isVacation && <span className="text-slate-800 mr-1">■</span>}
-                           {p.project_name}
-                         </span>
+                    <div key={idx} className={`rounded-xl shadow-sm border p-4 transition-colors cursor-pointer ${isSubmitted ? 'bg-slate-50 border-emerald-200/60 opacity-90 hover:border-emerald-300' : 'bg-white border-slate-200 hover:border-blue-300'}`} onClick={() => {
+                        if (isSubmitted) {
+                            navigate(`/reports/${reportId}/edit`);
+                        } else {
+                            const personnelData = schedGroup.workersRaw ? schedGroup.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
+                            const vehicleData = schedGroup.vehiclesRaw ? schedGroup.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
+                            const tomorrowStr = dateFns.format(dateFns.addDays(new Date(), 1), "yyyy-MM-dd'T'17:00");
+                            navigate(`/reports/new`, { 
+                                state: { 
+                                    projectId: p.id,
+                                    personnel: personnelData,
+                                    vehicles: vehicleData,
+                                    category: p.category,
+                                    reportDate: tomorrowStr
+                                } 
+                            });
+                        }
+                    }}>
+                      <div className="flex items-center mb-3">
+                         <div className="flex items-center gap-2 max-w-[calc(100%-70px)]">
+                             <span className="text-[10px] font-bold font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                                {p.project_number || '番号なし'}
+                             </span>
+                             <span className="font-bold text-sm text-slate-700 truncate" title={p.project_name}>
+                               {isVacation && <span className="text-slate-800 mr-1">■</span>}
+                               {p.project_name}
+                             </span>
+                         </div>
+                         {isSubmitted && (
+                             <span className="ml-auto shrink-0 flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-200/50">
+                                 <CheckCircle2 className="w-3 h-3" />
+                                 予定済
+                             </span>
+                         )}
                       </div>
                       <div className="space-y-1 mt-2">
                         <div className="flex items-start gap-3">
