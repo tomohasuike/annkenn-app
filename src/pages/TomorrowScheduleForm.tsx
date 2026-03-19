@@ -113,6 +113,9 @@ export default function TomorrowScheduleForm() {
             
             if (personnel && Array.isArray(personnel)) {
                 setSelectedWorkers(personnel.map(p => p.worker_name));
+                if (personnel.length > 0 && personnel[0].start_time) {
+                    setSchedule(prev => ({ ...prev, arrival_time: personnel[0].start_time.slice(0, 5) }));
+                }
             }
             
             if (passedSubcontractors && Array.isArray(passedSubcontractors) && passedSubcontractors.length > 0) {

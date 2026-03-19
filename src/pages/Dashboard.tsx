@@ -137,6 +137,8 @@ export default function Dashboard() {
           id,
           project_id,
           assignment_date,
+          start_time,
+          end_time,
           worker_id,
           vehicle_id,
           worker_master!assignments_worker_id_fkey ( name, type ),
@@ -153,6 +155,8 @@ export default function Dashboard() {
           id,
           project_id,
           assignment_date,
+          start_time,
+          end_time,
           worker_id,
           vehicle_id,
           worker_master!assignments_worker_id_fkey ( name, type ),
@@ -367,10 +371,10 @@ export default function Dashboard() {
     
     if (wRaw) {
         if (wRaw.type === '協力会社') {
-            acc[pid].subcontractorsRaw.push({ id: curr.worker_id, name: wRaw.name, count: curr.count || 1 });
+            acc[pid].subcontractorsRaw.push({ id: curr.worker_id, name: wRaw.name, count: curr.count || 1, start_time: curr.start_time, end_time: curr.end_time });
         } else {
             acc[pid].workers.push(wRaw.name);
-            acc[pid].workersRaw.push({ id: curr.worker_id, name: wRaw.name });
+            acc[pid].workersRaw.push({ id: curr.worker_id, name: wRaw.name, start_time: curr.start_time, end_time: curr.end_time });
         }
     }
     if (vRaw) {
@@ -394,10 +398,10 @@ export default function Dashboard() {
     
     if (wRaw) {
         if (wRaw.type === '協力会社') {
-            acc[pid].subcontractorsRaw.push({ id: curr.worker_id, name: wRaw.name, count: curr.count || 1 });
+            acc[pid].subcontractorsRaw.push({ id: curr.worker_id, name: wRaw.name, count: curr.count || 1, start_time: curr.start_time, end_time: curr.end_time });
         } else {
             acc[pid].workers.push(wRaw.name);
-            acc[pid].workersRaw.push({ id: curr.worker_id, name: wRaw.name });
+            acc[pid].workersRaw.push({ id: curr.worker_id, name: wRaw.name, start_time: curr.start_time, end_time: curr.end_time });
         }
     }
     if (vRaw) {
@@ -811,8 +815,8 @@ export default function Dashboard() {
                            <li key={idx}>
                              <button
                                onClick={() => {
-                                  const personnelData = group.workersRaw ? group.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
-                                  const subcontractorData = group.subcontractorsRaw ? group.subcontractorsRaw.map((s: any) => ({ subcontractor_name: s.name, worker_count: String(s.count) })) : [];
+                                  const personnelData = group.workersRaw ? group.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name, start_time: w.start_time || null, end_time: w.end_time || null })) : [];
+                                  const subcontractorData = group.subcontractorsRaw ? group.subcontractorsRaw.map((s: any) => ({ subcontractor_name: s.name, worker_count: String(s.count), start_time: s.start_time || null, end_time: s.end_time || null })) : [];
                                   const vehicleData = group.vehiclesRaw ? group.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
                                   navigate(`/reports/new`, { 
                                       state: { 
@@ -820,7 +824,8 @@ export default function Dashboard() {
                                           personnel: personnelData,
                                           passedSubcontractors: subcontractorData,
                                           vehicles: vehicleData,
-                                          category: p.category
+                                          category: p.category,
+                                          reportDate: dateFns.format(new Date(), 'yyyy-MM-dd')
                                       } 
                                   });
                                }}
@@ -855,8 +860,8 @@ export default function Dashboard() {
                            <li key={idx}>
                              <button
                                onClick={() => {
-                                  const personnelData = group.workersRaw ? group.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name })) : [];
-                                  const subcontractorData = group.subcontractorsRaw ? group.subcontractorsRaw.map((s: any) => ({ subcontractor_name: s.name, worker_count: String(s.count) })) : [];
+                                  const personnelData = group.workersRaw ? group.workersRaw.map((w: any) => ({ worker_id: w.id, worker_name: w.name, start_time: w.start_time || null, end_time: w.end_time || null })) : [];
+                                  const subcontractorData = group.subcontractorsRaw ? group.subcontractorsRaw.map((s: any) => ({ subcontractor_name: s.name, worker_count: String(s.count), start_time: s.start_time || null, end_time: s.end_time || null })) : [];
                                   const vehicleData = group.vehiclesRaw ? group.vehiclesRaw.map((v: any) => ({ vehicle_id: v.id, vehicle_name: v.vehicle_name })) : [];
                                   const tomorrowStr = dateFns.format(dateFns.addDays(new Date(), 1), "yyyy-MM-dd");
                                   navigate(`/tomorrow-schedules/new`, { 

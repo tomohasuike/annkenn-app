@@ -147,11 +147,11 @@ export function useWorkSummary() {
         .select(`
           id, project_id, report_date, work_category, start_time, end_time, site_photos,
           projects (id, project_name, project_number, category),
-          report_personnel (worker_name, worker_master(name)),
+          report_personnel (worker_name, worker_master(name), start_time, end_time),
           report_vehicles (vehicle_name),
           report_machinery (machinery_name),
           report_materials (material_name, photo, documentation),
-          report_subcontractors (subcontractor_name, worker_count)
+          report_subcontractors (subcontractor_name, worker_count, start_time, end_time)
         `);
 
       if (!isAllTime) {
@@ -224,21 +224,26 @@ export function useWorkSummary() {
         const timeInfo = calculateActualHours(row.start_time, row.end_time);
         const totalH = timeInfo.normal + timeInfo.ot;
 
-        // Parse Staff
+        // Parse Staff and Deduplicate
         const workers = Array.isArray(row.report_personnel) ? row.report_personnel : [];
-        const rawNames = workers.map((w: any) => {
-          if (w.worker_master && !Array.isArray(w.worker_master) && w.worker_master.name) return w.worker_master.name;
-          if (w.worker_master && Array.isArray(w.worker_master) && w.worker_master[0]?.name) return w.worker_master[0].name;
-          return w.worker_name;
-        }).filter(Boolean);
+        const staffMap = new Map<string, {name: string, start_time: string, end_time: string}>();
         
-        // Deduplicate Staff
-        const staffMap = new Map<string, string>();
-        rawNames.forEach(name => {
-           const key = name.replace(/[\s　]+/g, "");
-           if (!staffMap.has(key)) staffMap.set(key, name);
+        workers.forEach((w: any) => {
+          let name = w.worker_name;
+          if (w.worker_master) {
+             name = Array.isArray(w.worker_master) ? w.worker_master[0]?.name : w.worker_master.name;
+          }
+          if (!name) return;
+          const key = name.replace(/[\s　]+/g, "");
+          if (!staffMap.has(key)) {
+             staffMap.set(key, { 
+                name: name,
+                start_time: w.start_time || row.start_time,
+                end_time: w.end_time || row.end_time
+             });
+          }
         });
-        const staffsRaw = Array.from(staffMap.values());
+        const staffsData = Array.from(staffMap.values());
         
         // Parse Equipment and Deduplicate
         const cars = [...new Set(Array.isArray(row.report_vehicles) ? row.report_vehicles.map((v:any) => v.vehicle_name).filter(Boolean) : [])];
@@ -249,11 +254,15 @@ export function useWorkSummary() {
         const subsRaw = Array.isArray(row.report_subcontractors) ? row.report_subcontractors : [];
         const subsMap = new Map<string, any>();
         subsRaw.forEach(s => {
-           const name = (s.subcontractor_name || '不明業者').replace(/[\s　]+/g, "");
-           if (!subsMap.has(name)) {
-               subsMap.set(name, s);
+           const subName = (s.subcontractor_name || '不明業者');
+           const sTime = s.start_time || row.start_time;
+           const eTime = s.end_time || row.end_time;
+           const key = `${subName.replace(/[\s　]+/g, "")}_${sTime}_${eTime}`;
+           
+           if (!subsMap.has(key)) {
+               subsMap.set(key, { ...s, subcontractor_name: subName, start_time: sTime, end_time: eTime });
            } else {
-               const existing = subsMap.get(name);
+               const existing = subsMap.get(key);
                existing.worker_count = (Number(existing.worker_count) || 0) + (Number(s.worker_count) || 0);
            }
         });
@@ -334,8 +343,17 @@ export function useWorkSummary() {
           reportId: row.id,
           date: formattedDate,
           kubun: wKubun || "一般",
-          staffs: staffsRaw.join(", "),
-          partners: subs.map((s:any) => s.subcontractor_name).join(", "),
+          staffs: staffsData.map(s => {
+              const info = calculateActualHours(s.start_time, s.end_time);
+              const custom = (s.start_time !== row.start_time || s.end_time !== row.end_time) ? `(${info.normal + info.ot}h)` : '';
+              return `${s.name}${custom}`;
+          }).join(", "),
+          partners: subs.map((s:any) => {
+              const info = calculateActualHours(s.start_time, s.end_time);
+              const custom = (s.start_time !== row.start_time || s.end_time !== row.end_time) ? ` (${info.normal + info.ot}h)` : '';
+              const hc = Number(s.worker_count) > 1 ? `[${s.worker_count}名]` : '';
+              return `${s.subcontractor_name}${hc}${custom}`;
+          }).join(", "),
           hours: totalH,
           ot: timeInfo.ot,
           car: cars.join(", "),
@@ -343,34 +361,39 @@ export function useWorkSummary() {
         });
 
         // Staff
-        staffsRaw.forEach(rawName => {
+        staffsData.forEach(staff => {
+          // Calculate individual time
+          const staffTimeInfo = calculateActualHours(staff.start_time, staff.end_time);
+          const staffTotalH = staffTimeInfo.normal + staffTimeInfo.ot;
+
+          const rawName = staff.name;
           const nKey = rawName.replace(/[\s　]+/g, "");
           if (!nKey) return;
           const dName = rawName.replace(/[\s　]+/g, " ");
 
           // Project
           pObj.staffCount++;
-          pObj.normalHours += timeInfo.normal;
-          pObj.overtimeHours += timeInfo.ot;
-          pObj.totalHours += totalH;
-          pObj.breakdown[cat] += totalH;
-          pObj.breakdownDetails[cat].normal += timeInfo.normal;
-          pObj.breakdownDetails[cat].ot += timeInfo.ot;
+          pObj.normalHours += staffTimeInfo.normal;
+          pObj.overtimeHours += staffTimeInfo.ot;
+          pObj.totalHours += staffTotalH;
+          pObj.breakdown[cat] += staffTotalH;
+          pObj.breakdownDetails[cat].normal += staffTimeInfo.normal;
+          pObj.breakdownDetails[cat].ot += staffTimeInfo.ot;
 
           // Summary
           results.summary.totalPeople++;
-          results.summary.totalHours += timeInfo.normal;
-          results.summary.totalOT += timeInfo.ot;
-          results.summary.kubunTotals[cat] += totalH;
-          results.summary.kubunDetails[cat].normal += timeInfo.normal;
-          results.summary.kubunDetails[cat].ot += timeInfo.ot;
+          results.summary.totalHours += staffTimeInfo.normal;
+          results.summary.totalOT += staffTimeInfo.ot;
+          results.summary.kubunTotals[cat] += staffTotalH;
+          results.summary.kubunDetails[cat].normal += staffTimeInfo.normal;
+          results.summary.kubunDetails[cat].ot += staffTimeInfo.ot;
 
           // Staff Array
           if (!results.staff[nKey]) {
             results.staff[nKey] = { displayName: dName, kouji: { normal: 0, ot: 0 }, kanri: { normal: 0, ot: 0 }, mitsumori: { normal: 0, ot: 0 } };
           }
-          results.staff[nKey][cat].normal += timeInfo.normal;
-          results.staff[nKey][cat].ot += timeInfo.ot;
+          results.staff[nKey][cat].normal += staffTimeInfo.normal;
+          results.staff[nKey][cat].ot += staffTimeInfo.ot;
         });
       }
 

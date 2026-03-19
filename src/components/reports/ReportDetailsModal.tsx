@@ -31,8 +31,8 @@ export default function ReportDetailsModal({ reportId, onClose }: ReportDetailsM
         if (error) throw error;
 
         // Fetch related data
-        const { data: personnel } = await supabase.from('report_personnel').select('worker_name, worker_master(name)').eq('report_id', reportId);
-        const { data: subcontractors } = await supabase.from('report_subcontractors').select('subcontractor_name, worker_count').eq('report_id', reportId);
+        const { data: personnel } = await supabase.from('report_personnel').select('worker_name, worker_master(name), start_time, end_time').eq('report_id', reportId);
+        const { data: subcontractors } = await supabase.from('report_subcontractors').select('subcontractor_name, worker_count, start_time, end_time').eq('report_id', reportId);
         const { data: vehicles } = await supabase.from('report_vehicles').select('vehicle_name, vehicle_master(vehicle_name)').eq('report_id', reportId);
         const { data: machinery } = await supabase.from('report_machinery').select('machinery_name, vehicle_master(vehicle_name)').eq('report_id', reportId);
         const { data: materials } = await supabase.from('report_materials').select('*').eq('report_id', reportId);
@@ -253,9 +253,15 @@ export default function ReportDetailsModal({ reportId, onClose }: ReportDetailsM
                         {data.personnel.length > 0 ? (
                            data.personnel.map((p: any, i: number) => {
                              const name = p.worker_master ? (Array.isArray(p.worker_master) ? p.worker_master[0]?.name : p.worker_master.name) : p.worker_name;
+                             let timeStr = '';
+                             if (p.start_time || p.end_time) {
+                               const s = p.start_time ? p.start_time.substring(0, 5) : '';
+                               const e = p.end_time ? p.end_time.substring(0, 5) : '';
+                               timeStr = ` (${s}〜${e})`;
+                             }
                              return (
                                <div key={`p-${i}`} className="flex items-center justify-between text-sm bg-card border rounded-md px-3 py-2 shadow-sm">
-                                 <span className="font-medium">{name}</span>
+                                 <span className="font-medium">{name}<span className="text-xs text-muted-foreground font-normal ml-1">{timeStr}</span></span>
                                  <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-bold uppercase">自社</span>
                                </div>
                              );
@@ -263,12 +269,20 @@ export default function ReportDetailsModal({ reportId, onClose }: ReportDetailsM
                         ) : null}
 
                         {data.subcontractors.length > 0 ? (
-                           data.subcontractors.map((s: any, i: number) => (
-                             <div key={`s-${i}`} className="flex items-center justify-between text-sm bg-card border rounded-md px-3 py-2 shadow-sm">
-                               <span className="font-medium">{s.subcontractor_name}</span>
-                               <span className="text-[10px] bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded font-bold uppercase shrink-0"><span className="text-sm mr-1">{s.worker_count || 0}</span>名</span>
-                             </div>
-                           ))
+                           data.subcontractors.map((s: any, i: number) => {
+                             let timeStr = '';
+                             if (s.start_time || s.end_time) {
+                               const st = s.start_time ? s.start_time.substring(0, 5) : '';
+                               const et = s.end_time ? s.end_time.substring(0, 5) : '';
+                               timeStr = ` (${st}〜${et})`;
+                             }
+                             return (
+                               <div key={`s-${i}`} className="flex items-center justify-between text-sm bg-card border rounded-md px-3 py-2 shadow-sm">
+                                 <span className="font-medium">{s.subcontractor_name}<span className="text-xs text-muted-foreground font-normal ml-1">{timeStr}</span></span>
+                                 <span className="text-[10px] bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded font-bold uppercase shrink-0"><span className="text-sm mr-1">{s.worker_count || 0}</span>名</span>
+                               </div>
+                             );
+                           })
                         ) : null}
 
                         {data.personnel.length === 0 && data.subcontractors.length === 0 && (

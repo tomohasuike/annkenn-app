@@ -24,10 +24,11 @@ type ReportData = {
   site_photos?: string
 }
 
-type Personnel = { worker_id: string; worker_name: string }
+type Personnel = { worker_id: string; worker_name: string; group_id?: string; start_time?: string; end_time?: string; }
+type TimeGroup = { id: string; start_time: string; end_time: string; }
 type Vehicle = { vehicle_id: string; vehicle_name: string }
 type Material = { material_name: string; quantity: string; pending_photos: File[]; pending_docs: File[]; existing_photos: string[]; existing_docs: string[] }
-type Subcontractor = { company_name: string; headcount: string }
+type Subcontractor = { company_name: string; headcount: string; group_id?: string; }
 
 export default function ReportForm() {
   const { id } = useParams()
@@ -60,6 +61,7 @@ export default function ReportForm() {
 
   // Relational Arrays
   const [personnel, setPersonnel] = useState<Personnel[]>([])
+  const [timeGroups, setTimeGroups] = useState<TimeGroup[]>([])
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [machinery, setMachinery] = useState<Vehicle[]>([]) // Stored as vehicles here for simplicity, distinguished by type in DB
   const [materials, setMaterials] = useState<Material[]>([])
@@ -77,6 +79,20 @@ export default function ReportForm() {
         // Apply initial state from navigation if present
         if (location.state) {
             const { projectId, personnel: initPersonnel, vehicles: initVehicles, category, reportDate, passedSubcontractors: initSubcontractors } = location.state as any;
+
+            const newGroups: { id: string, start_time: string, end_time: string }[] = [];
+            const getGroupForTime = (st?: string | null, et?: string | null) => {
+                if (!st && !et) return 'default';
+                const s = st?.slice(0, 5) || '';
+                const e = et?.slice(0, 5) || '';
+                let g = newGroups.find(x => x.start_time === s && x.end_time === e);
+                if (!g) {
+                    g = { id: `group-${Math.random().toString(36).substr(2, 9)}`, start_time: s, end_time: e };
+                    newGroups.push(g);
+                }
+                return g.id;
+            };
+
             if (category) {
                 setSelectedProjectCategory(category);
             }
@@ -84,7 +100,10 @@ export default function ReportForm() {
                 setReport(prev => ({ ...prev, project_id: projectId }));
             }
             if (initPersonnel && Array.isArray(initPersonnel)) {
-                setPersonnel(initPersonnel);
+                setPersonnel(initPersonnel.map((p: any) => ({
+                    ...p,
+                    group_id: getGroupForTime(p.start_time, p.end_time)
+                })));
             }
             if (initVehicles && Array.isArray(initVehicles)) {
                 setVehicles(initVehicles);
@@ -92,15 +111,56 @@ export default function ReportForm() {
             if (initSubcontractors && Array.isArray(initSubcontractors) && initSubcontractors.length > 0) {
                 setSubcontractors(initSubcontractors.map((s: any) => ({
                     company_name: s.subcontractor_name || '',
-                    headcount: s.worker_count || '1'
+                    headcount: s.worker_count || '1',
+                    group_id: getGroupForTime(s.start_time, s.end_time)
                 })));
             } else {
                 setSubcontractors([{ company_name: '', headcount: '1' }]);
+            }
+            
+            if (newGroups.length > 0) {
+                setTimeGroups(prev => {
+                    const mergedGroups = [...prev];
+                    newGroups.forEach(ng => {
+                         if (!mergedGroups.some(eg => eg.start_time === ng.start_time && eg.end_time === ng.end_time)) {
+                             mergedGroups.push(ng);
+                         }
+                    });
+                    return mergedGroups;
+                });
             }
             if (reportDate) {
                 const parsedTarget = new Date(reportDate);
                 const start = new Date(parsedTarget); start.setHours(8, 0, 0, 0);
                 const end = new Date(parsedTarget); end.setHours(17, 0, 0, 0);
+                
+                let minStartMinutes: number | null = null;
+                let maxEndMinutes: number | null = null;
+                
+                newGroups.forEach(g => {
+                    if (g.start_time) {
+                        const [h, m] = g.start_time.split(':').map(Number);
+                        if (!isNaN(h) && !isNaN(m)) {
+                            const total = h * 60 + m;
+                            if (minStartMinutes === null || total < minStartMinutes) minStartMinutes = total;
+                        }
+                    }
+                    if (g.end_time) {
+                        const [h, m] = g.end_time.split(':').map(Number);
+                        if (!isNaN(h) && !isNaN(m)) {
+                            const total = h * 60 + m;
+                            if (maxEndMinutes === null || total > maxEndMinutes) maxEndMinutes = total;
+                        }
+                    }
+                });
+
+                if (minStartMinutes !== null) {
+                    start.setHours(Math.floor(minStartMinutes / 60), minStartMinutes % 60, 0, 0);
+                }
+                if (maxEndMinutes !== null) {
+                    end.setHours(Math.floor(maxEndMinutes / 60), maxEndMinutes % 60, 0, 0);
+                }
+
                 setReport(prev => ({ 
                     ...prev, 
                     보고日時: reportDate,
@@ -274,7 +334,20 @@ export default function ReportForm() {
       let dynamicWorkersList = [...masters.workers];
       let dynamicVehiclesList = [...masters.vehicles];
 
-      const { data: pData } = await supabase.from('report_personnel').select('worker_id, worker_master(name), worker_name').eq('report_id', reportId)
+      const loadedGroups: TimeGroup[] = [];
+      const resolveGroupId = (start_time: string | null, end_time: string | null) => {
+          if (!start_time && !end_time) return undefined;
+          const sTime = start_time ? start_time.substring(0, 5) : '';
+          const eTime = end_time ? end_time.substring(0, 5) : '';
+          let existingGroup = loadedGroups.find(g => g.start_time === sTime && g.end_time === eTime);
+          if (!existingGroup) {
+              existingGroup = { id: Math.random().toString(36).substring(7), start_time: sTime, end_time: eTime };
+              loadedGroups.push(existingGroup);
+          }
+          return existingGroup.id;
+      };
+
+      const { data: pData } = await supabase.from('report_personnel').select('worker_id, worker_master(name), worker_name, start_time, end_time').eq('report_id', reportId)
       if (pData && pData.length > 0) {
           setPersonnel(pData.map((p: any) => {
               let wId = p.worker_id || '';
@@ -288,7 +361,14 @@ export default function ReportForm() {
                       dynamicWorkersList.push({ id: wId, name: wName });
                   }
               }
-              return { worker_id: wId, worker_name: wName };
+              
+              return { 
+                  worker_id: wId, 
+                  worker_name: wName,
+                  group_id: resolveGroupId(p.start_time, p.end_time),
+                  start_time: p.start_time,
+                  end_time: p.end_time
+              };
           }))
       } else if (location.state?.personnel && Array.isArray(location.state.personnel) && location.state.personnel.length > 0) {
           setPersonnel(location.state.personnel);
@@ -357,8 +437,14 @@ export default function ReportForm() {
           }
       }))
 
-      const { data: subData } = await supabase.from('report_subcontractors').select('subcontractor_name, worker_count').eq('report_id', reportId)
-      if (subData) setSubcontractors(subData.map((s: any) => ({ company_name: s.subcontractor_name || '', headcount: s.worker_count || '' })))
+      const { data: subData } = await supabase.from('report_subcontractors').select('subcontractor_name, worker_count, start_time, end_time').eq('report_id', reportId)
+      if (subData) setSubcontractors(subData.map((s: any) => ({ 
+          company_name: s.subcontractor_name || '', 
+          headcount: s.worker_count || '',
+          group_id: resolveGroupId(s.start_time, s.end_time)
+      })))
+
+      if (loadedGroups.length > 0) setTimeGroups(loadedGroups);
 
     } catch (e) {
       console.error("Error fetching report details:", e)
@@ -466,11 +552,24 @@ export default function ReportForm() {
         // Insert new relations
         if (currentReportId) {
             if (personnel.length > 0) {
-                const pPayload = personnel.filter(p => p.worker_id || p.worker_name).map(p => ({ 
-                    report_id: currentReportId, 
-                    worker_id: p.worker_id?.startsWith('legacy-') ? null : (p.worker_id || null), 
-                    worker_name: p.worker_id?.startsWith('legacy-') ? p.worker_name : null
-                }))
+                const pPayload = personnel.filter(p => p.worker_id || p.worker_name).map(p => {
+                    let sTime: string | null = null;
+                    let eTime: string | null = null;
+                    if (p.group_id) {
+                        const tg = timeGroups.find(g => g.id === p.group_id);
+                        if (tg) {
+                            sTime = tg.start_time || null;
+                            eTime = tg.end_time || null;
+                        }
+                    }
+                    return { 
+                        report_id: currentReportId, 
+                        worker_id: p.worker_id?.startsWith('legacy-') ? null : (p.worker_id || null), 
+                        worker_name: p.worker_id?.startsWith('legacy-') ? p.worker_name : null,
+                        start_time: sTime,
+                        end_time: eTime
+                    }
+                })
                 if (pPayload.length > 0) await supabase.from('report_personnel').insert(pPayload)
             }
             if (vehicles.length > 0) {
@@ -535,7 +634,24 @@ export default function ReportForm() {
                 if (matPayload.length > 0) await supabase.from('report_materials').insert(matPayload)
             }
             if (subcontractors.length > 0) {
-                const subPayload = subcontractors.filter(s => s.company_name.trim() !== '').map(s => ({ report_id: currentReportId, subcontractor_name: s.company_name, worker_count: s.headcount ? s.headcount.toString() : null }))
+                const subPayload = subcontractors.filter(s => s.company_name.trim() !== '').map(s => {
+                    let sTime: string | null = null;
+                    let eTime: string | null = null;
+                    if (s.group_id) {
+                        const tg = timeGroups.find(g => g.id === s.group_id);
+                        if (tg) {
+                            sTime = tg.start_time || null;
+                            eTime = tg.end_time || null;
+                        }
+                    }
+                    return { 
+                        report_id: currentReportId, 
+                        subcontractor_name: s.company_name, 
+                        worker_count: s.headcount ? s.headcount.toString() : null,
+                        start_time: sTime,
+                        end_time: eTime
+                    }
+                })
                 if (subPayload.length > 0) await supabase.from('report_subcontractors').insert(subPayload)
             }
         } // <-- Added missing closing bracket here
@@ -853,92 +969,165 @@ export default function ReportForm() {
       </div>
 
       <div className="rounded-xl border bg-card p-6 shadow-sm mb-6">
-        <div className="space-y-4">
-                <div className="pb-2 border-b">
-                    <h3 className="text-lg font-medium flex items-center gap-2">
-                        <Users className="w-5 h-5 text-muted-foreground" />
-                        作業員編成 <span className="text-red-500 text-sm">*</span>
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1">参加した作業員を選択してください。</p>
-                </div>
-                
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {workersList.map(worker => {
-                        const isSelected = personnel.some(p => p.worker_id === worker.id);
-                        
-                        return (
-                            <div key={worker.id} className={`border rounded-lg p-3 transition-all ${isSelected ? 'border-primary bg-primary/5 shadow-sm' : 'bg-muted/20 hover:bg-muted/50 border-transparent hover:border-border'}`}>
-                                <label className="flex items-center gap-2 cursor-pointer mb-2">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={isSelected}
-                                        onChange={(e) => {
-                                            if (e.target.checked) {
-                                                setPersonnel([...personnel, { worker_id: worker.id, worker_name: worker.name }]);
-                                            } else {
-                                                setPersonnel(personnel.filter(p => p.worker_id !== worker.id));
-                                            }
-                                        }}
-                                        className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
-                                    />
-                                    <span className={`font-medium text-sm select-none ${isSelected ? 'text-primary' : 'text-foreground'}`}>{worker.name}</span>
-                                </label>
-                            </div>
-                        );
-                    })}
-                </div>
-
-
+        <div className="space-y-6">
+          <div className="pb-2 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                  <Users className="w-5 h-5 text-muted-foreground" />
+                  稼働時間ごとの人員・業者編成 <span className="text-red-500 text-sm">*</span>
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">時間枠ごとに作業員と協力業者を追加してください。</p>
             </div>
-      </div>
+            <button
+                type="button"
+                onClick={() => setTimeGroups([...timeGroups, { id: Math.random().toString(36).substring(7), start_time: '', end_time: '' }])}
+                className="text-sm font-bold text-primary hover:text-primary/80 flex items-center gap-1 bg-primary/10 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+            >
+                <Plus className="w-4 h-4" /> 別の時間枠を追加
+            </button>
+          </div>
 
-      <div className="rounded-xl border bg-card p-6 shadow-sm mb-6">
-        <div className="space-y-4">
-                <div className="flex justify-between items-center pb-2 border-b">
-                    <h3 className="text-lg font-medium flex items-center gap-2">
-                        <Building className="w-5 h-5 text-muted-foreground" />
-                        協力業者
-                    </h3>
-                    <button 
-                        onClick={() => setSubcontractors([...subcontractors, { company_name: '', headcount: '' }])}
-                        className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3 py-1 gap-2"
-                    >
-                        <Plus className="w-4 h-4" />
-                        業者を追加
-                    </button>
-                </div>
-                {subcontractors.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">協力業者が登録されていません</div>
-                ) : (
-                    <div className="space-y-3">
-                        {subcontractors.map((s, index) => (
-                            <div key={index} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-muted/30 p-3 rounded-lg border">
-                                <div className="flex-[2] w-full space-y-1">
-                                    <label className="text-xs text-muted-foreground sm:hidden">業者名</label>
-                                    <AutocompleteInput 
-                                        value={s.company_name}
-                                        onChange={(val) => { const n = [...subcontractors]; n[index].company_name = val; setSubcontractors(n); }}
-                                        tableName="report_subcontractors"
-                                        columnName="subcontractor_name"
-                                        projectId={report.project_id}
-                                        placeholder="協力業者名"
-                                        className="w-full h-10 border-input"
-                                    />
-                                </div>
-                                <div className="w-full sm:w-24 space-y-1">
-                                    <label className="text-xs text-muted-foreground sm:hidden">人数</label>
-                                    <input 
-                                        type="number" placeholder="人数" value={s.headcount}
-                                        onChange={(e) => { const n = [...subcontractors]; n[index].headcount = e.target.value; setSubcontractors(n); }}
-                                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                                    />
-                                </div>
-                                <button onClick={() => setSubcontractors(subcontractors.filter((_, i) => i !== index))} className="p-2 text-red-500 hover:bg-red-50 rounded-md transition-colors self-end sm:self-auto"><Trash2 className="w-5 h-5" /></button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+          <div className="space-y-4">
+          {[{ id: 'default', start_time: report.作業開始時間?.split('T')[1] || '', end_time: report.作業終了時間?.split('T')[1] || '', isDefault: true }, ...timeGroups].map((g, index) => {
+              const groupMembers = personnel.filter(p => (p.group_id || 'default') === g.id);
+              const groupSubs = subcontractors.filter(s => (s.group_id || 'default') === g.id);
+              const isDefault = g.id === 'default';
+
+              return (
+                  <div key={g.id} className={`border rounded-xl p-4 sm:p-5 relative transition-all ${isDefault ? 'bg-primary/5 border-primary/20 shadow-sm' : 'bg-muted/30 border-border'}`}>
+                      {!isDefault && (
+                          <button 
+                              type="button" 
+                              onClick={() => {
+                                  setPersonnel(personnel.filter(p => p.group_id !== g.id));
+                                  setSubcontractors(subcontractors.filter(s => s.group_id !== g.id));
+                                  setTimeGroups(timeGroups.filter(t => t.id !== g.id));
+                              }}
+                              className="absolute top-4 right-4 text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors"
+                          >
+                              <Trash2 className="w-4 h-4" />
+                          </button>
+                      )}
+
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 border-b border-border/60 pb-3 mb-4">
+                          <span className={`font-bold text-sm px-2.5 py-1 rounded inline-flex shrink-0 w-fit ${isDefault ? 'bg-primary text-primary-foreground' : 'bg-slate-200 text-slate-700'}`}>
+                              {isDefault ? '基本時間' : `追加グループ ${index}`}
+                          </span>
+                          {isDefault ? (
+                              <span className="font-bold text-base flex items-center gap-2">
+                                  {g.start_time} <span className="text-muted-foreground font-normal">〜</span> {g.end_time}
+                                  <span className="text-xs font-normal text-muted-foreground ml-2">※日報上部の作業時間と連動します</span>
+                              </span>
+                          ) : (
+                              <div className="flex items-center gap-2">
+                                  <input 
+                                      type="time" 
+                                      value={g.start_time || ''}
+                                      onChange={e => setTimeGroups(timeGroups.map(t => t.id === g.id ? { ...t, start_time: e.target.value } : t))}
+                                      className="border border-input rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary focus:outline-none w-28 bg-background"
+                                  />
+                                  <span className="text-muted-foreground font-medium">〜</span>
+                                  <input 
+                                      type="time" 
+                                      value={g.end_time || ''}
+                                      onChange={e => setTimeGroups(timeGroups.map(t => t.id === g.id ? { ...t, end_time: e.target.value } : t))}
+                                      className="border border-input rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary focus:outline-none w-28 bg-background"
+                                  />
+                              </div>
+                          )}
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+                          {/* 作業員エリア */}
+                          <div className="space-y-3">
+                              <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> 作業員 (自社)</label>
+                              <div className="flex flex-col gap-2">
+                                  <div className="flex flex-wrap gap-2">
+                                      {groupMembers.map(m => (
+                                          <div key={m.worker_id} className="flex items-center gap-1.5 bg-background border shadow-sm pl-3 pr-1.5 py-1.5 rounded-full text-sm font-medium">
+                                              {m.worker_name}
+                                              <button type="button" onClick={() => setPersonnel(personnel.filter(p => p !== m))} className="text-slate-400 hover:text-red-500 hover:bg-slate-100 rounded-full p-1 transition-colors">
+                                                  <X className="w-3.5 h-3.5" />
+                                              </button>
+                                          </div>
+                                      ))}
+                                  </div>
+                                  <div className="relative max-w-xs mt-1">
+                                      <select 
+                                          className="appearance-none w-full bg-secondary/50 hover:bg-secondary/80 text-secondary-foreground text-sm font-semibold px-4 py-2 rounded-lg border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer pr-10"
+                                          value=""
+                                          onChange={(e) => {
+                                              if(!e.target.value) return;
+                                              const w = workersList.find(w => w.id === e.target.value);
+                                              if(w) {
+                                                  setPersonnel([...personnel, { worker_id: w.id, worker_name: w.name, group_id: isDefault ? undefined : g.id }]);
+                                              }
+                                              e.target.value = "";
+                                          }}
+                                      >
+                                          <option value="" disabled>＋ 作業員を追加する</option>
+                                          {workersList.filter(w => !personnel.some(p => p.worker_id === w.id)).map(w => (
+                                              <option key={w.id} value={w.id}>{w.name}</option>
+                                          ))}
+                                      </select>
+                                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center justify-center bg-white rounded-md shadow-sm p-1">
+                                         <Plus className="w-3 h-3 text-secondary-foreground" />
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+
+                          {/* 協力業者エリア */}
+                          <div className="space-y-3">
+                              <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5"><Building className="w-3.5 h-3.5" /> 協力業者</label>
+                              <div className="space-y-2.5">
+                                  {groupSubs.map(s => {
+                                      const trueIndex = subcontractors.findIndex(sub => sub === s);
+                                      if (trueIndex === -1) return null;
+                                      return (
+                                          <div key={trueIndex} className="flex items-start sm:items-center gap-2 bg-background p-2 rounded-lg border shadow-sm">
+                                              <div className="flex-1 min-w-[140px]">
+                                                  <AutocompleteInput 
+                                                      value={s.company_name}
+                                                      onChange={(val) => { const n = [...subcontractors]; n[trueIndex].company_name = val; setSubcontractors(n); }}
+                                                      tableName="report_subcontractors"
+                                                      columnName="subcontractor_name"
+                                                      projectId={report.project_id}
+                                                      placeholder="業者名"
+                                                      className="w-full h-9 text-sm border-input"
+                                                  />
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                <div className="w-20 relative">
+                                                    <input 
+                                                        type="number" placeholder="人数" value={s.headcount}
+                                                        onChange={(e) => { const n = [...subcontractors]; n[trueIndex].headcount = e.target.value; setSubcontractors(n); }}
+                                                        className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                                                    />
+                                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">名</span>
+                                                </div>
+                                                <button type="button" onClick={() => setSubcontractors(subcontractors.filter((_, i) => i !== trueIndex))} className="p-2 text-slate-400 hover:text-red-500 hover:bg-slate-100 rounded-md transition-colors shrink-0">
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                              </div>
+                                          </div>
+                                      );
+                                  })}
+                                  <button 
+                                      type="button"
+                                      onClick={() => setSubcontractors([...subcontractors, { company_name: '', headcount: '1', group_id: isDefault ? undefined : g.id }])}
+                                      className="text-sm text-secondary-foreground bg-secondary/50 hover:bg-secondary/80 border border-transparent font-semibold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors w-full sm:max-w-xs justify-center sm:justify-start"
+                                  >
+                                      <Plus className="w-3.5 h-3.5 bg-white rounded-md shadow-sm p-0.5" /> 協力業者枠を追加する
+                                  </button>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              )
+          })}
+          </div>
+        </div>
       </div>
 
       <div className="rounded-xl border bg-card p-6 shadow-sm mb-6">

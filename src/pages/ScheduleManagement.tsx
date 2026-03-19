@@ -3,7 +3,7 @@ import { createPortal } from "react-dom"
 import { supabase } from "../lib/supabase"
 import { format, addDays, subDays, startOfWeek } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { Search, ChevronLeft, ChevronRight, Plus, RefreshCw, Users, MessageSquare, Info, X, CalendarDays, List, ListTodo, History, PanelLeft, ChevronDown, ChevronRight as ChevronRightIcon, Truck, FolderGit2, Trash2 } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Plus, RefreshCw, Users, MessageSquare, Info, X, CalendarDays, List, ListTodo, History, PanelLeft, ChevronDown, ChevronRight as ChevronRightIcon, Truck, Trash2, Clock, FolderGit2, User } from 'lucide-react'
 
 type ProjectData = { id: string; name: string; category: string; status: string; no: string | null; site: string | null; legacy_id?: string; client_name?: string | null; client_company_name?: string | null; folder_url?: string | null }
 type ResourceData = { id: string; name: string; type: 'worker' | 'vehicle'; categoryId?: 'president' | 'employee' | 'partner' | 'vehicle' | 'machine' }
@@ -17,6 +17,8 @@ type AssignmentData = {
   count: number
   notes: string | null
   assigned_by?: string | null
+  start_time: string | null
+  end_time: string | null
   projects: { project_name: string } | null
   worker_master: { name: string, type?: string } | null
   vehicle_master: { vehicle_name: string } | null
@@ -78,6 +80,27 @@ export default function ScheduleManagement() {
   const [plannedCountModalState, setPlannedCountModalState] = useState<{ isOpen: boolean, projectId: string, dateStr: string, initialValue: string }>({ isOpen: false, projectId: '', dateStr: '', initialValue: '' })
   const [partnerCountModalState, setPartnerCountModalState] = useState<{ isOpen: boolean, assignmentId: string, initialValue: number }>({ isOpen: false, assignmentId: '', initialValue: 1 })
   const [mobileCellModalState, setMobileCellModalState] = useState<{ isOpen: boolean, projectId: string, dateStr: string, dailyDataId?: string }>({ isOpen: false, projectId: '', dateStr: '' })
+  
+  // Custom Empty Time Blocks State
+  const [customTimeBlocks, setCustomTimeBlocks] = useState<Record<string, { start_time: string, end_time: string }[]>>({});
+  
+  // Time Block Modal State
+  const [timeBlockModalState, setTimeBlockModalState] = useState<{isOpen: boolean; projectId: string; dateStr: string; start: string; end: string}>({ isOpen: false, projectId: '', dateStr: '', start: '08:00', end: '17:00' });
+  
+  // Add Assignment Modal State
+  const [addAssignmentModalState, setAddAssignmentModalState] = useState<{
+    isOpen: boolean;
+    projectId: string;
+    projectName: string;
+    dateStr: string;
+    startTime: string;
+    endTime: string;
+    selectedWorkers: string[];
+    selectedVehicles: string[];
+    selectedSubcontractors: { id: string, name: string, count: number }[];
+  }>({
+    isOpen: false, projectId: '', projectName: '', dateStr: '', startTime: '', endTime: '', selectedWorkers: [], selectedVehicles: [], selectedSubcontractors: []
+  });
   
   // Add Resource Modal
   const [showAddResourceModal, setShowAddResourceModal] = useState(false)
@@ -226,7 +249,7 @@ export default function ScheduleManagement() {
       const { data, error } = await supabase
         .from('assignments')
         .select(`
-          id, assignment_date, project_id, worker_id, vehicle_id, count, notes, assigned_by,
+          id, assignment_date, project_id, worker_id, vehicle_id, count, notes, assigned_by, start_time, end_time,
           projects(project_name), worker_master!assignments_worker_id_fkey(name, type), vehicle_master(vehicle_name)
         `)
         .gte('assignment_date', startDateStr)
@@ -339,32 +362,48 @@ export default function ScheduleManagement() {
     e.dataTransfer.dropEffect = "move"
   }
 
-  const handleDrop = async (e: React.DragEvent, targetProjectId: string, targetDate: Date) => {
+  const isOverlapping = (st1: string | null, et1: string | null, st2: string | null, et2: string | null) => {
+    if (!st1 || !et1 || !st2 || !et2) return true;
+    return (st1 < et2 && st2 < et1);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetProjectId: string, targetDate: Date, targetStartTime: string | null = null, targetEndTime: string | null = null) => {
     e.preventDefault()
-    if (draggedItems.length === 0) return
+    e.currentTarget.classList.remove('bg-blue-100', 'border-blue-400', 'ring-2', 'ring-blue-400')
+    
+    let itemsToProcess = [...draggedItems];
+    if (itemsToProcess.length === 0) {
+        const dragData = e.dataTransfer.getData('text/plain')
+        if (!dragData) return;
+        try {
+            itemsToProcess = JSON.parse(dragData)
+        } catch (err) {
+            const parts = dragData.split(':');
+            if (parts.length === 2) itemsToProcess = [{ id: parts[1], type: parts[0] as any, sourceProjectId: '', sourceDate: '', assignmentId: undefined }];
+            else return;
+        }
+    }
+
+    setDraggedItems([])
+    setSelectedItems([])
     const dateStr = format(targetDate, 'yyyy-MM-dd')
-    
-    const itemsToProcess = [...draggedItems];
-    setDraggedItems([]);
-    setSelectedItems([]); // ドロップ成功（またはリセット）とみなす
-    
-    // UIを即座に更新する（Optimistic UI）
+
+    // Optimistic UI Update
     setAssignments(prev => {
         let next = [...prev];
         itemsToProcess.forEach((item, index) => {
-            // 自身へのドロップは何もしない
             if (item.sourceProjectId === targetProjectId && item.sourceDate === dateStr) return;
             
             const sourceAssignment = item.assignmentId ? prev.find(a => a.id === item.assignmentId) : null;
             
-            // 協力会社以外の場合、同じ日に既に配置されていないかチェックする
             if (item.type === 'worker') {
               const isPartner = resources.find(r => r.id === item.id)?.categoryId === 'partner'
               if (!isPartner && targetProjectId !== "UNASSIGNED_POOL") {
                 const alreadyAssigned = next.some(a => 
                   a.assignment_date === dateStr && 
                   a.worker_id === item.id &&
-                  a.id !== item.assignmentId
+                  a.id !== item.assignmentId &&
+                  isOverlapping(a.start_time, a.end_time, targetStartTime, targetEndTime)
                 )
                 if (alreadyAssigned) return;
               }
@@ -372,7 +411,8 @@ export default function ScheduleManagement() {
                 const alreadyAssigned = next.some(a => 
                   a.assignment_date === dateStr && 
                   a.vehicle_id === item.id &&
-                  a.id !== item.assignmentId
+                  a.id !== item.assignmentId &&
+                  isOverlapping(a.start_time, a.end_time, targetStartTime, targetEndTime)
                 )
                 if (alreadyAssigned) return;
             }
@@ -394,6 +434,8 @@ export default function ScheduleManagement() {
                     count: countToUse,
                     notes: sourceAssignment ? sourceAssignment.notes : null,
                     assigned_by: currentWorkerId,
+                    start_time: targetStartTime || null,
+                    end_time: targetEndTime || null,
                     projects: { project_name: '' },
                     worker_master: item.type === 'worker' ? (() => {
                        const r = resources.find(res => res.id === item.id);
@@ -424,7 +466,8 @@ export default function ScheduleManagement() {
             const alreadyAssigned = assignments.some(a => 
               a.assignment_date === dateStr && 
               a.worker_id === item.id &&
-              a.id !== item.assignmentId
+              a.id !== item.assignmentId &&
+              isOverlapping(a.start_time, a.end_time, targetStartTime, targetEndTime)
             )
             if (alreadyAssigned) shouldSkip = true;
           }
@@ -432,7 +475,8 @@ export default function ScheduleManagement() {
             const alreadyAssigned = assignments.some(a => 
               a.assignment_date === dateStr && 
               a.vehicle_id === item.id &&
-              a.id !== item.assignmentId
+              a.id !== item.assignmentId &&
+              isOverlapping(a.start_time, a.end_time, targetStartTime, targetEndTime)
             )
             if (alreadyAssigned) shouldSkip = true;
         }
@@ -445,6 +489,8 @@ export default function ScheduleManagement() {
             worker_id: item.type === 'worker' ? item.id : null,
             vehicle_id: item.type === 'vehicle' ? item.id : null,
             count: sourceAssignment ? sourceAssignment.count : 1,
+            start_time: targetStartTime || null,
+            end_time: targetEndTime || null,
             assigned_by: currentWorkerId
         };
 
@@ -468,6 +514,10 @@ export default function ScheduleManagement() {
     // 全ての更新が終わったら再取得
     fetchAssignments();
   }
+
+  const handleAddTimeBlockPrompt = (projectId: string, dateStr: string) => {
+    setTimeBlockModalState({ isOpen: true, projectId, dateStr, start: '08:00', end: '12:00' });
+  };
 
   const handleAddResource = async () => {
     if (!newResourceName.trim()) return
@@ -602,6 +652,70 @@ export default function ScheduleManagement() {
   const activeTodos = todos.filter(t => !t.completed)
   const completedTodos = todos.filter(t => t.completed)
 
+  const checkTimeOverlap = (modalStart: string, modalEnd: string, existingStart: string | null | undefined, existingEnd: string | null | undefined) => {
+    if (!modalStart || !modalEnd) return true;
+    if (!existingStart || !existingEnd) return true;
+    return modalStart < existingEnd && modalEnd > existingStart;
+  };
+
+  const getResourceAvailability = (rId: string, isVehicle = false) => {
+    const { dateStr, startTime, endTime, projectId } = addAssignmentModalState;
+    const existingAssignments = assignments.filter(a => a.assignment_date === dateStr && (isVehicle ? a.vehicle_id === rId : a.worker_id === rId));
+    
+    // Check overlaps
+    const overlaps = existingAssignments.filter(a => checkTimeOverlap(startTime, endTime, a.start_time, a.end_time));
+    const overlapOtherProjects = overlaps.filter(a => a.project_id !== projectId && a.project_id !== 'UNASSIGNED_POOL');
+    const overlapCurrentProject = overlaps.filter(a => a.project_id === projectId);
+
+    return {
+      isOverlap: overlapOtherProjects.length > 0,
+      isAlreadyHere: overlapCurrentProject.length > 0,
+      allAssignments: existingAssignments
+    };
+  };
+
+  const handleSaveAddAssignment = async () => {
+    const { projectId, dateStr, startTime, endTime, selectedWorkers } = addAssignmentModalState;
+    if (!projectId || !dateStr) return;
+
+    try {
+      const inserts: any[] = [];
+      
+      const st = startTime || null;
+      const et = endTime || null;
+
+      selectedWorkers.forEach(wId => {
+         inserts.push({ project_id: projectId, assignment_date: dateStr, start_time: st, end_time: et, worker_id: wId, count: 1, assigned_by: currentWorkerId });
+      });
+
+      if (inserts.length > 0) {
+         const { error } = await supabase.from('assignments').insert(inserts);
+         if (error) throw error;
+      }
+      
+      setAddAssignmentModalState(prev => ({ ...prev, isOpen: false }));
+      fetchAssignments();
+    } catch (e) {
+      console.error("Error adding multiple assignments:", e);
+      alert("配置の追加に失敗しました。");
+    }
+  };
+
+  const handleOpenAddModal = (projectId: string, projectName: string, dateStr: string, startTime: string = '', endTime: string = '', e?: React.MouseEvent) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    setAddAssignmentModalState({
+      isOpen: true,
+      projectId,
+      projectName,
+      dateStr,
+      startTime: startTime || '',
+      endTime: endTime || '',
+      selectedWorkers: [],
+      selectedVehicles: [],
+      selectedSubcontractors: resources.filter(r => r.type === 'worker' && r.categoryId === 'partner').map(r => ({ id: r.id, name: r.name, count: 0 }))
+    });
+  };
+
   const renderCellModals = () => (
     <>
       {/* Modals for Cell Actions */}
@@ -733,6 +847,73 @@ export default function ScheduleManagement() {
                   保存
                 </button>
               </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Time Block Modal */}
+      {timeBlockModalState.isOpen && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setTimeBlockModalState({ ...timeBlockModalState, isOpen: false }) }}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-slate-700 flex items-center gap-1.5"><Clock className="w-4 h-4 text-blue-500" /> 時間枠を追加</h3>
+              <button 
+                onClick={() => setTimeBlockModalState({ ...timeBlockModalState, isOpen: false })}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 flex flex-col gap-4">
+              <div className="flex items-center gap-4">
+                 <div className="flex-1">
+                   <label className="block text-[0.85em] font-bold text-slate-600 mb-1">開始時間</label>
+                   <input 
+                     type="time" 
+                     value={timeBlockModalState.start}
+                     onChange={e => setTimeBlockModalState(prev => ({ ...prev, start: e.target.value }))}
+                     className="w-full border border-slate-300 rounded p-1.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center font-bold text-slate-700"
+                   />
+                 </div>
+                 <div className="text-slate-400 font-bold mt-5">〜</div>
+                 <div className="flex-1">
+                   <label className="block text-[0.85em] font-bold text-slate-600 mb-1">終了時間</label>
+                   <input 
+                     type="time" 
+                     value={timeBlockModalState.end}
+                     onChange={e => setTimeBlockModalState(prev => ({ ...prev, end: e.target.value }))}
+                     className="w-full border border-slate-300 rounded p-1.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center font-bold text-slate-700"
+                   />
+                 </div>
+              </div>
+            </div>
+            <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-1.5">
+              <button 
+                onClick={() => setTimeBlockModalState({ ...timeBlockModalState, isOpen: false })}
+                className="px-4 py-1.5 border border-slate-300 rounded text-slate-600 font-bold bg-white hover:bg-slate-50 transition-colors shadow-sm"
+              >
+                キャンセル
+              </button>
+              <button 
+                onClick={() => {
+                  const { projectId, dateStr, start, end } = timeBlockModalState;
+                  if (!start || !end) {
+                    alert('時間を入力してください');
+                    return;
+                  }
+                  const key = `${projectId}-${dateStr}`;
+                  setCustomTimeBlocks(prev => ({
+                     ...prev,
+                     [key]: [...(prev[key] || []), { start_time: start, end_time: end }]
+                  }));
+                  setTimeBlockModalState({ ...timeBlockModalState, isOpen: false });
+                }}
+                className="px-4 py-1.5 rounded text-white font-bold bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors"
+              >
+                追加する
+              </button>
             </div>
           </div>
         </div>,
@@ -1067,12 +1248,16 @@ export default function ScheduleManagement() {
                                      {workers.map(w => (
                                        <div key={`w-${w.id}`} className="text-[10px] font-bold bg-blue-50 text-blue-700 border-l-[2px] border-blue-400 px-1 py-0.5 rounded-sm truncate w-full shadow-[0_1px_1px_rgba(0,0,0,0.02)]">
                                          {w.worker_master?.name}
+                                         {w.start_time && w.end_time && <span className="font-normal text-[8px] opacity-70 ml-0.5">({w.start_time.substring(0,5)}-{w.end_time.substring(0,5)})</span>}
                                        </div>
                                      ))}
                                      {/* 協力会社 */}
                                      {partners.map(w => (
                                        <div key={`p-${w.id}`} className="text-[10px] font-bold bg-purple-50 text-purple-700 border-l-[2px] border-purple-400 pl-1 pr-0.5 py-0.5 rounded-sm truncate w-full flex justify-between items-center shadow-[0_1px_1px_rgba(0,0,0,0.02)] mt-[1px]">
-                                         <span className="truncate">{w.worker_master?.name}</span>
+                                         <span className="truncate">
+                                            {w.worker_master?.name}
+                                            {w.start_time && w.end_time && <span className="font-normal text-[8px] opacity-70 ml-0.5">({w.start_time.substring(0,5)}-{w.end_time.substring(0,5)})</span>}
+                                         </span>
                                          <span className="ml-[1px] shrink-0 border border-purple-200 bg-white text-purple-800 rounded px-[2px] text-[8px] leading-none py-[1px] font-black">{w.count||1}</span>
                                        </div>
                                      ))}
@@ -1080,6 +1265,7 @@ export default function ScheduleManagement() {
                                      {vehicles.map(v => (
                                        <div key={`v-${v.id}`} className="text-[9px] font-bold bg-teal-50 text-teal-700 border-l-[2px] border-teal-400 px-1 py-0.5 rounded-sm truncate w-full shadow-[0_1px_1px_rgba(0,0,0,0.02)] mt-[1px]">
                                          {v.vehicle_master?.vehicle_name}
+                                         {v.start_time && v.end_time && <span className="font-normal text-[8px] opacity-70 ml-0.5">({v.start_time.substring(0,5)}-{v.end_time.substring(0,5)})</span>}
                                        </div>
                                      ))}
                                      
@@ -1516,8 +1702,6 @@ export default function ScheduleManagement() {
                           const daily = dailyData.find(dd => dd.project_id === p.id && dd.target_date === dateStr)
                           
                           // 予定人員カラーロジック：
-                          // 配置されている作業員数の合計を計算 (車両以外)
-                          // 作業員は1人としてカウント、協力会社は count の数値
                           const assignedWorkerCount = cellAssignments.reduce((total, a) => {
                             if (a.vehicle_id) return total; // 車両は除外
                             if (a.worker_master?.type === '協力会社') return total + (a.count || 1);
@@ -1527,10 +1711,8 @@ export default function ScheduleManagement() {
                           let plannedCountClasses = 'text-slate-400 border border-transparent';
                           if (daily?.planned_count) {
                              if (assignedWorkerCount < daily.planned_count) {
-                                // 不足時は赤色
                                 plannedCountClasses = 'text-red-600 bg-red-50 border border-red-200';
                              } else {
-                                // 充足時は緑色
                                 plannedCountClasses = 'text-emerald-700 bg-emerald-50 border border-emerald-200';
                              }
                           }
@@ -1540,7 +1722,7 @@ export default function ScheduleManagement() {
                               key={`${p.id}-${dateStr}`}
                               onDragOver={handleDragOver}
                               onDrop={(e) => handleDrop(e, p.id, d)}
-                              className={`p-0.5 border-r border-slate-200 align-top min-h-[80px] transition-colors ${isToday ? 'bg-blue-50/60 ring-2 ring-blue-300 ring-inset shadow-[inset_0_0_10px_rgba(59,130,246,0.1)]' : isWeekend ? 'bg-slate-50/30 hover:bg-slate-100' : 'hover:bg-blue-50/30'} ${isPast ? 'opacity-50 saturate-50' : ''} w-[120px] min-w-[120px] max-w-[120px]`}
+                              className={`p-0.5 border-r border-slate-200 align-top min-h-[80px] transition-colors ${isToday ? 'bg-blue-50/60 ring-2 ring-blue-300 ring-inset shadow-[inset_0_0_10px_rgba(59,130,246,0.1)]' : isWeekend ? 'bg-slate-50/30 hover:bg-slate-100' : 'hover:bg-blue-50/30'} ${isPast ? 'opacity-50 saturate-50' : ''} w-[120px] min-w-[120px] max-w-[120px] group/parent relative`}
                             >
                                <div className="flex flex-col gap-0.5 mb-0.5 px-1">
                                   <div className="flex justify-between items-center">
@@ -1571,60 +1753,139 @@ export default function ScheduleManagement() {
                                     </div>
                                   )}
                                </div>
-                               <div className="flex flex-col gap-0.5 min-h-[2.5rem] mt-0.5">
+                               <div className="flex flex-col gap-0.5 min-h-[2.5rem] mt-0.5 min-w-full">
                                   {(() => {
-                                     const regularAssignments = cellAssignments.filter(a => a.worker_master?.type !== '協力会社')
-                                     const partnerAssignments = cellAssignments.filter(a => a.worker_master?.type === '協力会社')
+                                     // Group classifications
+                                     const timeGroupsMap = new Map<string, { start: string|null, end: string|null, assignments: typeof cellAssignments }>();
+                                     
+                                     (customTimeBlocks[`${p.id}-${dateStr}`] || []).forEach(b => {
+                                         const gKey = `${b.start_time}-${b.end_time}`;
+                                         if (!timeGroupsMap.has(gKey)) timeGroupsMap.set(gKey, { start: b.start_time, end: b.end_time, assignments: [] });
+                                     });
+
+                                     cellAssignments.forEach(a => {
+                                         const st = a.start_time ? a.start_time.substring(0,5) : '';
+                                         const et = a.end_time ? a.end_time.substring(0,5) : '';
+                                         const gKey = (st && et) ? `${st}-${et}` : 'default';
+                                         if (!timeGroupsMap.has(gKey)) timeGroupsMap.set(gKey, { start: a.start_time, end: a.end_time, assignments: [] });
+                                         timeGroupsMap.get(gKey)!.assignments.push(a);
+                                     });
+
+                                     const timeGroups = Array.from(timeGroupsMap.values());
+                                     
+                                     timeGroups.sort((a, b) => {
+                                        if (!a.start && !b.start) return 0;
+                                        if (!a.start) return 1;
+                                        if (!b.start) return -1;
+                                        return a.start.localeCompare(b.start);
+                                     });
+
+                                     if (timeGroups.length === 0) {
+                                        timeGroups.push({ start: null, end: null, assignments: [] });
+                                     }
+                                     
                                      return (
                                         <>
-                                            {regularAssignments.map(a => (
-                                              <div 
-                                                  key={a.id}
-                                                  draggable={canDragItem(a.worker_id ? 'worker' : 'vehicle', a.id)}
-                                                  onDragStart={(e) => handleDragStart(e, (a.worker_id || a.vehicle_id) as string, a.worker_id ? 'worker' : 'vehicle', p.id, dateStr, a.id)}
-                                                  className={`group/item flex items-center justify-between px-1 py-0 text-[0.85em] bg-white border rounded shadow-sm hover:shadow ${a.worker_id ? 'border-l-4 border-[#3b82f6] text-slate-700 font-bold border-y-slate-200 border-r-slate-200' : 'border-l-4 border-[#10b981] text-slate-700 font-bold border-y-slate-200 border-r-slate-200'} ${canDragItem(a.worker_id ? 'worker' : 'vehicle', a.id) ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
-                                              >
-                                                  <span className="truncate">{a.worker_id ? a.worker_master?.name : a.vehicle_master?.vehicle_name}</span>
-                                                  <div className="flex items-center gap-0.5">
-                                                      {a.notes && <MessageSquare className="w-3 h-3 text-yellow-500" />}
-                                                      {isAdmin && <button onClick={(e) => handleDeleteAssignment(a.id, e)} className="opacity-0 group-hover/item:opacity-100 text-slate-300 hover:text-red-500 transition-opacity"><X className="w-3 h-3" /></button>}
-                                                  </div>
-                                              </div>
-                                            ))}
-                                            {partnerAssignments.length > 0 && (
-                                              <table className="w-full text-left mt-0.5 border-separate border-spacing-0">
-                                                <tbody>
-                                                  {partnerAssignments.map(pr => (
-                                                    <tr 
-                                                      key={pr.id} 
-                                                      className={`group/ptr transition-colors ${isAdmin ? 'cursor-pointer hover:bg-slate-50' : ''}`}
-                                                      onClick={(e) => handlePartnerCountClick(pr.id, pr.count || 1, e)}
-                                                    >
-                                                      <td 
-                                                        className={`text-[0.75em] text-purple-700 py-0.5 border-b border-slate-200 font-bold whitespace-nowrap pl-0.5 ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''}`} 
-                                                        style={{ width: '40%'}}
-                                                        draggable={canDragItem('worker', pr.id)}
-                                                        onDragStart={(e) => handleDragStart(e, pr.worker_id as string, 'worker', p.id, dateStr, pr.id)}
+                                           {timeGroups.map((group, gIdx) => {
+                                              const isDefault = !group.start && !group.end;
+                                              const regularAssignments = group.assignments.filter(a => a.worker_master?.type !== '協力会社');
+                                              const partnerAssignments = group.assignments.filter(a => a.worker_master?.type === '協力会社');
+                                              
+                                              if (isDefault && group.assignments.length === 0 && timeGroups.length > 1) return null;
+
+                                              return (
+                                                <div 
+                                                  key={gIdx}
+                                                  onDragOver={handleDragOver}
+                                                  onDrop={(e) => { e.stopPropagation(); handleDrop(e, p.id, d, group.start, group.end); }}
+                                                  className={`flex flex-col gap-0.5 min-h-[1.75rem] border ${!isDefault || group.assignments.length > 0 ? 'border-dashed border-slate-300 p-0.5 bg-white/50 hover:bg-white rounded-[4px] shadow-[inset_0_0_2px_rgba(0,0,0,0.05)]' : 'border-transparent'} transition-colors relative mb-0.5`}
+                                                >
+                                                   {/* Time Label */}
+                                                   {(!isDefault || group.start || group.end) && (
+                                                      <div className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1 py-[1px] rounded flex justify-between items-center shadow-sm">
+                                                         <span>{group.start?.substring(0,5)} 〜 {group.end?.substring(0,5)}</span>
+                                                         {isAdmin && (
+                                                           <div className="flex items-center gap-0.5">
+                                                             <button className="text-slate-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors" onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, group.start || '', group.end || '', e)} title="この時間帯に配置を追加"><Plus className="w-3 h-3"/></button>
+                                                             {group.assignments.length === 0 && (
+                                                               <button className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" onClick={(e) => { e.stopPropagation(); setCustomTimeBlocks(prev => { const newB = {...prev}; newB[`${p.id}-${dateStr}`] = newB[`${p.id}-${dateStr}`].filter(b => b.start_time !== group.start || b.end_time !== group.end); return newB; }) }} title="時間枠を削除"><X className="w-3 h-3"/></button>
+                                                             )}
+                                                           </div>
+                                                         )}
+                                                      </div>
+                                                   )}
+
+                                                   {/* Regulars */}
+                                                   {regularAssignments.map(a => (
+                                                      <div 
+                                                          key={a.id}
+                                                          draggable={canDragItem(a.worker_id ? 'worker' : 'vehicle', a.id)}
+                                                          onDragStart={(e) => handleDragStart(e, (a.worker_id || a.vehicle_id) as string, a.worker_id ? 'worker' : 'vehicle', p.id, dateStr, a.id)}
+                                                          className={`group/item flex items-center justify-between px-1 py-0 text-[0.85em] bg-white border rounded shadow-sm hover:shadow ${a.worker_id ? 'border-l-4 border-[#3b82f6] text-slate-700 font-bold border-y-slate-200 border-r-slate-200' : 'border-l-4 border-[#10b981] text-slate-700 font-bold border-y-slate-200 border-r-slate-200'} ${canDragItem(a.worker_id ? 'worker' : 'vehicle', a.id) ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                                       >
-                                                        協力: {pr.count||1}名
-                                                      </td>
-                                                      <td className="text-[0.75em] text-slate-600 py-0.5 border-b border-slate-200 truncate pl-1" style={{ width: '60%'}}>
-                                                        {pr.worker_master?.name}
-                                                        {isAdmin && <button onClick={(e) => { e.stopPropagation(); handleDeleteAssignment(pr.id, e); }} className="text-slate-300 hover:text-red-500 float-right mr-0.5 opacity-0 group-hover/ptr:opacity-100 transition-opacity"><X className="w-3 h-3" /></button>}
-                                                      </td>
-                                                    </tr>
-                                                  ))}
-                                                </tbody>
-                                              </table>
+                                                          <span className="truncate">
+                                                              {a.worker_id ? a.worker_master?.name : a.vehicle_master?.vehicle_name}
+                                                              {a.start_time && a.end_time && isDefault && <span className="font-normal text-[0.85em] opacity-70 ml-1">({a.start_time.substring(0,5)}〜{a.end_time.substring(0,5)})</span>}
+                                                          </span>
+                                                          <div className="flex items-center gap-0.5">
+                                                              {a.notes && <MessageSquare className="w-3 h-3 text-yellow-500" />}
+                                                              {isAdmin && <button onClick={(e) => handleDeleteAssignment(a.id, e)} className="opacity-0 group-hover/item:opacity-100 text-slate-300 hover:text-red-500 transition-opacity"><X className="w-3 h-3" /></button>}
+                                                          </div>
+                                                      </div>
+                                                   ))}
+
+                                                   {/* Partners */}
+                                                   {partnerAssignments.length > 0 && (
+                                                      <table className="w-full text-left mt-0.5 border-separate border-spacing-0 bg-white border border-slate-200 rounded overflow-hidden">
+                                                        <tbody>
+                                                          {partnerAssignments.map(pr => (
+                                                            <tr 
+                                                              key={pr.id} 
+                                                              className={`group/ptr transition-colors ${isAdmin ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+                                                              onClick={(e) => handlePartnerCountClick(pr.id, pr.count || 1, e)}
+                                                            >
+                                                              <td 
+                                                                className={`text-[0.75em] text-purple-700 py-0.5 border-b border-slate-100 font-bold whitespace-nowrap pl-0.5 ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''}`} 
+                                                                style={{ width: '40%'}}
+                                                                draggable={canDragItem('worker', pr.id)}
+                                                                onDragStart={(e) => handleDragStart(e, pr.worker_id as string, 'worker', p.id, dateStr, pr.id)}
+                                                              >
+                                                                協力: {pr.count||1}名
+                                                              </td>
+                                                              <td className="text-[0.75em] text-slate-600 py-0.5 border-b border-slate-100 truncate pl-1" style={{ width: '60%'}}>
+                                                                {pr.worker_master?.name}
+                                                                {pr.start_time && pr.end_time && isDefault && <span className="font-normal text-[0.85em] opacity-70 ml-1">({pr.start_time.substring(0,5)}〜{pr.end_time.substring(0,5)})</span>}
+                                                                {isAdmin && <button onClick={(e) => { e.stopPropagation(); handleDeleteAssignment(pr.id, e); }} className="text-slate-300 hover:text-red-500 float-right mr-0.5 opacity-0 group-hover/ptr:opacity-100 transition-opacity"><X className="w-3 h-3" /></button>}
+                                                              </td>
+                                                            </tr>
+                                                          ))}
+                                                        </tbody>
+                                                      </table>
+                                                   )}
+                                                   
+                                                   {draggedItems.length > 0 && isAdmin && (
+                                                      <div className="w-full min-h-[28px] border-2 border-dashed border-blue-400 rounded flex items-center justify-center bg-blue-50 mt-1 mb-0.5 shadow-inner transition-colors">
+                                                          <span className="text-[0.7em] font-bold text-blue-500 pointer-events-none flex items-center gap-1">
+                                                            <Plus className="w-3 h-3" /> ここに配置
+                                                          </span>
+                                                      </div>
+                                                   )}
+                                                </div>
+                                              )
+                                           })}
+                                            {isAdmin && (
+                                                <div className="absolute bottom-0 right-0 flex opacity-0 group-hover/parent:opacity-100 transition-opacity z-10 bg-white/80 rounded-tl-md shadow-sm border-t border-l border-slate-100">
+                                                    <button onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, '', '', e)} className="p-1 text-slate-400 hover:text-green-600 hover:bg-green-50 transition-colors" title="配置を追加">
+                                                        <Plus className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleAddTimeBlockPrompt(p.id, dateStr); }} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="時間枠を追加">
+                                                        <Clock className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
                                             )}
                                         </>
                                      )
                                   })()}
-                                  {draggedItems.length > 0 && isAdmin && (
-                                     <div className="w-full h-6 border-2 border-dashed border-blue-200 rounded-md opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center bg-blue-50/50">
-                                         <span className="text-[0.85em] font-bold text-blue-400">配置</span>
-                                     </div>
-                                  )}
                                </div>
                             </td>
                           )
@@ -1829,6 +2090,111 @@ export default function ScheduleManagement() {
                 className="px-4 py-2 rounded text-white text-[0.95em] font-bold bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 追加
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Assignment Modal */}
+      {addAssignmentModalState.isOpen && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-blue-50/50">
+              <div>
+                <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                  <Plus className="w-5 h-5 text-blue-600" />
+                  配置の追加
+                </h3>
+                <p className="text-sm text-slate-500 mt-1 font-medium select-none truncate max-w-lg">
+                  {addAssignmentModalState.projectName} - {format(new Date(addAssignmentModalState.dateStr), 'yyyy年MM月dd日')}
+                </p>
+              </div>
+              <button 
+                onClick={() => setAddAssignmentModalState(prev => ({ ...prev, isOpen: false }))}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-5 flex-1 overflow-y-auto space-y-6 bg-slate-50/30">
+               {/* 時間設定 */}
+               <div className="bg-white p-4 rounded border border-slate-200 shadow-sm">
+                  <h4 className="text-[0.9em] font-bold text-slate-700 mb-3 flex items-center gap-1"><Clock className="w-4 h-4 text-slate-400" />時間枠の指定</h4>
+                  <div className="flex items-center gap-2">
+                     <input 
+                       type="time" 
+                       value={addAssignmentModalState.startTime} 
+                       onChange={e => setAddAssignmentModalState(prev => ({ ...prev, startTime: e.target.value }))}
+                       className="border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500"
+                     />
+                     <span className="text-slate-400">〜</span>
+                     <input 
+                       type="time" 
+                       value={addAssignmentModalState.endTime} 
+                       onChange={e => setAddAssignmentModalState(prev => ({ ...prev, endTime: e.target.value }))}
+                       className="border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500"
+                     />
+                     <button onClick={() => setAddAssignmentModalState(prev => ({ ...prev, startTime: '', endTime: '' }))} className="ml-2 text-[0.8em] text-slate-400 hover:text-slate-600 underline">時間をクリア</button>
+                  </div>
+               </div>
+
+               {/* 人員選択 */}
+               <div className="bg-white p-4 rounded border border-slate-200 shadow-sm">
+                  <h4 className="text-[0.9em] font-bold text-slate-700 mb-3 flex items-center gap-1"><User className="w-4 h-4 text-blue-500" />自社人員</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                     {resources.filter(w => w.type === 'worker' && w.categoryId === 'employee' || w.categoryId === 'president').map(w => {
+                        const { isOverlap, isAlreadyHere, allAssignments } = getResourceAvailability(w.id, false);
+                        const isSelected = addAssignmentModalState.selectedWorkers.includes(w.id);
+                        
+                        // If already in this project at this time, we can still show them but disable them
+                        const isDisabled = isOverlap || isAlreadyHere;
+                        
+                        return (
+                          <div key={w.id} className="flex flex-col">
+                            <label className={`flex items-center gap-2 p-2 border rounded transition-colors ${isDisabled ? 'opacity-50 cursor-not-allowed border-slate-200 bg-slate-50' : isSelected ? 'border-blue-400 bg-blue-50 cursor-pointer' : 'border-slate-200 hover:bg-slate-50 cursor-pointer'}`}>
+                               <input 
+                                 type="checkbox" 
+                                 checked={isSelected || isAlreadyHere}
+                                 disabled={isDisabled}
+                                 onChange={(e) => {
+                                   if (e.target.checked) setAddAssignmentModalState(prev => ({ ...prev, selectedWorkers: [...prev.selectedWorkers, w.id] }));
+                                   else setAddAssignmentModalState(prev => ({ ...prev, selectedWorkers: prev.selectedWorkers.filter(id => id !== w.id) }));
+                                 }}
+                                 className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:bg-slate-200"
+                               />
+                               <span className="text-[0.85em] font-medium text-slate-700 truncate">{w.name}</span>
+                            </label>
+                            {allAssignments.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1 pl-1">
+                                {allAssignments.map(a => (
+                                  <span key={a.id} className={`text-[0.65em] px-1 py-0.5 rounded border ${isOverlap && checkTimeOverlap(addAssignmentModalState.startTime, addAssignmentModalState.endTime, a.start_time, a.end_time) ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
+                                    {a.project_id === addAssignmentModalState.projectId ? '【当案件】' : '【他案件】'}{a.start_time ? `${a.start_time.slice(0,5)}~${a.end_time?.slice(0,5)||''}` : '終日'}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                     })}
+                  </div>
+               </div>
+            </div>
+            
+            <div className="p-4 border-t border-slate-200 bg-white flex justify-end gap-2">
+              <button 
+                onClick={() => setAddAssignmentModalState(prev => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 border border-slate-300 rounded text-slate-700 text-[0.95em] font-bold bg-white hover:bg-slate-50 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button 
+                onClick={handleSaveAddAssignment}
+                disabled={addAssignmentModalState.selectedWorkers.length === 0}
+                className="px-6 py-2 rounded text-white text-[0.95em] font-bold bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                追加する
               </button>
             </div>
           </div>

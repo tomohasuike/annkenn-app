@@ -54,11 +54,11 @@ export default function ReportsList() {
               project_number,
               project_name
             ),
-            report_personnel ( worker_master(name), worker_name ),
+            report_personnel ( worker_master(name), worker_name, start_time, end_time ),
             report_vehicles ( vehicle_master(vehicle_name), vehicle_name ),
             report_machinery ( vehicle_master(vehicle_name), machinery_name ),
             report_materials ( material_name, quantity, photo, documentation ),
-            report_subcontractors ( subcontractor_name )
+            report_subcontractors ( subcontractor_name, worker_count, start_time, end_time )
           `)
           .order('report_date', { ascending: false })
           .limit(500)
@@ -74,7 +74,16 @@ export default function ReportsList() {
           start_time: item.start_time || '',
           end_time: item.end_time || '',
           progress: item.progress || '0',
-          personnel: item.report_personnel?.map((p: any) => Array.isArray(p.worker_master) ? p.worker_master[0]?.name : p.worker_master?.name || p.worker_name).filter(Boolean) || [],
+          personnel: item.report_personnel?.map((p: any) => {
+              const name = Array.isArray(p.worker_master) ? p.worker_master[0]?.name : p.worker_master?.name || p.worker_name;
+              if (!name) return null;
+              if (p.start_time || p.end_time) {
+                  const s = p.start_time ? p.start_time.substring(0, 5) : '';
+                  const e = p.end_time ? p.end_time.substring(0, 5) : '';
+                  return `${name} (${s}〜${e})`;
+              }
+              return name;
+          }).filter(Boolean) || [],
           vehicles: item.report_vehicles?.map((v: any) => Array.isArray(v.vehicle_master) ? v.vehicle_master[0]?.vehicle_name : v.vehicle_master?.vehicle_name || v.vehicle_name).filter(Boolean) || [],
           machinery: item.report_machinery?.map((m: any) => Array.isArray(m.vehicle_master) ? m.vehicle_master[0]?.vehicle_name : m.vehicle_master?.vehicle_name || m.machinery_name).filter(Boolean) || [],
           materials: item.report_materials?.map((m: any) => {
@@ -92,7 +101,17 @@ export default function ReportsList() {
             }
             return { name, photos, docs };
           }).filter(Boolean) || [],
-          subcontractors: item.report_subcontractors?.map((s: any) => s.subcontractor_name).filter(Boolean) || [],
+          subcontractors: item.report_subcontractors?.map((s: any) => {
+              const name = s.subcontractor_name || '不明業者';
+              let customTime = '';
+              if (s.start_time || s.end_time) {
+                  const st = s.start_time ? s.start_time.substring(0, 5) : '';
+                  const et = s.end_time ? s.end_time.substring(0, 5) : '';
+                  customTime = ` (${st}〜${et})`;
+              }
+              const count = s.worker_count && Number(s.worker_count) > 1 ? ` [${s.worker_count}名]` : '';
+              return `${name}${count}${customTime}`;
+          }).filter(Boolean) || [],
           project: {
             project_number: item.projects?.project_number || '',
             project_name: item.projects?.project_name || '案件未設定'
@@ -265,6 +284,14 @@ export default function ReportsList() {
                              <Users className="w-3.5 h-3.5 text-blue-500 mr-1" />
                              {report.personnel.map((name, i) => (
                                <span key={i} className="inline-flex items-center rounded-sm bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 whitespace-nowrap">{name}</span>
+                             ))}
+                           </div>
+                         )}
+                         {report.subcontractors.length > 0 && (
+                           <div className="flex flex-wrap gap-1 items-center">
+                             <Building className="w-3.5 h-3.5 text-orange-500 mr-1" />
+                             {report.subcontractors.map((name, i) => (
+                               <span key={i} className="inline-flex items-center rounded-sm bg-orange-50 px-1.5 py-0.5 text-xs font-medium text-orange-700 ring-1 ring-inset ring-orange-700/10 whitespace-nowrap">{name}</span>
                              ))}
                            </div>
                          )}
