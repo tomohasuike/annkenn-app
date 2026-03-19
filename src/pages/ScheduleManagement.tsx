@@ -1583,12 +1583,6 @@ export default function ScheduleManagement() {
                                  </div>
                              </div>
                           ))}
-                          {/* Drop target visual hint */}
-                          {draggedItems.length > 0 && isAdmin && (
-                             <div className="w-full h-6 border-2 border-dashed border-rose-200 rounded-md opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center bg-rose-50/50">
-                                 <span className="text-[0.85em] font-bold text-rose-400">配置</span>
-                             </div>
-                          )}
                        </div>
                      </td>
                    )
@@ -1862,25 +1856,19 @@ export default function ScheduleManagement() {
                                                         </tbody>
                                                       </table>
                                                    )}
-                                                   
-                                                   {draggedItems.length > 0 && isAdmin && (
-                                                      <div className="w-full min-h-[28px] border-2 border-dashed border-blue-400 rounded flex items-center justify-center bg-blue-50 mt-1 mb-0.5 shadow-inner transition-colors">
-                                                          <span className="text-[0.7em] font-bold text-blue-500 pointer-events-none flex items-center gap-1">
-                                                            <Plus className="w-3 h-3" /> ここに配置
-                                                          </span>
-                                                      </div>
-                                                   )}
-                                                </div>
+                                                 </div>
                                               )
                                            })}
                                             {isAdmin && (
-                                                <div className="absolute bottom-0 right-0 flex opacity-0 group-hover/parent:opacity-100 transition-opacity z-10 bg-white/80 rounded-tl-md shadow-sm border-t border-l border-slate-100">
-                                                    <button onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, '', '', e)} className="p-1 text-slate-400 hover:text-green-600 hover:bg-green-50 transition-colors" title="配置を追加">
+                                                <div className="w-full flex justify-end mt-1 opacity-0 group-hover/parent:opacity-100 transition-opacity">
+                                                  <div className="flex bg-slate-50 border border-slate-200 rounded shadow-sm overflow-hidden">
+                                                    <button onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, '', '', e)} className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-100 transition-colors" title="配置を追加">
                                                         <Plus className="w-3.5 h-3.5" />
                                                     </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); handleAddTimeBlockPrompt(p.id, dateStr); }} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="時間枠を追加">
+                                                    <button onClick={(e) => { e.stopPropagation(); handleAddTimeBlockPrompt(p.id, dateStr); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 transition-colors border-l border-slate-200" title="時間枠を追加">
                                                         <Clock className="w-3.5 h-3.5" />
                                                     </button>
+                                                  </div>
                                                 </div>
                                             )}
                                         </>
