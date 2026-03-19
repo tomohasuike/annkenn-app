@@ -746,7 +746,7 @@ export default function ScheduleManagement() {
     if (!projectId || !dateStr) return;
     
     // Default count to 1
-    const { data: newAsg, error } = await supabase.from('assignments').insert({
+    const { error } = await supabase.from('assignments').insert({
       project_id: projectId,
       worker_id: resources.find(r => r.id === resourceId)?.type === 'worker' ? resourceId : null,
       vehicle_id: resources.find(r => r.id === resourceId)?.type === 'vehicle' ? resourceId : null,
