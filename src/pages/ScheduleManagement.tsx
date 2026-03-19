@@ -838,8 +838,8 @@ export default function ScheduleManagement() {
                {/* Categories */}
                <div className="flex flex-col gap-3 mt-2">
                   {(['president', 'employee', 'partner', 'vehicle', 'machine'] as const).map(catId => {
-                    // 非管理者は車両と建機のみ追加可能
-                    if (!isAdmin && (catId === 'president' || catId === 'employee' || catId === 'partner')) return null;
+                    // モバイル版からは全員（管理者・非管理者問わず）作業車と建機のみ追加可能とする
+                    if (catId === 'president' || catId === 'employee' || catId === 'partner') return null;
                     
                     const catNameMap = { president: '社長', employee: '作業員', partner: '協力会社', vehicle: '車両', machine: '建設機械' };
                     const unassg = getUnassignedResources(dateStr, catId);
