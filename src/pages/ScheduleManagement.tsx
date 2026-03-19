@@ -1174,8 +1174,8 @@ export default function ScheduleManagement() {
 
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
         
-        {/* 左サイドバー：リソース一覧（管理モードかつ表示ONの時） */}
-        {isAdmin && showLeftPanel && (
+        {/* 左サイドバー：リソース一覧（表示ONの時） */}
+        {showLeftPanel && (
           <aside className="w-64 bg-white border-r border-[#dee2e6] flex flex-col shadow-inner shrink-0 z-30">
             <div className="p-1 border-b border-[#dee2e6] bg-[#f8f9fa]">
               <div className="flex justify-between items-center mb-3">
@@ -1227,7 +1227,7 @@ export default function ScheduleManagement() {
                                 draggable={canDragItem(res.type as 'worker'|'vehicle')}
                                 onDragStart={(e) => handleDragStart(e, res.id, res.type as 'worker'|'vehicle')}
                                 onClick={(e) => handleItemClick(e, { id: res.id, type: res.type as 'worker' | 'vehicle' })}
-                                className={`px-1 py-0.5 border border-slate-200 rounded-md border-l-4 ${typeBorder} font-bold text-[0.95em] flex items-center justify-between transition-all bg-white shadow-sm ${checkIsSelected(res.id) ? 'shadow-md ring-2 ring-blue-400 bg-blue-50/50 scale-[1.02] -translate-y-[1px] z-10' : ''} ${isAdmin ? 'cursor-grab hover:bg-slate-50 hover:border-slate-300' : 'cursor-default'}`}
+                                className={`px-1 py-0.5 border border-slate-200 rounded-md border-l-4 ${typeBorder} font-bold text-[0.95em] flex items-center justify-between transition-all bg-white shadow-sm ${checkIsSelected(res.id) ? 'shadow-md ring-2 ring-blue-400 bg-blue-50/50 scale-[1.02] -translate-y-[1px] z-10' : ''} ${canDragItem(res.type as 'worker'|'vehicle') ? 'cursor-grab hover:bg-slate-50 hover:border-slate-300' : 'cursor-default opacity-60'}`}
                             >
                                 <span className="truncate">{res.name}</span>
                             </div>
@@ -1324,7 +1324,7 @@ export default function ScheduleManagement() {
                                         draggable={canDragItem(res.type as 'worker'|'vehicle')}
                                         onDragStart={(e) => handleDragStart(e, res.id, res.type as 'worker'|'vehicle', "UNASSIGNED_POOL", dateStr)}
                                         onClick={(e) => handleItemClick(e, { id: res.id, type: res.type as 'worker'|'vehicle', sourceProjectId: "UNASSIGNED_POOL", sourceDate: dateStr })}
-                                        className={`px-2 py-0.5 text-[0.85em] bg-white border border-[#c8e6c9] border-l-[3px] ${typeBorder} rounded-md shadow-sm text-slate-700 font-bold whitespace-nowrap flex items-center justify-between w-full transition-all ${checkIsSelected(res.id, "UNASSIGNED_POOL", dateStr) ? 'shadow-md ring-2 ring-blue-400 bg-blue-50/50 scale-[1.02] -translate-y-[1px] z-10' : ''} ${isAdmin ? 'cursor-grab hover:bg-emerald-50 active:cursor-grabbing' : 'cursor-default'}`}
+                                        className={`px-2 py-0.5 text-[0.85em] bg-white border border-[#c8e6c9] border-l-[3px] ${typeBorder} rounded-md shadow-sm text-slate-700 font-bold whitespace-nowrap flex items-center justify-between w-full transition-all ${checkIsSelected(res.id, "UNASSIGNED_POOL", dateStr) ? 'shadow-md ring-2 ring-blue-400 bg-blue-50/50 scale-[1.02] -translate-y-[1px] z-10' : ''} ${canDragItem(res.type as 'worker'|'vehicle') ? 'cursor-grab hover:bg-emerald-50 active:cursor-grabbing' : 'cursor-default opacity-60'}`}
                                       >
                                       {res.name}
                                       <Info className="w-3 h-3 text-slate-300" />
@@ -1388,7 +1388,7 @@ export default function ScheduleManagement() {
                                  draggable={canDragItem(a.worker_id ? 'worker' : 'vehicle', a.id)}
                                  onDragStart={(e) => handleDragStart(e, (a.worker_id || a.vehicle_id) as string, a.worker_id ? 'worker' : 'vehicle', vacationProjId, dateStr, a.id)}
                                  onClick={(e) => handleItemClick(e, { id: (a.worker_id || a.vehicle_id) as string, type: a.worker_id ? 'worker' : 'vehicle', sourceProjectId: vacationProjId, sourceDate: dateStr, assignmentId: a.id })}
-                                 className={`group/item px-1 py-0 text-[0.85em] bg-white border border-slate-200 border-l-[3px] ${a.worker_id ? 'border-l-blue-500' : 'border-l-emerald-500'} rounded-md shadow-sm text-slate-700 font-bold flex items-center justify-between transition-all ${checkIsSelected((a.worker_id || a.vehicle_id) as string, vacationProjId, dateStr, a.id) ? 'shadow-md ring-2 ring-blue-400 bg-blue-50/50 scale-[1.02] -translate-y-[1px] z-10' : ''} ${isAdmin ? 'cursor-grab active:cursor-grabbing hover:border-slate-300 hover:shadow' : 'cursor-default'}`}
+                                 className={`group/item px-1 py-0 text-[0.85em] bg-white border border-slate-200 border-l-[3px] ${a.worker_id ? 'border-l-blue-500' : 'border-l-emerald-500'} rounded-md shadow-sm text-slate-700 font-bold flex items-center justify-between transition-all ${checkIsSelected((a.worker_id || a.vehicle_id) as string, vacationProjId, dateStr, a.id) ? 'shadow-md ring-2 ring-blue-400 bg-blue-50/50 scale-[1.02] -translate-y-[1px] z-10' : ''} ${canDragItem(a.worker_id ? 'worker' : 'vehicle', a.id) ? 'cursor-grab active:cursor-grabbing hover:border-slate-300 hover:shadow' : 'cursor-default'}`}
                              >
                                  <span className="truncate">{a.worker_id ? a.worker_master?.name : a.vehicle_master?.vehicle_name}</span>
                                  <div className="flex items-center gap-0.5">
@@ -1582,7 +1582,7 @@ export default function ScheduleManagement() {
                                                   key={a.id}
                                                   draggable={canDragItem(a.worker_id ? 'worker' : 'vehicle', a.id)}
                                                   onDragStart={(e) => handleDragStart(e, (a.worker_id || a.vehicle_id) as string, a.worker_id ? 'worker' : 'vehicle', p.id, dateStr, a.id)}
-                                                  className={`group/item flex items-center justify-between px-1 py-0 text-[0.85em] bg-white border rounded shadow-sm hover:shadow ${a.worker_id ? 'border-l-4 border-[#3b82f6] text-slate-700 font-bold border-y-slate-200 border-r-slate-200' : 'border-l-4 border-[#10b981] text-slate-700 font-bold border-y-slate-200 border-r-slate-200'} ${isAdmin ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                                                  className={`group/item flex items-center justify-between px-1 py-0 text-[0.85em] bg-white border rounded shadow-sm hover:shadow ${a.worker_id ? 'border-l-4 border-[#3b82f6] text-slate-700 font-bold border-y-slate-200 border-r-slate-200' : 'border-l-4 border-[#10b981] text-slate-700 font-bold border-y-slate-200 border-r-slate-200'} ${canDragItem(a.worker_id ? 'worker' : 'vehicle', a.id) ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
                                               >
                                                   <span className="truncate">{a.worker_id ? a.worker_master?.name : a.vehicle_master?.vehicle_name}</span>
                                                   <div className="flex items-center gap-0.5">
