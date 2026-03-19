@@ -515,10 +515,6 @@ export default function ScheduleManagement() {
     fetchAssignments();
   }
 
-  const handleAddTimeBlockPrompt = (projectId: string, dateStr: string) => {
-    setTimeBlockModalState({ isOpen: true, projectId, dateStr, start: '08:00', end: '12:00' });
-  };
-
   const handleAddResource = async () => {
     if (!newResourceName.trim()) return
     try {
@@ -1861,14 +1857,9 @@ export default function ScheduleManagement() {
                                            })}
                                             {isAdmin && (
                                                 <div className="w-full flex justify-end mt-1 opacity-0 group-hover/parent:opacity-100 transition-opacity">
-                                                  <div className="flex bg-slate-50 border border-slate-200 rounded shadow-sm overflow-hidden">
-                                                    <button onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, '', '', e)} className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-100 transition-colors" title="配置を追加">
+                                                    <button onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, '', '', e)} className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded bg-white border border-slate-200 shadow-sm transition-colors" title="配置を追加">
                                                         <Plus className="w-3.5 h-3.5" />
                                                     </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); handleAddTimeBlockPrompt(p.id, dateStr); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 transition-colors border-l border-slate-200" title="時間枠を追加">
-                                                        <Clock className="w-3.5 h-3.5" />
-                                                    </button>
-                                                  </div>
                                                 </div>
                                             )}
                                         </>
