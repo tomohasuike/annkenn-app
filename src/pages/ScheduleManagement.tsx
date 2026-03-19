@@ -3,7 +3,7 @@ import { createPortal } from "react-dom"
 import { supabase } from "../lib/supabase"
 import { format, addDays, subDays, startOfWeek } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { Search, ChevronLeft, ChevronRight, Plus, RefreshCw, Users, MessageSquare, Info, X, CalendarDays, List, ListTodo, History, PanelLeft, ChevronDown, ChevronRight as ChevronRightIcon, Truck, FolderGit2 } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Plus, RefreshCw, Users, MessageSquare, Info, X, CalendarDays, List, ListTodo, History, PanelLeft, ChevronDown, ChevronRight as ChevronRightIcon, Truck, FolderGit2, Trash2 } from 'lucide-react'
 
 type ProjectData = { id: string; name: string; category: string; status: string; no: string | null; site: string | null; legacy_id?: string; client_name?: string | null; client_company_name?: string | null; folder_url?: string | null }
 type ResourceData = { id: string; name: string; type: 'worker' | 'vehicle'; categoryId?: 'president' | 'employee' | 'partner' | 'vehicle' | 'machine' }
@@ -77,6 +77,7 @@ export default function ScheduleManagement() {
   const [commentModalState, setCommentModalState] = useState<{ isOpen: boolean, projectId: string, dateStr: string, initialValue: string }>({ isOpen: false, projectId: '', dateStr: '', initialValue: '' })
   const [plannedCountModalState, setPlannedCountModalState] = useState<{ isOpen: boolean, projectId: string, dateStr: string, initialValue: string }>({ isOpen: false, projectId: '', dateStr: '', initialValue: '' })
   const [partnerCountModalState, setPartnerCountModalState] = useState<{ isOpen: boolean, assignmentId: string, initialValue: number }>({ isOpen: false, assignmentId: '', initialValue: 1 })
+  const [mobileCellModalState, setMobileCellModalState] = useState<{ isOpen: boolean, projectId: string, dateStr: string, dailyDataId?: string }>({ isOpen: false, projectId: '', dateStr: '' })
   
   // Add Resource Modal
   const [showAddResourceModal, setShowAddResourceModal] = useState(false)
@@ -512,7 +513,7 @@ export default function ScheduleManagement() {
     return assignments.filter(a => a.project_id === projectId && a.assignment_date === dateStr)
   }
 
-  const getUnassignedResources = (dateStr: string, categoryId: 'president'|'employee'|'partner'|'vehicle') => {
+  const getUnassignedResources = (dateStr: string, categoryId: 'president'|'employee'|'partner'|'vehicle'|'machine') => {
       // Very naive logic: if they are assigned to *any* project on this day, they are not unassigned.
       return resources.filter(r => r.categoryId === categoryId && !assignments.some(a => 
           a.assignment_date === dateStr && a.project_id !== "UNASSIGNED_POOL" &&
@@ -740,6 +741,140 @@ export default function ScheduleManagement() {
     </>
   );
 
+  const handleAddAssignmentMobile = async (resourceId: string) => {
+    const { projectId, dateStr } = mobileCellModalState;
+    if (!projectId || !dateStr) return;
+    
+    // Default count to 1
+    const { data: newAsg, error } = await supabase.from('assignments').insert({
+      project_id: projectId,
+      worker_id: resources.find(r => r.id === resourceId)?.type === 'worker' ? resourceId : null,
+      vehicle_id: resources.find(r => r.id === resourceId)?.type === 'vehicle' ? resourceId : null,
+      assignment_date: dateStr,
+      count: 1,
+      assigned_by: currentWorkerId
+    }).select().single();
+    
+    if (error) {
+      console.error("Failed to add assignment", error);
+      return;
+    }
+    
+    fetchAssignments();
+  }
+
+  const handleDeleteAssignmentMobile = async (assignmentId: string) => {
+     try {
+       setAssignments(prev => prev.filter(a => a.id !== assignmentId))
+       const { error } = await supabase.from('assignments').delete().eq('id', assignmentId)
+       if (error) throw error
+     } catch (err) {
+       console.error("Failed to delete assignment:", err)
+       fetchAssignments()
+     }
+  }
+
+  const renderMobileCellModal = () => {
+    if (!mobileCellModalState.isOpen) return null;
+    const { projectId, dateStr } = mobileCellModalState;
+    const project = projectsList.find(p => p.id === projectId);
+    
+    // Get existing assignments
+    const asg = assignments.filter(a => a.project_id === projectId && a.assignment_date === dateStr);
+    
+    return createPortal(
+      <>
+        <div className="fixed inset-0 bg-slate-900/40 z-[9999] opacity-100 transition-opacity" onClick={() => setMobileCellModalState({ ...mobileCellModalState, isOpen: false })} />
+        <div className="fixed inset-x-0 bottom-0 z-[10000] bg-slate-50 rounded-t-xl shadow-2xl flex flex-col h-[85vh] transform transition-transform border border-slate-200" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-white rounded-t-xl shrink-0">
+             <div>
+               <div className="font-bold text-[14px] text-slate-800 flex items-center gap-1"><CalendarDays className="w-4 h-4 text-blue-600"/> {format(new Date(dateStr), 'M/d')} ({['日','月','火','水','木','金','土'][new Date(dateStr).getDay()]})</div>
+               <div className="text-[12px] text-slate-500 font-medium line-clamp-1 break-all pr-2 mt-0.5">{project?.name}</div>
+             </div>
+             <button onClick={() => setMobileCellModalState({ ...mobileCellModalState, isOpen: false })} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors flex-shrink-0">
+               <X className="w-5 h-5"/>
+             </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-3 custom-scrollbar flex flex-col gap-4">
+             {/* 既に配置されているリソース一覧 */}
+             <div className="bg-white rounded border border-slate-200 shadow-sm p-3">
+               <div className="text-[12px] font-bold text-slate-700 flex items-center gap-1.5 mb-2 pb-1.5 border-b border-slate-100"><Users className="w-3.5 h-3.5"/> 配置済みリソース</div>
+               {asg.length === 0 ? (
+                 <div className="text-[11px] text-slate-400 py-2 text-center">配置されていません</div>
+               ) : (
+                 <div className="flex flex-col gap-1.5 mt-2">
+                   {asg.map(a => {
+                     const isWorker = !!a.worker_id;
+                     const isPartner = a.worker_master?.type === '協力会社';
+                     const canEdit = isAdmin || a.assigned_by === currentWorkerId;
+                     
+                     let bgClass = "bg-blue-50 border-blue-200 text-blue-800";
+                     if (isPartner) bgClass = "bg-purple-50 border-purple-200 text-purple-800";
+                     if (!isWorker) bgClass = "bg-teal-50 border-teal-200 text-teal-800";
+                     
+                     return (
+                       <div key={a.id} className={`flex items-center justify-between p-1.5 px-2 rounded border shadow-sm ${bgClass}`}>
+                         <span className="text-[12px] font-bold truncate pr-2">
+                           {a.worker_master?.name || a.vehicle_master?.vehicle_name}
+                           {isPartner && <span className="ml-2 font-black">× {a.count}</span>}
+                         </span>
+                         {canEdit && (
+                           <button onClick={(e) => { e.stopPropagation(); handleDeleteAssignmentMobile(a.id); }} className="p-1.5 text-rose-500 hover:bg-rose-100 rounded bg-white flex-shrink-0 border border-rose-200/50">
+                             <Trash2 className="w-3.5 h-3.5" />
+                           </button>
+                         )}
+                       </div>
+                     )
+                   })}
+                 </div>
+               )}
+             </div>
+
+             {/* 新規リソースの追加 */}
+             <div className="bg-white rounded border border-slate-200 shadow-sm p-3">
+               <div className="text-[12px] font-bold text-slate-700 mb-2 pb-1.5 border-b border-slate-100 flex items-center gap-1.5"><Plus className="w-3.5 h-3.5 text-blue-500"/> リソースを追加</div>
+               
+               {/* Categories */}
+               <div className="flex flex-col gap-3 mt-2">
+                  {(['president', 'employee', 'partner', 'vehicle', 'machine'] as const).map(catId => {
+                    // 非管理者は車両と建機のみ追加可能
+                    if (!isAdmin && (catId === 'president' || catId === 'employee' || catId === 'partner')) return null;
+                    
+                    const catNameMap = { president: '社長', employee: '作業員', partner: '協力会社', vehicle: '車両', machine: '建設機械' };
+                    const unassg = getUnassignedResources(dateStr, catId);
+                    
+                    if (unassg.length === 0) return null;
+                     
+                    return (
+                      <div key={catId} className="flex flex-col gap-1.5">
+                        <div className="text-[11px] font-bold text-slate-500 flex justify-between items-center">
+                          {catNameMap[catId]}
+                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[9px]">{unassg.length}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {unassg.map(r => (
+                            <button
+                              key={r.id}
+                              onClick={() => handleAddAssignmentMobile(r.id)}
+                              className="px-2 py-1.5 bg-slate-50 border border-slate-200 rounded text-[11px] font-bold text-slate-700 shadow-sm hover:bg-blue-50 active:bg-blue-100 transition-colors"
+                            >
+                              {r.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+               </div>
+             </div>
+          </div>
+        </div>
+      </>,
+      document.body
+    );
+  };
+
   // --- Render Mobile View (Horizontal 1-Week Scroll) ---
   if (isMobile) {
     const prevWeek = () => setCurrentDate(subDays(currentDate, 7))
@@ -884,7 +1019,11 @@ export default function ScheduleManagement() {
                            const isShort = daily?.planned_count && sumWorkers < daily.planned_count;
 
                            return (
-                             <td key={i} className={`group/cell p-1 border-r border-slate-100 align-top w-[100px] min-w-[100px] max-w-[100px] relative ${isColToday ? 'bg-blue-50/20' : ''}`}>
+                             <td 
+                               key={i} 
+                               className={`group/cell p-1 border-r border-slate-100 align-top w-[100px] min-w-[100px] max-w-[100px] relative cursor-pointer hover:bg-slate-50 transition-colors ${isColToday ? 'bg-blue-50/20' : ''}`}
+                               onClick={() => setMobileCellModalState({ isOpen: true, projectId: p.id, dateStr: dStr, dailyDataId: daily?.id })}
+                             >
                                <div className="flex flex-col gap-1 min-h-[40px]">
                                   {/* 予定人数とコメント入力エリア */}
                                   <div className="flex items-start justify-between mb-0.5 border-b border-slate-100 pb-0.5 gap-1">
@@ -943,6 +1082,13 @@ export default function ScheduleManagement() {
                                          {v.vehicle_master?.vehicle_name}
                                        </div>
                                      ))}
+                                     
+                                     {/* +追加ボタン（見た目のみ、タップは親のtd要素で処理される） */}
+                                     <div className="mt-1 flex justify-center">
+                                       <div className="text-[9px] text-slate-400 border border-slate-200 border-dashed rounded bg-slate-50 w-full py-0.5 flex items-center justify-center gap-0.5 hover:bg-slate-100 transition-colors">
+                                         <Plus className="w-2.5 h-2.5" /> 追加
+                                       </div>
+                                     </div>
                                   </div>
                                </div>
                              </td>
@@ -960,6 +1106,7 @@ export default function ScheduleManagement() {
          {/* ボトムスペーサー代わり */}
          <div className="h-6 shrink-0 bg-slate-50"></div>
          {renderCellModals()}
+         {renderMobileCellModal()}
       </div>
     )
   }
