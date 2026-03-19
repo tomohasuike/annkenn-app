@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase"
-import { Truck, Wrench, ShieldCheck, Camera, History, Loader2, Save, AlertTriangle, AlertCircle, X, CheckCircle2, ChevronRight, UploadCloud } from "lucide-react"
-import { format, isThisMonth } from "date-fns"
+import { Truck, Wrench, ShieldCheck, Camera, History, Loader2, Save, AlertTriangle, AlertCircle, X, CheckCircle2 } from "lucide-react"
+import { format } from "date-fns"
 import imageCompression from 'browser-image-compression'
 
 interface Vehicle {

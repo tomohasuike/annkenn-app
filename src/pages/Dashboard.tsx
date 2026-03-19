@@ -48,6 +48,7 @@ export default function Dashboard() {
 
   const getProjectDisplayName = (p: any) => {
       if (!p) return '名称未設定';
+      if (isVacationOrMisc(p)) return 'Day off';
       const num = p.project_number ? `${p.project_number}　` : '';
       const name = p.project_name || p.name || '名称未設定';
       const clientOrSite = formatSiteName(p);
@@ -1025,7 +1026,7 @@ export default function Dashboard() {
                       <div className="flex items-center mb-3">
                          <div className="flex items-center gap-2 max-w-[calc(100%-70px)]">
                              <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${isVacation ? 'bg-orange-100/70 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                {p.project_number || '番号なし'}
+                                {isVacation ? 'Day off' : (p.project_number || '番号なし')}
                              </span>
                              <span className={`font-bold text-sm truncate ${isVacation ? 'text-orange-900' : 'text-slate-700'}`} title={getProjectDisplayName(p)}>
                                {isVacation && <span className="text-orange-500 mr-1">■</span>}
@@ -1116,7 +1117,7 @@ export default function Dashboard() {
                       <div className="flex items-center mb-3">
                          <div className="flex items-center gap-2 max-w-[calc(100%-70px)]">
                              <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${isVacation ? 'bg-orange-100/70 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                {p.project_number || '番号なし'}
+                                {isVacation ? 'Day off' : (p.project_number || '番号なし')}
                              </span>
                              <span className={`font-bold text-sm truncate ${isVacation ? 'text-orange-900' : 'text-slate-700'}`} title={getProjectDisplayName(p)}>
                                {isVacation && <span className="text-orange-500 mr-1">■</span>}
