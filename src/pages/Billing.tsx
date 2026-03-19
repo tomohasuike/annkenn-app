@@ -47,9 +47,13 @@ export default function Billing() {
   const [projects, setProjects] = useState<ProjectData[]>([]) // For Projects tab
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [activeTab, setActiveTab] = useState<"projects" | "pending" | "completed" | "summary" | "pending_summary">("pending")
+  const [activeTab, setActiveTab] = useState<"projects" | "pending" | "completed" | "summary" | "pending_summary">(
+    () => (sessionStorage.getItem('billingActiveTab') as any) || "pending"
+  )
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null)
-  const [projectStatusFilter, setProjectStatusFilter] = useState("着工中 (未請求)")
+  const [projectStatusFilter, setProjectStatusFilter] = useState(
+    () => sessionStorage.getItem('billingProjectStatusFilter') || "着工中 (未請求)"
+  )
   const [summaryMonthFilter, setSummaryMonthFilter] = useState<string>("ALL")
   const [summaryCategoryFilter, setSummaryCategoryFilter] = useState<string>("ALL")
   const [expandedSummaryCategories, setExpandedSummaryCategories] = useState<Record<string, boolean>>({})
@@ -72,6 +76,14 @@ export default function Billing() {
       [categoryName]: prev[categoryName] !== undefined ? !prev[categoryName] : false
     }))
   }
+
+  useEffect(() => {
+    sessionStorage.setItem('billingActiveTab', activeTab)
+  }, [activeTab])
+
+  useEffect(() => {
+    sessionStorage.setItem('billingProjectStatusFilter', projectStatusFilter)
+  }, [projectStatusFilter])
 
   useEffect(() => {
     checkAccessAndFetchData()
