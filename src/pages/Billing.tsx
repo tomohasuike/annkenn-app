@@ -369,7 +369,7 @@ export default function Billing() {
       else if (d.expected_deposit_date) allDates.push(d.expected_deposit_date)
     })
 
-    const isCompleted = hasDetails && inv.billing_category === "完成" && allPaid
+    const isCompleted = hasDetails && allPaid
 
     const lastDateStr = allDates.length > 0 ? allDates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime()).reverse()[0] : null
     const lastDepositDateDate = lastDateStr ? new Date(lastDateStr) : new Date(0);
@@ -415,7 +415,8 @@ export default function Billing() {
 
   // Extract unique months (YYYY-MM) from completed invoices for the filter dropdown
   const availableMonths = Array.from(new Set(
-    completedInvoices
+    enrichedInvoices
+      .filter(inv => inv.totalBilled > 0)
       .filter(isNotVacation)
       .map(inv => {
         if (!inv.lastDepositDate || inv.lastDepositDate === "-") return null
@@ -430,6 +431,10 @@ export default function Billing() {
     pendingInvoices
       .filter(isNotVacation)
       .flatMap(inv => inv.invoice_details || [])
+      .filter(d => {
+        const ds = d.details_status;
+        return ds !== "入金済" && ds !== "完了" && ds !== "未請求";
+      })
       .map(d => {
         if (!d.expected_deposit_date) return null
         const date = new Date(d.expected_deposit_date)
@@ -444,7 +449,8 @@ export default function Billing() {
 
   // Extract unique categories from completed invoices for the filter dropdown
   const availableCategories = Array.from(new Set(
-    completedInvoices
+    enrichedInvoices
+      .filter(inv => inv.totalBilled > 0)
       .filter(isNotVacation)
       .map(inv => (inv.primaryProj as any)?.category)
       .filter(Boolean) as string[]
@@ -733,7 +739,7 @@ export default function Billing() {
             ) : activeTab === "summary" ? (
               /* Summary Tab Content */
               (() => {
-                // Aggregate data from completedInvoices
+                // Aggregate data from enrichedInvoices
                 let grandTotal = 0
                 
                 type CategoryGroup = {
@@ -742,7 +748,8 @@ export default function Billing() {
                 };
                 const categoryTotals: Record<string, CategoryGroup> = {}
 
-                const invoicesToProcess = completedInvoices.filter(inv => {
+                const invoicesToProcess = enrichedInvoices.filter(inv => {
+                   if (inv.totalBilled === 0) return false
                    const proj = inv.primaryProj as Partial<ProjectData>
                    if (proj?.project_number === 'VACATION' || (proj?.project_name && proj.project_name.includes('休暇'))) return false
                    
@@ -929,7 +936,7 @@ export default function Billing() {
                   
                   details.forEach(detail => {
                     const ds = determineStatusForDetail(detail)
-                    if (ds === "入金済" || ds === "完了") return // Skip paid details
+                    if (ds === "入金済" || ds === "完了" || ds === "未請求") return // Skip paid and unbilled details
                     
                     const amt = Number(detail.amount) || 0
                     if (amt === 0) return
@@ -1388,55 +1395,85 @@ export default function Billing() {
                   <tr>
                     <th className="px-6 py-4 border-b border-slate-200">対象工事 / 案件名</th>
                     <th className="px-6 py-4 border-b border-slate-200">請求項目</th>
-                    <th className="px-6 py-4 border-b border-slate-200 text-center">入金日</th>
-                    <th className="px-6 py-4 border-b border-slate-200 text-right">請求額</th>
+                    <th className="px-6 py-4 border-b border-slate-200 text-center">入金日/予定日</th>
+                    <th className="px-6 py-4 border-b border-slate-200 text-right">
+                      {activeTab === 'pending_summary' ? '未入金額' : '入金完了額'}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {selectedClientDetails.invoices.map((inv, idx) => {
+                  {selectedClientDetails.invoices.flatMap((inv, idx) => {
                     const pName = inv.primaryProj?.project_name || "案件名未設定"
                     const pNum = inv.primaryProj?.project_number
                     const legacyId = inv.primaryProj?.legacy_id
                     
-                    return (
-                      <tr key={idx} className="hover:bg-slate-50/80 transition-colors group">
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col gap-1">
-                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex gap-2">
-                               {legacyId && <span>ID: <span className="bg-slate-100 text-slate-600 px-1 py-0.5 rounded">{legacyId}</span></span>}
-                               {pNum && <span>NO: <span className="bg-slate-100 text-slate-600 px-1 py-0.5 rounded">{pNum}</span></span>}
+                    return (inv.invoice_details || []).map((detail: any, dIdx: number) => {
+                      const ds = detail.details_status;
+                      
+                      // Filter logic exactly matching the tab aggregation
+                      if (activeTab === 'pending_summary') {
+                        if (ds === "入金済" || ds === "完了" || ds === "未請求") return null;
+                      } else {
+                        // summary tab
+                        if (ds !== "入金済" && ds !== "完了") return null;
+                      }
+
+                      const amt = Number(detail.amount) || 0;
+                      if (amt === 0) return null;
+
+                      let displayDate = activeTab === 'pending_summary'
+                        ? (detail.expected_deposit_date || "---")
+                        : (detail.deposit_date || detail.billing_date || "---");
+
+                      if (displayDate !== "---") {
+                         const parsed = new Date(displayDate);
+                         if (!isNaN(parsed.getTime())) {
+                            const days = ["日", "月", "火", "水", "木", "金", "土"];
+                            displayDate = `${parsed.getFullYear()}/${parsed.getMonth()+1}/${parsed.getDate()}(${days[parsed.getDay()]})`;
+                         }
+                      }
+                    
+                      return (
+                        <tr key={`${idx}-${dIdx}`} className="hover:bg-slate-50/80 transition-colors group">
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col gap-1">
+                              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex gap-2">
+                                 {legacyId && <span>ID: <span className="bg-slate-100 text-slate-600 px-1 py-0.5 rounded">{legacyId}</span></span>}
+                                 {pNum && <span>NO: <span className="bg-slate-100 text-slate-600 px-1 py-0.5 rounded">{pNum}</span></span>}
+                              </div>
+                              <div 
+                                className="font-bold text-slate-700 group-hover:text-blue-700 transition-colors cursor-pointer hover:underline"
+                                onClick={() => {
+                                  setSelectedClientDetails(null)
+                                  navigate(`/billing/${inv.id}`)
+                                }}
+                              >
+                                {pName}
+                              </div>
                             </div>
-                            <div 
-                              className="font-bold text-slate-700 group-hover:text-blue-700 transition-colors cursor-pointer hover:underline"
-                              onClick={() => {
-                                setSelectedClientDetails(null)
-                                navigate(`/billing/${inv.id}`)
-                              }}
-                            >
-                              {pName}
+                          </td>
+                          <td className="px-6 py-4">
+                             <div className="text-slate-600 font-medium">
+                               {inv.billing_subject || "---"}
+                               {detail.billing_month ? ` (${detail.billing_month})` : ''}
+                             </div>
+                             <div className="text-xs text-slate-400 mt-1">
+                               {inv.billing_category}
+                             </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded bg-slate-100 text-slate-600 font-mono text-xs font-medium">
+                              {displayDate}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className={`font-mono text-lg font-bold ${activeTab === 'pending_summary' ? 'text-rose-600' : 'text-slate-700'}`}>
+                              ¥{amt.toLocaleString()}
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                           <div className="text-slate-600 font-medium">
-                             {inv.billing_subject || "---"}
-                           </div>
-                           <div className="text-xs text-slate-400 mt-1">
-                             {inv.billing_category}
-                           </div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded bg-slate-100 text-slate-600 font-mono text-xs font-medium">
-                            {inv.lastDepositDate || "---"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="font-mono text-lg font-bold text-slate-700">
-                            ¥{(inv.totalBilled || 0).toLocaleString()}
-                          </div>
-                        </td>
-                      </tr>
-                    )
+                          </td>
+                        </tr>
+                      )
+                    })
                   })}
                 </tbody>
               </table>
@@ -1446,8 +1483,17 @@ export default function Billing() {
             <div className="px-6 py-5 border-t bg-slate-50 flex justify-end items-center relative z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
               <div className="text-right flex items-center gap-4 bg-white px-6 py-3 rounded-xl border shadow-sm">
                 <span className="text-sm text-slate-500 font-bold tracking-widest uppercase">合計金額</span>
-                <span className="text-3xl font-black text-indigo-600 font-mono tracking-tight">
-                  ¥{selectedClientDetails.invoices.reduce((sum, inv) => sum + (inv.totalBilled || 0), 0).toLocaleString()}
+                <span className={`text-3xl font-black font-mono tracking-tight ${activeTab === 'pending_summary' ? 'text-rose-600' : 'text-indigo-600'}`}>
+                  ¥{selectedClientDetails.invoices.reduce((sum, inv) => {
+                    const displayAmount = activeTab === 'pending_summary' 
+                      ? (inv.invoice_details || []).reduce((s: number, d: any) => {
+                          const ds = d.details_status;
+                          if (ds === "入金済" || ds === "完了" || ds === "未請求") return s;
+                          return s + (Number(d.amount) || 0);
+                        }, 0)
+                      : (inv.totalBilled || 0);
+                    return sum + displayAmount;
+                  }, 0).toLocaleString()}
                 </span>
               </div>
             </div>
