@@ -17,6 +17,7 @@ import WorkSummary from "./pages/work-summary/WorkSummary"
 import SafetyReportForm from "./pages/SafetyReportForm"
 import SafetyDashboard from "./pages/SafetyDashboard"
 import Settings from './pages/Settings'
+import VehicleInspection from "./pages/VehicleInspection"
 
 import Login from "./pages/Login"
 import ProtectedRoute from "./components/auth/ProtectedRoute"
@@ -60,6 +61,7 @@ function App() {
               <Route path="work-summary" element={<WorkSummary />} />
               <Route path="workers" element={<WorkersPlaceholder />} />
               <Route path="safety-dashboard" element={<SafetyDashboard />} />
+              <Route path="vehicle-inspection" element={<VehicleInspection />} />
               <Route path="settings" element={<Settings />} />
             </Route>
           </Route>

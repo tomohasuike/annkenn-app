@@ -47,6 +47,7 @@ const APPS = [
   { id: 'schedule-admin', name: '工程管理(フル)' },
   { id: 'work-summary', name: '作業集計管理' },
   { id: 'billing', name: '請求管理' },
+  { id: 'vehicle-inspection', name: '車両点検' },
   { id: 'safety-dashboard', name: '安否確認管理' }
 ]
 
@@ -124,6 +125,7 @@ export default function Settings() {
       const { data: vehicleData, error: vehicleErr } = await supabase
         .from('vehicle_master')
         .select('*')
+        .or('is_inspection_only.is.null,is_inspection_only.eq.false')
         .order('id', { ascending: true })
         
       if (vehicleErr) throw vehicleErr
@@ -184,23 +186,23 @@ export default function Settings() {
   const savePermissions = async () => {
     setSaving(true)
     try {
-      // Setup promises for all updates (display order + permissions)
-      const updates = workers.map((w, index) => {
-          return supabase.from('worker_master')
+      for (let i = 0; i < workers.length; i++) {
+          const w = workers[i];
+          const { error } = await supabase.from('worker_master')
             .update({
                 is_admin: w.is_admin,
                 allowed_apps: w.allowed_apps,
-                display_order: index + 1
+                display_order: i + 1
             })
             .eq('id', w.id);
-      });
-      
-      // Execute all updates concurrently in batches
-      await Promise.all(updates);
+            
+          if (error) throw new Error(`権限更新エラー (${w.name}): ${error.message}`);
+      }
       alert('権限と表示順を保存しました。');
-    } catch (e) {
+    } catch (e: any) {
       console.error(e)
-      alert('保存に失敗しました。')
+      alert(`保存に失敗しました: ${e.message}`)
+
     } finally {
       setSaving(false)
     }

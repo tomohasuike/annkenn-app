@@ -7,7 +7,8 @@ import {
   RefreshCw,
   Edit3,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
@@ -56,6 +57,7 @@ export default function SafetyDashboard() {
   // Sending notification state
   const [sendingAlert, setSendingAlert] = useState(false);
   const [modalMessage, setModalMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const pdfTargetRef = useRef<HTMLDivElement>(null);
 
@@ -63,10 +65,11 @@ export default function SafetyDashboard() {
     try {
       setRefreshing(true);
       
-      // 1. Fetch Workers
+      // 1. Fetch Workers (Exclude subcontractors: 協力会社)
       const { data: workerData, error: workerErr } = await supabase
         .from('worker_master')
         .select('id, name')
+        .neq('type', '協力会社')
         .order('name');
       if (workerErr) throw workerErr;
       setWorkers(workerData || []);
@@ -212,6 +215,25 @@ export default function SafetyDashboard() {
     }
   };
 
+  const executeDelete = async () => {
+    if (selectedEventId === 'all') return;
+
+    try {
+      const { error } = await supabase
+        .from('safety_notification_history')
+        .delete()
+        .eq('id', selectedEventId);
+        
+      if (error) throw error;
+      
+      setModalMessage({ type: 'success', text: '通知履歴を削除しました。' });
+      setSelectedEventId('all');
+      fetchData();
+    } catch (err: any) {
+      setModalMessage({ type: 'error', text: `削除エラー: ${err.message}` });
+    }
+  };
+
   const handlePdfExport = async () => {
     const target = pdfTargetRef.current;
     if (!target) return;
@@ -333,6 +355,15 @@ export default function SafetyDashboard() {
                   </option>
                 ))}
               </select>
+              {selectedEventId !== 'all' && (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                  title="この履歴を削除"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </div>
             
             <button 
@@ -569,6 +600,48 @@ export default function SafetyDashboard() {
                 className="px-6 py-2 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-700 transition-colors shadow-sm"
               >
                 確認 (OK)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 print-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-4 flex items-center gap-3 border-b bg-red-50 border-red-100">
+              <div className="p-2 rounded-full bg-red-100 text-red-600">
+                <Trash2 size={24} />
+              </div>
+              <h3 className="font-bold text-lg text-red-800">
+                履歴の削除
+              </h3>
+            </div>
+            <div className="p-6 text-slate-700 font-medium leading-relaxed break-words">
+              選択中の通知履歴を削除します。よろしいですか？<br/>
+              <span className="text-sm text-red-500 mt-2 block font-bold text-left">
+                ※ 本番（緊急）の履歴は削除しないことをおすすめします。
+              </span>
+            </div>
+            <div className="px-6 pb-6 flex justify-end gap-3">
+              <button 
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
+              >
+                キャンセル
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  executeDelete();
+                }}
+                className="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors shadow-sm flex items-center gap-1.5"
+              >
+                <Trash2 size={16} />
+                <span>削除する</span>
               </button>
             </div>
           </div>

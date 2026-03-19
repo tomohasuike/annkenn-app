@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ShieldCheck, HardHat, FileText, AlertTriangle, CheckCircle2, FileCheck2, Loader2, Clock, LayoutDashboard, CalendarClock, ChevronDown, ChevronUp } from "lucide-react"
+import { ShieldCheck, HardHat, FileText, AlertTriangle, CheckCircle2, FileCheck2, Loader2, Clock, LayoutDashboard, CalendarClock, ChevronDown, ChevronUp, Truck, Wrench } from "lucide-react"
 import { supabase } from "../lib/supabase"
 import * as dateFns from "date-fns"
 
@@ -19,11 +19,18 @@ export default function Dashboard() {
   const [recentReports, setRecentReports] = useState<any[]>([]);
   const [submittedTodayReports, setSubmittedTodayReports] = useState<Record<string, string>>({});
   const [submittedTomorrowReports, setSubmittedTomorrowReports] = useState<Record<string, string>>({});
+  const [vehicleAlerts, setVehicleAlerts] = useState<{
+      uninspected: { id: string, name: string, category: string }[],
+      oilOverdue: { id: string, name: string, category: string, diff: number }[]
+  }>({ uninspected: [], oilOverdue: [] });
   const [tomorrowPlans, setTomorrowPlans] = useState<any[]>([]);
   const [currentWorkerId, setCurrentWorkerId] = useState<string | null>(null);
   
   const [allWorkers, setAllWorkers] = useState<any[]>([]);
   const [allWorkersWeeklySchedules, setAllWorkersWeeklySchedules] = useState<any[]>([]);
+
+  // Safety Status State
+  const [showSafetyReportPrompt, setShowSafetyReportPrompt] = useState(false);
 
   // Billing States
   const [fiscalYearSales, setFiscalYearSales] = useState(0);
@@ -96,6 +103,31 @@ export default function Dashboard() {
   const fiscalYearStartStr = dateFns.format(fiscalStart, 'yyyy-MM-dd');
   const fiscalYearEndStr = dateFns.format(fiscalEnd, 'yyyy-MM-dd');
 
+  // 1.5. Check Safety Report Status
+  if (workerId) {
+      const { data: latestEvent } = await supabase
+          .from('safety_notification_history')
+          .select('sent_at')
+          .order('sent_at', { ascending: false })
+          .limit(1)
+          .single();
+          
+      if (latestEvent) {
+           const { data: myReport } = await supabase
+               .from('safety_reports')
+               .select('id')
+               .eq('worker_id', workerId)
+               .gte('created_at', latestEvent.sent_at)
+               .limit(1);
+               
+           if (!myReport || myReport.length === 0) {
+               setShowSafetyReportPrompt(true);
+           } else {
+               setShowSafetyReportPrompt(false);
+           }
+      }
+  }
+
   // 2. Fetch Assignments for Today and Tomorrow
       // Today schedules
       const { data: schedules } = await supabase
@@ -149,7 +181,7 @@ export default function Dashboard() {
               project_id,
               assignment_date,
               worker_id,
-              project:projects ( id, project_name, site_name, project_number, category, client_name )
+              project:projects ( id, project_name, site_name, project_number, category, client_name, folder_url )
           `)
           .gte('assignment_date', todayStr)
           .lte('assignment_date', weeklyEndStr)
@@ -264,6 +296,37 @@ export default function Dashboard() {
         setOverdueInvoices(overdue);
       }
 
+      // 6. Fetch Vehicle Inspections Alerts
+      const startOfMonthStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+      const { data: vData } = await supabase.from('vehicle_master').select('id, vehicle_name, category, last_inspected_mileage, last_oil_change_mileage');
+      const { data: iData } = await supabase.from('vehicle_inspections').select('id, vehicle_id, created_at, action_type').gte('created_at', startOfMonthStr);
+      
+      if (vData) {
+          const inspectedThisMonth = new Set((iData || []).filter(i => i.action_type === '点検').map(i => i.vehicle_id));
+          
+          const uninspected: typeof vehicleAlerts.uninspected = [];
+          const oilOverdue: typeof vehicleAlerts.oilOverdue = [];
+          
+          vData.forEach(v => {
+              // Hide 建設機械 from Dashboard alerts
+              if (v.category === '建設機械') return;
+
+              if (!inspectedThisMonth.has(v.id)) {
+                  uninspected.push({ id: v.id, name: v.vehicle_name, category: v.category });
+              }
+              
+              const current = Math.max(v.last_inspected_mileage || 0, v.last_oil_change_mileage || 0);
+              if (v.last_oil_change_mileage) {
+                  const diff = current - v.last_oil_change_mileage;
+                  if (diff >= 8000) {
+                      oilOverdue.push({ id: v.id, name: v.vehicle_name, category: v.category, diff });
+                  }
+              }
+          });
+          
+          setVehicleAlerts({ uninspected, oilOverdue });
+      }
+
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {
@@ -374,15 +437,31 @@ export default function Dashboard() {
           </h1>
           <p className="text-sm text-slate-500 mt-1">本日の状況と重要なアラートを確認できます。</p>
         </div>
-
-        <button 
-          onClick={() => navigate('/safety-report')}
-          className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-full shadow-md hover:shadow-lg transition-all flex items-center gap-2 animate-pulse shrink-0"
-        >
-          <ShieldCheck className="w-6 h-6" />
-          <span>緊急安否報告</span>
-        </button>
       </div>
+
+      {/* Safety Report Alert - Only show if active */}
+      {showSafetyReportPrompt && (
+        <div className="bg-red-600/10 border-l-4 border-red-600 p-4 rounded-r-lg mb-2 flex flex-col sm:flex-row gap-4 items-center justify-between animate-fade-in shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="bg-red-100 p-2 rounded-full shrink-0">
+              <ShieldCheck className="w-6 h-6 text-red-600 animate-pulse" />
+            </div>
+            <div>
+              <p className="font-bold text-red-800 text-lg">緊急：安否確認のお願い</p>
+              <p className="text-red-700 text-sm mt-0.5">
+                安否確認の通知が発信されています。ご自身の安全状況を速やかに報告してください。
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => navigate('/safety-report')}
+            className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 animate-bounce-slow shrink-0 whitespace-nowrap"
+          >
+            <ShieldCheck className="w-5 h-5" />
+            <span>安否状況を報告する</span>
+          </button>
+        </div>
+      )}
 
       {/* SUMMARY CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -507,7 +586,13 @@ export default function Dashboard() {
                                       return (
                                         <div key={assignment.id} 
                                              className="text-[10px] bg-white border border-sky-200 rounded-md p-1.5 shadow-[0_1px_1px_rgba(0,0,0,0.02)] cursor-pointer hover:border-sky-400 transition-colors flex flex-col gap-0.5"
-                                             onClick={() => navigate('/projects/'+p?.id)}
+                                             onClick={() => {
+                                                if (p?.folder_url) {
+                                                    window.open(p.folder_url, '_blank');
+                                                } else {
+                                                    navigate('/projects/'+p?.id);
+                                                }
+                                             }}
                                         >
                                           <div className="flex items-center gap-1 shrink-0 overflow-hidden">
                                             {p?.project_number && (
@@ -568,7 +653,13 @@ export default function Dashboard() {
                                     return (
                                       <div key={assignment.id} 
                                            className="text-[10px] bg-indigo-50 border border-indigo-100 rounded-md p-1.5 shadow-[0_1px_1px_rgba(0,0,0,0.02)] cursor-pointer hover:border-indigo-300 transition-colors flex flex-col gap-0.5"
-                                           onClick={() => navigate('/projects/'+p?.id)}
+                                           onClick={() => {
+                                              if (p?.folder_url) {
+                                                  window.open(p.folder_url, '_blank');
+                                              } else {
+                                                  navigate('/projects/'+p?.id);
+                                              }
+                                           }}
                                       >
                                         <div className="flex items-center gap-1 shrink-0 overflow-hidden">
                                           {p?.project_number && (
@@ -790,6 +881,57 @@ export default function Dashboard() {
                          );
                       })}
                     </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* Vehicle Inspection Alerts */}
+              {(vehicleAlerts.uninspected.length > 0 || vehicleAlerts.oilOverdue.length > 0) && (
+                <div className="p-4 flex items-start gap-4 border-b last:border-0 border-slate-100 bg-sky-50/50">
+                  <div className="shrink-0 mt-0.5 relative">
+                      <Truck className="w-5 h-5 text-sky-600" />
+                      <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-white"></div>
+                  </div>
+                  <div className="w-full">
+                    <h3 className="text-sm font-bold text-sky-800">車両の点検・整備アラート</h3>
+                    {vehicleAlerts.uninspected.length > 0 && (
+                      <div className="mt-2 mb-3">
+                         <p className="text-[13px] font-bold text-red-600 mb-1 flex items-center gap-1">
+                             <AlertTriangle className="w-3.5 h-3.5" />
+                             今月の点検が未実施の車両 ({vehicleAlerts.uninspected.length}台)
+                         </p>
+                         <div className="flex flex-wrap gap-1.5 mt-1.5">
+                             {vehicleAlerts.uninspected.map(v => (
+                                 <span key={v.id} className="inline-flex items-center gap-1 bg-white border border-red-200 text-red-700 text-xs px-2 py-1 rounded shadow-sm">
+                                     {v.category === '建設機械' ? <Wrench className="w-3 h-3 text-purple-600" /> : <Truck className="w-3 h-3 text-blue-600" />}
+                                     {v.name}
+                                 </span>
+                             ))}
+                         </div>
+                      </div>
+                    )}
+                    
+                    {vehicleAlerts.oilOverdue.length > 0 && (
+                      <div className="mt-3 mb-2">
+                         <p className="text-[13px] font-bold text-orange-600 mb-1 flex items-center gap-1">
+                             <AlertTriangle className="w-3.5 h-3.5" />
+                             オイル交換時期を超過している車両 ({vehicleAlerts.oilOverdue.length}台)
+                         </p>
+                         <div className="flex flex-wrap gap-1.5 mt-1.5">
+                             {vehicleAlerts.oilOverdue.map(v => (
+                                 <span key={v.id} className="inline-flex items-center gap-1 bg-white border border-orange-300 text-orange-800 text-xs px-2 py-1 rounded shadow-sm">
+                                     {v.category === '建設機械' ? <Wrench className="w-3 h-3 text-purple-600" /> : <Truck className="w-3 h-3 text-blue-600" />}
+                                     {v.name} <span className="opacity-70 ml-0.5">({v.diff.toLocaleString()}km超過)</span>
+                                 </span>
+                             ))}
+                         </div>
+                      </div>
+                    )}
+                    
+                    <button onClick={() => navigate('/vehicle-inspection')} className="mt-3 text-xs font-bold text-sky-700 bg-sky-100 hover:bg-sky-200 border border-sky-200 px-3 py-1.5 rounded-md transition-colors shadow-sm inline-flex items-center gap-1">
+                      <span>車両点検アプリを開く</span>
+                      <span className="text-lg leading-none transform translate-y-[-1px]">&rarr;</span>
+                    </button>
                   </div>
                 </div>
               )}

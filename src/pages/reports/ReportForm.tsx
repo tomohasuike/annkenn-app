@@ -158,7 +158,7 @@ export default function ReportForm() {
           return (a.name || '').localeCompare(b.name || '', 'ja');
       });
       
-      const { data: vData } = await supabase.from('vehicle_master').select('id, vehicle_name, category')
+      const { data: vData } = await supabase.from('vehicle_master').select('id, vehicle_name, category').or('is_inspection_only.is.null,is_inspection_only.eq.false')
       
       if (pData) {
         // 工程管理用の特別な案件（VACATIONなど）を除外

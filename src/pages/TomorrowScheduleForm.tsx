@@ -178,7 +178,7 @@ export default function TomorrowScheduleForm() {
         
       if (wData) setWorkersList(wData.map(w => ({ id: w.id, name: w.name })))
 
-      const { data: vData } = await supabase.from('vehicle_master').select('id, vehicle_name, category')
+      const { data: vData } = await supabase.from('vehicle_master').select('id, vehicle_name, category').or('is_inspection_only.is.null,is_inspection_only.eq.false')
       const finalVehiclesList = vData ? vData.map(v => ({ id: v.id, name: v.vehicle_name, category: v.category })) : [];
       setVehiclesList(finalVehiclesList)
 
@@ -733,32 +733,7 @@ export default function TomorrowScheduleForm() {
               </div>
             </section>
 
-            {/* ステータス */}
-            <section className="bg-card border rounded-xl shadow-sm overflow-hidden">
-                <div className="border-b bg-muted/30 px-6 py-4">
-                    <h3 className="font-semibold">手配・通達ステータス</h3>
-                </div>
-                <div className="p-6 space-y-6">
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">確定状態</label>
-                        <div className="flex flex-wrap gap-4">
-                            {['未定', '確定', '変更待ち', 'キャンセル'].map((status) => (
-                                <label key={status} className="flex items-center gap-2 cursor-pointer">
-                                    <input 
-                                        type="radio" 
-                                        name="send_flag"
-                                        value={status}
-                                        checked={schedule.send_flag === status}
-                                        onChange={(e) => setSchedule({...schedule, send_flag: e.target.value})}
-                                        className="w-4 h-4 text-primary focus:ring-primary border-gray-300"
-                                    />
-                                    <span className="text-sm">{status}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </section>
+
 
           </div>
         </div>

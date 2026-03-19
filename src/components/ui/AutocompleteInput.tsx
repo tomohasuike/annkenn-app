@@ -9,6 +9,7 @@ interface AutocompleteInputProps {
   columnName: string;
   projectId?: string | null;  // For filtering by project attributes
   filters?: Record<string, any>; // Optional additional strict filters
+  notFilters?: Record<string, any>; // Optional negative filters
   customFilter?: (item: any) => boolean; // Optional client-side filter
   placeholder?: string;
   className?: string;
@@ -22,6 +23,7 @@ export function AutocompleteInput({
   columnName,
   projectId,
   filters,
+  notFilters,
   customFilter,
   placeholder,
   className = '',
@@ -95,6 +97,13 @@ export function AutocompleteInput({
                 query = query.eq(key, val);
             });
         }
+        
+        // Apply negative filters if any
+        if (notFilters) {
+            Object.entries(notFilters).forEach(([key, val]) => {
+                query = query.neq(key, val);
+            });
+        }
 
         if (matchingProjectIds.length > 0) {
              if (tableName === 'completion_reports' || tableName === 'daily_reports') {
@@ -146,7 +155,7 @@ export function AutocompleteInput({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [value, isOpen, tableName, columnName, projectId, filters]);
+  }, [value, isOpen, tableName, columnName, projectId, filters, notFilters]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen) return;

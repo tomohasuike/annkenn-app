@@ -158,6 +158,7 @@ export default function SafetyReportForm() {
                 columnName="name"
                 value={workerName}
                 onChange={setWorkerName}
+                notFilters={{ type: '協力会社' }}
                 placeholder="名前を入力・選択"
                 required
                 className="font-bold border-slate-300"
