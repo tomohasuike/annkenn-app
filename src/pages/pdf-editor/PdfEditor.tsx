@@ -281,6 +281,54 @@ export default function PdfEditor() {
       }
   };
 
+  const performDriveOpenById = (fileIdToLoad: string) => {
+      if (!tokenClient || !isGoogleApiLoaded) return;
+      
+      tokenClient.callback = async (response: any) => {
+          if (response.error !== undefined) {
+              console.error(response);
+              toast.error('Google Drive認証に失敗しました');
+              return;
+          }
+          
+          try {
+              setIsMerging(true);
+              const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileIdToLoad}?fields=id,name,parents&supportsAllDrives=true`, {
+                  headers: { Authorization: `Bearer ${response.access_token}` }
+              });
+              if (!res.ok) throw new Error('Failed to fetch file metadata');
+              const metadata = await res.json();
+              const parentId = metadata.parents && metadata.parents.length > 0 ? metadata.parents[0] : null;
+              
+              const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileIdToLoad}?alt=media&supportsAllDrives=true`, {
+                  headers: { Authorization: `Bearer ${response.access_token}` }
+              });
+              if (!fileRes.ok) throw new Error('Failed to download file data');
+              const blob = await fileRes.blob();
+              const downloadedFile = new File([blob], metadata.name, { type: 'application/pdf' });
+              (downloadedFile as any).fileId = fileIdToLoad;
+              (downloadedFile as any).parentId = parentId;
+              
+              setFiles([downloadedFile]);
+              setDriveFileId(fileIdToLoad);
+              setPageAnnotations({});
+              setFilePageCounts([]);
+              setPageOrder([]);
+              setPast([]);
+              setFuture([]);
+              await loadProjectDataFromDrive(fileIdToLoad, response.access_token);
+              
+              toast.success('ドライブからファイルを読み込みました');
+          } catch (e) {
+              console.error(e);
+              toast.error('ドライブからのファイル読み込みに失敗しました');
+          } finally {
+              setIsMerging(false);
+          }
+      };
+      tokenClient.requestAccessToken({prompt: ''});
+  };
+
   useEffect(() => {
       const urlParams = new URLSearchParams(window.location.search);
       const stateParam = urlParams.get('state');
@@ -289,56 +337,16 @@ export default function PdfEditor() {
           try {
               const state = JSON.parse(stateParam);
               if (state.action === 'open' && state.ids && state.ids.length > 0) {
-                  const fileIdToLoad = state.ids[0];
+                  const targetFileId = state.ids[0];
                   
+                  // URLからパラメータを消去し、リロード時の無限ループ（再発火）を防ぐ
                   window.history.replaceState({}, document.title, window.location.pathname);
                   
-                  tokenClient.callback = async (response: any) => {
-                      if (response.error !== undefined) {
-                          console.error(response);
-                          toast.error('Google Drive認証に失敗しました');
-                          return;
-                      }
-                      
-                      try {
-                          setIsMerging(true);
-                          const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileIdToLoad}?fields=id,name,parents&supportsAllDrives=true`, {
-                              headers: { Authorization: `Bearer ${response.access_token}` }
-                          });
-                          if (!res.ok) throw new Error('Failed to fetch file metadata');
-                          const metadata = await res.json();
-                          const parentId = metadata.parents && metadata.parents.length > 0 ? metadata.parents[0] : null;
-                          
-                          const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileIdToLoad}?alt=media&supportsAllDrives=true`, {
-                              headers: { Authorization: `Bearer ${response.access_token}` }
-                          });
-                          if (!fileRes.ok) throw new Error('Failed to download file data');
-                          const blob = await fileRes.blob();
-                          const downloadedFile = new File([blob], metadata.name, { type: 'application/pdf' });
-                          (downloadedFile as any).fileId = fileIdToLoad;
-                          (downloadedFile as any).parentId = parentId;
-                          
-                          setFiles([downloadedFile]);
-                          setDriveFileId(fileIdToLoad);
-                          setPageAnnotations({});
-                          setFilePageCounts([]);
-                          setPageOrder([]);
-                          setPast([]);
-                          setFuture([]);
-                          await loadProjectDataFromDrive(fileIdToLoad, response.access_token);
-                          
-                          toast.success('ドライブからファイルを読み込みました');
-                      } catch (e) {
-                          console.error(e);
-                          toast.error('ドライブからのファイル読み込みに失敗しました');
-                      } finally {
-                          setIsMerging(false);
-                      }
-                  };
-                  tokenClient.requestAccessToken({prompt: ''});
+                  // ★ ここで既存のドライブ読み込み関数（対象のファイルIDを渡す）を呼び出す
+                  performDriveOpenById(targetFileId);
               }
           } catch (e) {
-              console.error('Invalid state parameter in URL', e);
+              console.error('Drive state parameterの解析に失敗しました:', e);
           }
       }
   }, [isGoogleApiLoaded, tokenClient, isMerging, files.length]);
