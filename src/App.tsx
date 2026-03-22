@@ -18,6 +18,7 @@ import SafetyReportForm from "./pages/SafetyReportForm"
 import SafetyDashboard from "./pages/SafetyDashboard"
 import Settings from './pages/Settings'
 import VehicleInspection from "./pages/VehicleInspection"
+import PdfEditor from "./pages/pdf-editor/PdfEditor"
 
 import Login from "./pages/Login"
 import ProtectedRoute from "./components/auth/ProtectedRoute"
@@ -37,6 +38,7 @@ function App() {
           {/* 安否確認フォーム (レイアウトなし・要認証) */}
           <Route element={<ProtectedRoute />}>
             <Route path="/safety-report" element={<SafetyReportForm />} />
+            <Route path="/pdf-editor" element={<PdfEditor />} />
           </Route>
           
           <Route element={<ProtectedRoute />}>

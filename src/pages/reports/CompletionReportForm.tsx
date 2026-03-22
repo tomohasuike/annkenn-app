@@ -351,6 +351,19 @@ export function CompletionReportForm() {
           }
       }
 
+      // Auto-update project status if inspection result is "合格" 
+      if (formData.inspection_result === '合格') {
+        const { error: projectStatusError } = await supabase
+          .from('projects')
+          .update({ status_flag: '完工' })
+          .eq('id', formData.project_id);
+          
+        if (projectStatusError) {
+          console.error('Failed to auto-update project status:', projectStatusError);
+          // Non-blocking error, we still want to indicate the report saved
+        }
+      }
+
       alert("完了報告を保存しました！");
       navigate('/reports'); // Go back to reports list, or maybe a dedicated completion reports list
       

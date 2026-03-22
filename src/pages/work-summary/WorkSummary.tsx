@@ -346,10 +346,32 @@ export default function WorkSummary() {
             <h2 className="text-xl font-bold mb-4 px-1 flex items-center gap-2"><Building2 className="text-orange-500 w-5 h-5" /> 協力会社別</h2>
             <div className="space-y-2">
               {data && Object.keys(data.companies).length > 0 ? (
-                 Object.entries(data.companies).sort((a,b) => b[1] - a[1]).map(([name, count]) => (
-                  <div key={name} className="flex justify-between items-center bg-card p-3 rounded-lg border shadow-sm hover:bg-muted/30 transition-colors">
-                    <span className="text-sm font-bold truncate mr-2">{name}</span>
-                    <span className="bg-orange-500 text-white px-2.5 py-0.5 rounded-full text-[11px] font-bold shrink-0">{count} 名</span>
+                 Object.entries(data.companies).sort((a,b) => b[1].total - a[1].total).map(([name, info]) => (
+                  <div key={name} className="bg-card rounded-lg border shadow-sm hover:border-orange-500/50 transition-colors overflow-hidden">
+                    <details className="group">
+                      <summary className="flex justify-between items-center p-3 cursor-pointer select-none list-none marker:hidden [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-border group-open:bg-muted/10 font-bold overflow-hidden">
+                        <div className="flex items-center gap-2 overflow-hidden flex-1 mr-3">
+                           <div className="w-5 h-5 bg-orange-100 rounded flex items-center justify-center shrink-0">
+                             <Building2 className="w-3 h-3 text-orange-600" />
+                           </div>
+                           <span className="text-sm truncate">{name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                           <span className="bg-orange-500 text-white px-2.5 py-0.5 rounded-full text-[11px] font-bold">{info.total} 名</span>
+                        </div>
+                      </summary>
+                      <div className="bg-muted/5 p-3 space-y-1.5 max-h-[300px] overflow-y-auto">
+                        {info.projects.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.date.localeCompare(b.date)).map((proj, idx) => (
+                           <div key={idx} className="flex justify-between items-center text-xs py-1 border-b border-border/50 last:border-0">
+                             <div className="flex flex-col flex-1 min-w-0 pr-3">
+                                <span className="text-[10px] bg-muted w-fit px-1 rounded text-muted-foreground font-medium mb-0.5">{proj.date}</span>
+                                <span className="truncate font-medium">{proj.projectName}</span>
+                             </div>
+                             <span className="shrink-0 text-[11px] bg-background border px-1.5 py-0.5 rounded shadow-sm text-foreground font-bold">{proj.count}名</span>
+                           </div>
+                        ))}
+                      </div>
+                    </details>
                   </div>
                  ))
               ) : <p className="text-muted-foreground italic text-sm px-1">利用実績がありません</p>}

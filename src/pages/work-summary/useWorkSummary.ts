@@ -54,7 +54,7 @@ export type StaffSummary = Record<WorkCategory, TimeDetail> & { displayName: str
 export type AggregationResult = {
   projects: Record<string, ProjectSummary>;
   staff: Record<string, StaffSummary>;
-  companies: Record<string, number>;
+  companies: Record<string, { total: number; projects: { date: string; projectName: string; count: number }[] }>;
   summary: SummaryStats;
 }
 
@@ -279,7 +279,30 @@ export function useWorkSummary() {
           const name = sub.subcontractor_name || '不明業者';
           pObj.partnerCount += count;
           results.summary.totalPeople += count;
-          results.companies[name] = (results.companies[name] || 0) + count;
+          
+          if (!results.companies[name]) {
+            results.companies[name] = { total: 0, projects: [] };
+          }
+          results.companies[name].total += count;
+          
+          let formattedDate = '不明';
+          if (row.report_date) {
+            const d = new Date(row.report_date);
+            if (!isNaN(d.getTime())) {
+              const days = ['日', '月', '火', '水', '木', '金', '土'];
+              const mm = String(d.getMonth() + 1).padStart(2, '0');
+              const dd = String(d.getDate()).padStart(2, '0');
+              formattedDate = `${mm}/${dd}(${days[d.getDay()]})`;
+            } else {
+              formattedDate = row.report_date.split('T')[0];
+            }
+          }
+
+          results.companies[name].projects.push({
+            date: formattedDate,
+            projectName: pName,
+            count: count
+          });
         });
 
         // Equipment

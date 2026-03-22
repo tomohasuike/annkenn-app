@@ -95,11 +95,12 @@ export default function ScheduleManagement() {
     dateStr: string;
     startTime: string;
     endTime: string;
+    modalType: 'personnel' | 'vehicle';
     selectedWorkers: string[];
     selectedVehicles: string[];
     selectedSubcontractors: { id: string, name: string, count: number }[];
   }>({
-    isOpen: false, projectId: '', projectName: '', dateStr: '', startTime: '', endTime: '', selectedWorkers: [], selectedVehicles: [], selectedSubcontractors: []
+    isOpen: false, projectId: '', projectName: '', dateStr: '', startTime: '', endTime: '', modalType: 'personnel', selectedWorkers: [], selectedVehicles: [], selectedSubcontractors: []
   });
   
   // Add Resource Modal
@@ -671,7 +672,7 @@ export default function ScheduleManagement() {
   };
 
   const handleSaveAddAssignment = async () => {
-    const { projectId, dateStr, startTime, endTime, selectedWorkers } = addAssignmentModalState;
+    const { projectId, dateStr, startTime, endTime, selectedWorkers, selectedSubcontractors, selectedVehicles, modalType } = addAssignmentModalState;
     if (!projectId || !dateStr) return;
 
     try {
@@ -680,9 +681,18 @@ export default function ScheduleManagement() {
       const st = startTime || null;
       const et = endTime || null;
 
-      selectedWorkers.forEach(wId => {
-         inserts.push({ project_id: projectId, assignment_date: dateStr, start_time: st, end_time: et, worker_id: wId, count: 1, assigned_by: currentWorkerId });
-      });
+      if (modalType === 'personnel') {
+        selectedWorkers.forEach(wId => {
+           inserts.push({ project_id: projectId, assignment_date: dateStr, start_time: st, end_time: et, worker_id: wId, count: 1, assigned_by: currentWorkerId });
+        });
+        selectedSubcontractors.filter(s => s.count > 0).forEach(s => {
+           inserts.push({ project_id: projectId, assignment_date: dateStr, start_time: st, end_time: et, worker_id: s.id, count: s.count, assigned_by: currentWorkerId });
+        });
+      } else if (modalType === 'vehicle') {
+        selectedVehicles.forEach(vId => {
+           inserts.push({ project_id: projectId, assignment_date: dateStr, start_time: null, end_time: null, vehicle_id: vId, count: 1, assigned_by: currentWorkerId });
+        });
+      }
 
       if (inserts.length > 0) {
          const { error } = await supabase.from('assignments').insert(inserts);
@@ -697,7 +707,7 @@ export default function ScheduleManagement() {
     }
   };
 
-  const handleOpenAddModal = (projectId: string, projectName: string, dateStr: string, startTime: string = '', endTime: string = '', e?: React.MouseEvent) => {
+  const handleOpenAddModal = (projectId: string, projectName: string, dateStr: string, startTime: string = '', endTime: string = '', e?: React.MouseEvent, modalType: 'personnel' | 'vehicle' = 'personnel') => {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     setAddAssignmentModalState({
       isOpen: true,
@@ -706,6 +716,7 @@ export default function ScheduleManagement() {
       dateStr,
       startTime: startTime || '',
       endTime: endTime || '',
+      modalType,
       selectedWorkers: [],
       selectedVehicles: [],
       selectedSubcontractors: resources.filter(r => r.type === 'worker' && r.categoryId === 'partner').map(r => ({ id: r.id, name: r.name, count: 0 }))
@@ -1796,7 +1807,8 @@ export default function ScheduleManagement() {
                                                          <span>{group.start?.substring(0,5)} 〜 {group.end?.substring(0,5)}</span>
                                                          {isAdmin && (
                                                            <div className="flex items-center gap-0.5">
-                                                             <button className="text-slate-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors" onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, group.start || '', group.end || '', e)} title="この時間帯に配置を追加"><Plus className="w-3 h-3"/></button>
+                                                             <button className="text-slate-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors" onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, group.start || '', group.end || '', e, 'personnel')} title="この時間帯に人員を配置"><Plus className="w-3 h-3"/></button>
+                                                             <button className="text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors" onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, group.start || '', group.end || '', e, 'vehicle')} title="この時間帯に車両・機械を配置"><Truck className="w-3 h-3"/></button>
                                                              {group.assignments.length === 0 && (
                                                                <button className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" onClick={(e) => { e.stopPropagation(); setCustomTimeBlocks(prev => { const newB = {...prev}; newB[`${p.id}-${dateStr}`] = newB[`${p.id}-${dateStr}`].filter(b => b.start_time !== group.start || b.end_time !== group.end); return newB; }) }} title="時間枠を削除"><X className="w-3 h-3"/></button>
                                                              )}
@@ -1857,9 +1869,14 @@ export default function ScheduleManagement() {
                                            })}
                                             {isAdmin && (
                                                 <div className="w-full flex justify-end mt-1 opacity-0 group-hover/parent:opacity-100 transition-opacity">
-                                                    <button onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, '', '', e)} className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded bg-white border border-slate-200 shadow-sm transition-colors" title="配置を追加">
+                                                  <div className="flex bg-slate-50 border border-slate-200 rounded shadow-sm overflow-hidden">
+                                                    <button onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, '', '', e, 'personnel')} className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-100 transition-colors" title="人員を配置">
                                                         <Plus className="w-3.5 h-3.5" />
                                                     </button>
+                                                    <button onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, '', '', e, 'vehicle')} className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-100 transition-colors border-l border-slate-200" title="車両・機械を配置">
+                                                        <Truck className="w-3.5 h-3.5" />
+                                                    </button>
+                                                  </div>
                                                 </div>
                                             )}
                                         </>
@@ -2082,8 +2099,8 @@ export default function ScheduleManagement() {
             <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-blue-50/50">
               <div>
                 <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                  <Plus className="w-5 h-5 text-blue-600" />
-                  配置の追加
+                  {addAssignmentModalState.modalType === 'personnel' ? <Users className="w-5 h-5 text-blue-600" /> : <Truck className="w-5 h-5 text-orange-600" />}
+                  {addAssignmentModalState.modalType === 'personnel' ? '人員・業者の配置を追加' : '車両・機械の配置を追加'}
                 </h3>
                 <p className="text-sm text-slate-500 mt-1 font-medium select-none truncate max-w-lg">
                   {addAssignmentModalState.projectName} - {format(new Date(addAssignmentModalState.dateStr), 'yyyy年MM月dd日')}
@@ -2099,66 +2116,201 @@ export default function ScheduleManagement() {
             
             <div className="p-5 flex-1 overflow-y-auto space-y-6 bg-slate-50/30">
                {/* 時間設定 */}
-               <div className="bg-white p-4 rounded border border-slate-200 shadow-sm">
-                  <h4 className="text-[0.9em] font-bold text-slate-700 mb-3 flex items-center gap-1"><Clock className="w-4 h-4 text-slate-400" />時間枠の指定</h4>
-                  <div className="flex items-center gap-2">
-                     <input 
-                       type="time" 
-                       value={addAssignmentModalState.startTime} 
-                       onChange={e => setAddAssignmentModalState(prev => ({ ...prev, startTime: e.target.value }))}
-                       className="border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500"
-                     />
-                     <span className="text-slate-400">〜</span>
-                     <input 
-                       type="time" 
-                       value={addAssignmentModalState.endTime} 
-                       onChange={e => setAddAssignmentModalState(prev => ({ ...prev, endTime: e.target.value }))}
-                       className="border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500"
-                     />
-                     <button onClick={() => setAddAssignmentModalState(prev => ({ ...prev, startTime: '', endTime: '' }))} className="ml-2 text-[0.8em] text-slate-400 hover:text-slate-600 underline">時間をクリア</button>
-                  </div>
-               </div>
+               {addAssignmentModalState.modalType === 'personnel' && (
+                 <div className="bg-white p-4 rounded border border-slate-200 shadow-sm">
+                    <h4 className="text-[0.9em] font-bold text-slate-700 mb-3 flex items-center gap-1"><Clock className="w-4 h-4 text-slate-400" />時間枠の指定</h4>
+                    <div className="flex items-center gap-2">
+                       <input 
+                         type="time" 
+                         value={addAssignmentModalState.startTime} 
+                         onChange={e => setAddAssignmentModalState(prev => ({ ...prev, startTime: e.target.value }))}
+                         className="border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500"
+                       />
+                       <span className="text-slate-400">〜</span>
+                       <input 
+                         type="time" 
+                         value={addAssignmentModalState.endTime} 
+                         onChange={e => setAddAssignmentModalState(prev => ({ ...prev, endTime: e.target.value }))}
+                         className="border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500"
+                       />
+                       <button onClick={() => setAddAssignmentModalState(prev => ({ ...prev, startTime: '', endTime: '' }))} className="ml-2 text-[0.8em] text-slate-400 hover:text-slate-600 underline">時間をクリア</button>
+                    </div>
+                 </div>
+               )}
 
-               {/* 人員選択 */}
-               <div className="bg-white p-4 rounded border border-slate-200 shadow-sm">
-                  <h4 className="text-[0.9em] font-bold text-slate-700 mb-3 flex items-center gap-1"><User className="w-4 h-4 text-blue-500" />自社人員</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                     {resources.filter(w => w.type === 'worker' && w.categoryId === 'employee' || w.categoryId === 'president').map(w => {
-                        const { isOverlap, isAlreadyHere, allAssignments } = getResourceAvailability(w.id, false);
-                        const isSelected = addAssignmentModalState.selectedWorkers.includes(w.id);
-                        
-                        // If already in this project at this time, we can still show them but disable them
-                        const isDisabled = isOverlap || isAlreadyHere;
-                        
-                        return (
-                          <div key={w.id} className="flex flex-col">
-                            <label className={`flex items-center gap-2 p-2 border rounded transition-colors ${isDisabled ? 'opacity-50 cursor-not-allowed border-slate-200 bg-slate-50' : isSelected ? 'border-blue-400 bg-blue-50 cursor-pointer' : 'border-slate-200 hover:bg-slate-50 cursor-pointer'}`}>
-                               <input 
-                                 type="checkbox" 
-                                 checked={isSelected || isAlreadyHere}
-                                 disabled={isDisabled}
-                                 onChange={(e) => {
-                                   if (e.target.checked) setAddAssignmentModalState(prev => ({ ...prev, selectedWorkers: [...prev.selectedWorkers, w.id] }));
-                                   else setAddAssignmentModalState(prev => ({ ...prev, selectedWorkers: prev.selectedWorkers.filter(id => id !== w.id) }));
-                                 }}
-                                 className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:bg-slate-200"
-                               />
-                               <span className="text-[0.85em] font-medium text-slate-700 truncate">{w.name}</span>
-                            </label>
-                            {allAssignments.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1 pl-1">
-                                {allAssignments.map(a => (
-                                  <span key={a.id} className={`text-[0.65em] px-1 py-0.5 rounded border ${isOverlap && checkTimeOverlap(addAssignmentModalState.startTime, addAssignmentModalState.endTime, a.start_time, a.end_time) ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
-                                    {a.project_id === addAssignmentModalState.projectId ? '【当案件】' : '【他案件】'}{a.start_time ? `${a.start_time.slice(0,5)}~${a.end_time?.slice(0,5)||''}` : '終日'}
-                                  </span>
-                                ))}
+               {addAssignmentModalState.modalType === 'personnel' && (
+                 <>
+                   {/* 自社人員選択 */}
+                   <div className="bg-white p-4 rounded border border-slate-200 shadow-sm">
+                      <h4 className="text-[0.9em] font-bold text-slate-700 mb-3 flex items-center gap-1"><User className="w-4 h-4 text-blue-500" />自社人員</h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                         {resources.filter(w => w.type === 'worker' && (w.categoryId === 'employee' || w.categoryId === 'president')).map(w => {
+                            const { isOverlap, isAlreadyHere, allAssignments } = getResourceAvailability(w.id, false);
+                            const isSelected = addAssignmentModalState.selectedWorkers.includes(w.id);
+                            
+                            // If already in this project at this time, we can still show them but disable them
+                            const isDisabled = isOverlap || isAlreadyHere;
+                            
+                            return (
+                              <div key={w.id} className="flex flex-col">
+                                <label className={`flex items-center gap-2 p-2 border rounded transition-colors ${isDisabled ? 'opacity-50 cursor-not-allowed border-slate-200 bg-slate-50' : isSelected ? 'border-blue-400 bg-blue-50 cursor-pointer' : 'border-slate-200 hover:bg-slate-50 cursor-pointer'}`}>
+                                   <input 
+                                     type="checkbox" 
+                                     checked={isSelected || isAlreadyHere}
+                                     disabled={isDisabled}
+                                     onChange={(e) => {
+                                       if (e.target.checked) setAddAssignmentModalState(prev => ({ ...prev, selectedWorkers: [...prev.selectedWorkers, w.id] }));
+                                       else setAddAssignmentModalState(prev => ({ ...prev, selectedWorkers: prev.selectedWorkers.filter(id => id !== w.id) }));
+                                     }}
+                                     className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:bg-slate-200"
+                                   />
+                                   <span className="text-[0.85em] font-medium text-slate-700 truncate">{w.name}</span>
+                                </label>
+                                {allAssignments.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1 pl-1">
+                                    {allAssignments.map(a => (
+                                      <span key={a.id} className={`text-[0.65em] px-1 py-0.5 rounded border ${isOverlap && checkTimeOverlap(addAssignmentModalState.startTime, addAssignmentModalState.endTime, a.start_time, a.end_time) ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
+                                        {a.project_id === addAssignmentModalState.projectId ? '【当案件】' : '【他案件】'}{a.start_time ? `${a.start_time.slice(0,5)}~${a.end_time?.slice(0,5)||''}` : '終日'}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        )
-                     })}
-                  </div>
-               </div>
+                            )
+                         })}
+                      </div>
+                   </div>
+
+                   {/* 協力業者選択 */}
+                   <div className="bg-white p-4 rounded border border-slate-200 shadow-sm mt-4">
+                      <h4 className="text-[0.9em] font-bold text-slate-700 mb-3 flex items-center gap-1"><Users className="w-4 h-4 text-purple-500" />協力業者</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                         {addAssignmentModalState.selectedSubcontractors.map((sub, idx) => {
+                            const isSelected = sub.count > 0;
+                            return (
+                              <div key={sub.id} className="flex flex-col">
+                                <div className={`flex items-center justify-between p-2 border rounded transition-colors ${isSelected ? 'border-purple-400 bg-purple-50' : 'border-slate-200 bg-slate-50'}`}>
+                                   <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                                     <input 
+                                       type="checkbox" 
+                                       checked={isSelected}
+                                       onChange={(e) => {
+                                         const newSub = [...addAssignmentModalState.selectedSubcontractors];
+                                         newSub[idx].count = e.target.checked ? 1 : 0;
+                                         setAddAssignmentModalState(prev => ({ ...prev, selectedSubcontractors: newSub }));
+                                       }}
+                                       className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                                     />
+                                     <span className="text-[0.85em] font-medium text-slate-700 truncate">{sub.name}</span>
+                                   </label>
+                                   {isSelected && (
+                                     <div className="flex items-center gap-1 shrink-0">
+                                        <input 
+                                          type="number" 
+                                          min="1" 
+                                          max="99" 
+                                          value={sub.count} 
+                                          onChange={e => {
+                                            const val = parseInt(e.target.value) || 1;
+                                            const newSub = [...addAssignmentModalState.selectedSubcontractors];
+                                            newSub[idx].count = val;
+                                            setAddAssignmentModalState(prev => ({ ...prev, selectedSubcontractors: newSub }));
+                                          }}
+                                          className="w-12 text-right px-1 py-0.5 border border-slate-300 rounded text-[0.85em] focus:outline-none focus:border-purple-500" 
+                                        />
+                                        <span className="text-[0.8em] text-slate-500">名</span>
+                                     </div>
+                                   )}
+                                </div>
+                              </div>
+                            )
+                         })}
+                      </div>
+                   </div>
+                 </>
+               )}
+
+               {addAssignmentModalState.modalType === 'vehicle' && (
+                 <>
+                   {/* 作業車選択 */}
+                   <div className="bg-white p-4 rounded border border-slate-200 shadow-sm">
+                      <h4 className="text-[0.9em] font-bold text-slate-700 mb-3 flex items-center gap-1"><Truck className="w-4 h-4 text-emerald-500" />作業車</h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                         {resources.filter(w => w.type === 'vehicle' && w.categoryId === 'vehicle').map(w => {
+                            const { isOverlap, isAlreadyHere, allAssignments } = getResourceAvailability(w.id, true);
+                            const isSelected = addAssignmentModalState.selectedVehicles.includes(w.id);
+                            const isDisabled = isOverlap || isAlreadyHere;
+                            
+                            return (
+                              <div key={w.id} className="flex flex-col">
+                                <label className={`flex items-center gap-2 p-2 border rounded transition-colors ${isDisabled ? 'opacity-50 cursor-not-allowed border-slate-200 bg-slate-50' : isSelected ? 'border-emerald-400 bg-emerald-50 cursor-pointer' : 'border-slate-200 hover:bg-slate-50 cursor-pointer'}`}>
+                                   <input 
+                                     type="checkbox" 
+                                     checked={isSelected || isAlreadyHere}
+                                     disabled={isDisabled}
+                                     onChange={(e) => {
+                                       if (e.target.checked) setAddAssignmentModalState(prev => ({ ...prev, selectedVehicles: [...prev.selectedVehicles, w.id] }));
+                                       else setAddAssignmentModalState(prev => ({ ...prev, selectedVehicles: prev.selectedVehicles.filter(id => id !== w.id) }));
+                                     }}
+                                     className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50 disabled:bg-slate-200"
+                                   />
+                                   <span className="text-[0.85em] font-medium text-slate-700 truncate">{w.name}</span>
+                                </label>
+                                {allAssignments.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1 pl-1">
+                                    {allAssignments.map(a => (
+                                      <span key={a.id} className={`text-[0.65em] px-1 py-0.5 rounded border ${isOverlap && checkTimeOverlap(addAssignmentModalState.startTime, addAssignmentModalState.endTime, a.start_time, a.end_time) ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
+                                        {a.project_id === addAssignmentModalState.projectId ? '【当案件】' : '【他案件】'}{a.start_time ? `${a.start_time.slice(0,5)}~${a.end_time?.slice(0,5)||''}` : '終日'}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                         })}
+                      </div>
+                   </div>
+
+                   {/* 建設機械選択 */}
+                   <div className="bg-white p-4 rounded border border-slate-200 shadow-sm mt-4">
+                      <h4 className="text-[0.9em] font-bold text-slate-700 mb-3 flex items-center gap-1"><Truck className="w-4 h-4 text-teal-500" />建設機械</h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                         {resources.filter(w => w.type === 'vehicle' && w.categoryId === 'machine').map(w => {
+                            const { isOverlap, isAlreadyHere, allAssignments } = getResourceAvailability(w.id, true);
+                            const isSelected = addAssignmentModalState.selectedVehicles.includes(w.id);
+                            const isDisabled = isOverlap || isAlreadyHere;
+                            
+                            return (
+                              <div key={w.id} className="flex flex-col">
+                                <label className={`flex items-center gap-2 p-2 border rounded transition-colors ${isDisabled ? 'opacity-50 cursor-not-allowed border-slate-200 bg-slate-50' : isSelected ? 'border-teal-400 bg-teal-50 cursor-pointer' : 'border-slate-200 hover:bg-slate-50 cursor-pointer'}`}>
+                                   <input 
+                                     type="checkbox" 
+                                     checked={isSelected || isAlreadyHere}
+                                     disabled={isDisabled}
+                                     onChange={(e) => {
+                                       if (e.target.checked) setAddAssignmentModalState(prev => ({ ...prev, selectedVehicles: [...prev.selectedVehicles, w.id] }));
+                                       else setAddAssignmentModalState(prev => ({ ...prev, selectedVehicles: prev.selectedVehicles.filter(id => id !== w.id) }));
+                                     }}
+                                     className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 disabled:opacity-50 disabled:bg-slate-200"
+                                   />
+                                   <span className="text-[0.85em] font-medium text-slate-700 truncate">{w.name}</span>
+                                </label>
+                                {allAssignments.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1 pl-1">
+                                    {allAssignments.map(a => (
+                                      <span key={a.id} className={`text-[0.65em] px-1 py-0.5 rounded border ${isOverlap && checkTimeOverlap(addAssignmentModalState.startTime, addAssignmentModalState.endTime, a.start_time, a.end_time) ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
+                                        {a.project_id === addAssignmentModalState.projectId ? '【当案件】' : '【他案件】'}{a.start_time ? `${a.start_time.slice(0,5)}~${a.end_time?.slice(0,5)||''}` : '終日'}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                         })}
+                      </div>
+                   </div>
+                 </>
+               )}
             </div>
             
             <div className="p-4 border-t border-slate-200 bg-white flex justify-end gap-2">
@@ -2170,7 +2322,7 @@ export default function ScheduleManagement() {
               </button>
               <button 
                 onClick={handleSaveAddAssignment}
-                disabled={addAssignmentModalState.selectedWorkers.length === 0}
+                disabled={addAssignmentModalState.modalType === 'personnel' ? (addAssignmentModalState.selectedWorkers.length === 0 && addAssignmentModalState.selectedSubcontractors.filter(s => s.count > 0).length === 0) : addAssignmentModalState.selectedVehicles.length === 0}
                 className="px-6 py-2 rounded text-white text-[0.95em] font-bold bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 追加する

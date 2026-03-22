@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Outlet, NavLink } from "react-router-dom"
-import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck } from "lucide-react"
+import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature } from "lucide-react"
 import { ThemeSwitcher } from "../ui/ThemeSwitcher"
 import logoImg from "../../assets/logo.png"
 import { supabase } from "../../lib/supabase"
@@ -218,6 +218,17 @@ export default function AppLayout() {
               )}
             </NavLink>
             )}
+
+            <a 
+              href="/pdf-editor" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="flex items-center gap-4 px-5 py-3 text-[15px] font-medium transition-all relative group text-slate-500 hover:text-slate-800 hover:bg-slate-50/80"
+              title="全画面のPDFエディタを別タブで開きます"
+            >
+              <FileSignature className="w-5 h-5 text-slate-500 group-hover:text-slate-700" />
+              PDFエディタ
+            </a>
           </nav>
         </aside>
 
