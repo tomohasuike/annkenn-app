@@ -330,10 +330,13 @@ export default function PdfEditor() {
   };
 
   useEffect(() => {
+      // APIロード完了前なら何もしないで待つ
+      if (!isGoogleApiLoaded || !tokenClient) return;
+
       const urlParams = new URLSearchParams(window.location.search);
       const stateParam = urlParams.get('state');
       
-      if (stateParam && isGoogleApiLoaded && tokenClient && !isMerging && files.length === 0) {
+      if (stateParam && !isMerging && files.length === 0) {
           try {
               const state = JSON.parse(stateParam);
               if (state.action === 'open' && state.ids && state.ids.length > 0) {
