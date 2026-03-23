@@ -23,6 +23,40 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ message: "Project already has a folder, skipping creation." }), { status: 200 })
     }
 
+    // --- Branch Project Logic ---
+    // If it's a branch project (has parent_project_id), inherit the parent's folder instead of creating a new one.
+    if (record.parent_project_id) {
+      console.log(`Branch project detected: ${record.project_number}. Inheriting parent folder...`)
+      
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      const supabase = createClient(supabaseUrl, supabaseKey)
+
+      const { data: parentRecord, error: parentError } = await supabase
+        .from('projects')
+        .select('folder_url')
+        .eq('id', record.parent_project_id)
+        .single()
+        
+      if (!parentError && parentRecord?.folder_url) {
+        // Update this record with parent's folder_url
+        const { error: updateError } = await supabase
+          .from('projects')
+          .update({ folder_url: parentRecord.folder_url })
+          .eq('id', record.id)
+          
+        if (updateError) throw updateError
+        
+        return new Response(JSON.stringify({ 
+          message: "Branch project: Copied parent folder URL, skipped new folder creation.", 
+          folder_url: parentRecord.folder_url 
+        }), { status: 200 })
+      } else {
+        console.warn(`Could not find folder_url for parent project (${record.parent_project_id}). Proceeding to create a new folder...`)
+      }
+    }
+    // ----------------------------
+
     // 2. Load Environment Variables for Google Drive API
     const googleServiceAccountEmail = Deno.env.get('GOOGLE_SA_EMAIL')
     const googlePrivateKey = (Deno.env.get('GOOGLE_SA_PRIVATE_KEY') || '').replace(/\\n/g, '\n')
