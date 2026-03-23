@@ -14,8 +14,8 @@ export default function ProjectForm() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [initialLoading, setInitialLoading] = useState(isEditing)
   const [isGeneratingNumber, setIsGeneratingNumber] = useState(false)
-  
-  const [formData, setFormData] = useState({
+
+  const [formData, setFormData] = useState<any>({
     project_number: "",
     project_name: "",
     category: "一般",
@@ -23,7 +23,8 @@ export default function ProjectForm() {
     client_name: "",
     site_name: "",
     client_company_name: "",
-    folder_url: ""
+    folder_url: "",
+    parent_project_id: null
   })
   
   const [suggestions, setSuggestions] = useState<{clientNames: string[], siteNames: string[], contactNames: string[]}>({
@@ -44,7 +45,7 @@ export default function ProjectForm() {
             .single()
             
           if (error) throw error
-          if (data) {
+         if (data) {
             // 工程管理用の特別な案件（VACATIONなど）の場合は編集をブロックする
             if (data.project_number === 'VACATION' || data.project_name === '■ 休暇') {
               alert("この案件は工程管理専用のため、案件管理画面から編集・削除することはできません。")
@@ -52,7 +53,7 @@ export default function ProjectForm() {
               return
             }
             setFormData(data)
-          }
+        }
         } catch (err) {
           console.error("Error fetching project:", err)
           alert("データの取得に失敗しました")
@@ -64,7 +65,7 @@ export default function ProjectForm() {
     }
   }, [id, isEditing])
 
-  // Auto-generate project number for new projects based on category
+  // Auto-generate project number for new projects
   useEffect(() => {
     if (isEditing) return;
 
@@ -86,6 +87,7 @@ export default function ProjectForm() {
           .from('projects')
           .select('project_number')
           .ilike('project_number', `${searchPrefix}%`)
+          .not('project_number', 'like', '%-%') // ignore branches
           .order('project_number', { ascending: false })
           .limit(1);
 
@@ -102,7 +104,7 @@ export default function ProjectForm() {
         }
 
         const newNum = `${searchPrefix}${nextSequence.toString().padStart(2, '0')}`;
-        setFormData(prev => ({ ...prev, project_number: newNum }));
+        setFormData((prev: any) => ({ ...prev, project_number: newNum }));
       } catch (err) {
         console.error("Number generation error:", err);
       } finally {
@@ -110,8 +112,11 @@ export default function ProjectForm() {
       }
     }
 
-    generateProjectNumber();
-  }, [formData.category, isEditing])
+    // Only run normal auto-generation if project isn't a pre-populated branch
+    if (!formData.parent_project_id) {
+      generateProjectNumber();
+    }
+  }, [formData.category, isEditing]);
 
   // Fetch unique client names and site names based on category for autocomplete
   useEffect(() => {
@@ -155,7 +160,7 @@ export default function ProjectForm() {
   }, [formData.category, formData.client_name, formData.site_name])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
+    setFormData((prev: any) => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -203,6 +208,62 @@ export default function ProjectForm() {
       alert("削除に失敗しました: " + (err.message || "不明なエラー"))
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const createBranchProject = async (bType: "k" | "t", label: string) => {
+    if (!id || !formData.project_number) return;
+    try {
+      setLoading(true);
+      const prefix = `${formData.project_number}-${bType}0`;
+      const { data: latestSub, error: subErr } = await supabase
+        .from('projects')
+        .select('project_number')
+        .ilike('project_number', `${prefix}%`)
+        .order('project_number', { ascending: false })
+        .limit(1);
+      
+      if (subErr) throw subErr;
+
+      let nextSequence = 1;
+      if (latestSub && latestSub.length > 0 && latestSub[0].project_number) {
+        const highestNum = latestSub[0].project_number;
+        const match = highestNum.split('-')[1]?.match(/^[kt](\d+)$/);
+        if (match && match[1]) {
+          const seq = parseInt(match[1], 10);
+          if (!isNaN(seq)) nextSequence = seq + 1;
+        }
+      }
+      const newNum = `${formData.project_number}-${bType}${nextSequence.toString().padStart(2, '0')}`;
+      
+      const newProject = {
+        project_number: newNum,
+        project_name: `${formData.project_name}（${label}）`,
+        category: formData.category,
+        status_flag: "着工前",
+        client_name: formData.client_name,
+        site_name: formData.site_name,
+        client_company_name: formData.client_company_name,
+        folder_url: "",
+        parent_project_id: id
+      };
+
+      const { data: inserted, error } = await supabase
+        .from('projects')
+        .insert([newProject])
+        .select('id')
+        .single();
+        
+      if (error) throw error;
+      
+      alert(`「${label}」の枝番案件（${newNum}）を作成しました！`);
+      navigate(`/projects/${inserted.id}`);
+      window.scrollTo(0, 0);
+    } catch (err: any) {
+      console.error(err);
+      alert("枝番案件の作成に失敗しました: " + err.message);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -285,7 +346,7 @@ export default function ProjectForm() {
                     key={cat}
                     type="button"
                     onClick={() => {
-                        setFormData(prev => {
+                        setFormData((prev: any) => {
                             if (prev.category === cat) return prev;
                             return { 
                                 ...prev, 
@@ -330,7 +391,7 @@ export default function ProjectForm() {
                 value={(formData.category === "一般" || formData.category === "役所") ? (formData.client_name || '') : (formData.site_name || '')} 
                 onChange={(val) => {
                   const field = (formData.category === "一般" || formData.category === "役所") ? 'client_name' : 'site_name'
-                  setFormData(prev => ({ ...prev, [field]: val }))
+                  setFormData((prev: any) => ({ ...prev, [field]: val }))
                 }}
                 suggestions={(formData.category === "一般" || formData.category === "役所") ? suggestions.clientNames : suggestions.siteNames}
                 placeholder={(formData.category === "一般" || formData.category === "役所") ? "例: 山田太郎" : "東京都新宿区..."}
@@ -344,7 +405,7 @@ export default function ProjectForm() {
               <SearchableInput 
                 name="client_company_name" 
                 value={(formData as any).client_company_name || ''} 
-                onChange={(val) => setFormData(prev => ({ ...prev, client_company_name: val }))}
+                onChange={(val) => setFormData((prev: any) => ({ ...prev, client_company_name: val }))}
                 suggestions={suggestions.contactNames}
                 placeholder="例: 佐藤一郎"
               />
@@ -367,15 +428,39 @@ export default function ProjectForm() {
           <div className="flex justify-between items-center pt-4 border-t">
             <div>
               {isEditing && (
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  disabled={deleting || loading}
-                  className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors text-red-600 hover:bg-red-50 hover:text-red-700 h-10 px-4 py-2 gap-2 mr-auto disabled:opacity-50"
-                >
-                  {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                  削除する
-                </button>
+                <div className="flex gap-2 mr-auto">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={deleting || loading}
+                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors text-red-600 hover:bg-red-50 hover:text-red-700 h-10 px-4 py-2 gap-2 disabled:opacity-50 border border-transparent hover:border-red-200"
+                  >
+                    {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    削除する
+                  </button>
+                  
+                  {/* 分岐用ボタン */}
+                  {!formData.parent_project_id && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => createBranchProject("k", "仮設")}
+                        disabled={loading}
+                        className="inline-flex items-center justify-center rounded-md text-sm font-bold transition-colors text-indigo-700 bg-indigo-50 hover:bg-indigo-100 h-10 px-4 py-2 border border-indigo-200"
+                      >
+                        + 仮設を追加
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => createBranchProject("t", "追加")}
+                        disabled={loading}
+                        className="inline-flex items-center justify-center rounded-md text-sm font-bold transition-colors text-teal-700 bg-teal-50 hover:bg-teal-100 h-10 px-4 py-2 border border-teal-200"
+                      >
+                        + 追加工事
+                      </button>
+                    </>
+                  )}
+                </div>
               )}
             </div>
             

@@ -13,6 +13,7 @@ type Project = {
   site_name: string
   client_company_name: string
   folder_url: string
+  parent_project_id: string | null
 }
 
 export default function Projects() {
@@ -26,7 +27,8 @@ export default function Projects() {
     async function fetchProjects() {
       try {
         setLoading(true)
-        let query = supabase.from('projects').select('*').order('created_at', { ascending: false })
+        // Set order to project_number to naturally group 260301-t01, 260301-k01 and 260301 together
+        let query = supabase.from('projects').select('*').order('project_number', { ascending: false, nullsFirst: false })
         
         if (selectedStatuses.length > 0) {
           query = query.in('status_flag', selectedStatuses)
@@ -83,11 +85,37 @@ export default function Projects() {
     }
   }
 
-  const filteredProjects = projects.filter(p => 
-    (p.project_name?.includes(search) || '') || 
-    (p.client_name?.includes(search) || '') ||
-    (p.site_name?.includes(search) || '')
+  const searchLower = search.toLowerCase()
+  const directMatches = projects.filter(p => 
+    (p.project_name || '').toLowerCase().includes(searchLower) || 
+    (p.client_name || '').toLowerCase().includes(searchLower) ||
+    (p.site_name || '').toLowerCase().includes(searchLower) ||
+    (p.project_number || '').toLowerCase().includes(searchLower)
   )
+
+  const matchedFamilyIds = new Set(
+    directMatches.map(p => p.parent_project_id || p.id)
+  )
+
+  const filteredProjects = projects.filter(p => {
+    const familyId = p.parent_project_id || p.id
+    return matchedFamilyIds.has(familyId)
+  })
+
+  // 親案件が先頭に来て、枝番がすぐ下に来るように並び替え
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    const numA = a.project_number || ''
+    const numB = b.project_number || ''
+    const baseA = numA.split('-')[0]
+    const baseB = numB.split('-')[0]
+    
+    if (baseA !== baseB) {
+      // メイン案件としては新しい順（降順）にする
+      return baseB.localeCompare(baseA)
+    }
+    // 同じ案件の親子関係では、短い方（親）が先に来て、あとは昇順（k01, t01など）
+    return numA.localeCompare(numB)
+  })
 
   const statuses = ["すべて", "着工前", "着工中", "完工", "保留", "失注"]
 
@@ -191,7 +219,7 @@ export default function Projects() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filteredProjects.length === 0 ? (
+                {sortedProjects.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">
                       <Building2 className="w-12 h-12 mx-auto mb-4 opacity-20" />
@@ -199,14 +227,18 @@ export default function Projects() {
                     </td>
                   </tr>
                 ) : (
-                  filteredProjects.map((project) => (
-                    <tr key={project.id} className="hover:bg-muted/30 transition-colors">
+                  sortedProjects.map((project) => (
+                    <tr key={project.id} className={`hover:bg-muted/30 transition-colors ${project.parent_project_id ? 'bg-indigo-50/30' : ''}`}>
                       <td className="px-6 py-5">
                         <div className="text-xs text-muted-foreground/80 mb-1.5 font-mono flex items-center gap-1.5">
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/40" />
+                          {project.parent_project_id ? (
+                            <span className="inline-flex items-center rounded-sm bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">枝番</span>
+                          ) : (
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/40" />
+                          )}
                           {project.project_number || '番号未定'}
                         </div>
-                        <div className="font-bold text-foreground text-base truncate max-w-sm">
+                        <div className={`font-bold text-foreground text-base truncate max-w-sm ${project.parent_project_id ? 'pl-3 border-l-2 border-indigo-200' : ''}`}>
                           {project.project_name}
                         </div>
                         <div className="text-xs text-muted-foreground mt-2 flex items-center gap-2">
