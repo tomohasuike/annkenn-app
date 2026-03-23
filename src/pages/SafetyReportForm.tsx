@@ -28,16 +28,19 @@ export default function SafetyReportForm() {
   useEffect(() => {
     const fetchCurrentUserWorker = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data } = await supabase
+        const { data: { session } } = await supabase.auth.getSession();
+        const user = session?.user;
+        if (user && user.email) {
+          const { data: workerMatch } = await supabase
             .from('worker_master')
             .select('name')
-            .eq('user_id', user.id)
+            .ilike('email', user.email)
             .single();
-          
-          if (data && data.name) {
-            setWorkerName(data.name);
+
+          if (workerMatch && workerMatch.name) {
+            setWorkerName(workerMatch.name);
+          } else {
+            setWorkerName(user.email.split('@')[0]);
           }
         }
       } catch (err) {
