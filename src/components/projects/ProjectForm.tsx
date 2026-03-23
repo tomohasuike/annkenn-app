@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../../lib/supabase"
 import { useNavigate, useParams } from "react-router-dom"
-import { Loader2, ArrowLeft, Save, Trash2, ClipboardList, CalendarPlus } from "lucide-react"
+import { Loader2, ArrowLeft, Save, Trash2 } from "lucide-react"
 import { SearchableInput } from "../ui/SearchableInput"
 
 export default function ProjectForm() {
@@ -461,25 +461,6 @@ export default function ProjectForm() {
                     </>
                   )}
                   
-                  {/* 翌日予定作成ボタン */}
-                  <button
-                    type="button"
-                    onClick={() => navigate('/tomorrow-schedules/new', { state: { projectId: id, category: formData.category } })}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-bold transition-colors text-emerald-700 bg-emerald-50 hover:bg-emerald-100 h-10 px-4 py-2 border border-emerald-200 ml-2"
-                  >
-                    <CalendarPlus className="w-4 h-4 mr-2" />
-                    予定作成
-                  </button>
-                  
-                  {/* 作業日報作成ボタン */}
-                  <button
-                    type="button"
-                    onClick={() => navigate('/reports/new', { state: { projectId: id, category: formData.category } })}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-bold transition-colors text-amber-700 bg-amber-50 hover:bg-amber-100 h-10 px-4 py-2 border border-amber-200 ml-2"
-                  >
-                    <ClipboardList className="w-4 h-4 mr-2" />
-                    日報作成
-                  </button>
                 </div>
               )}
             </div>
