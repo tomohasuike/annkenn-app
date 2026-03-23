@@ -401,13 +401,14 @@ export default function ProjectForm() {
 
             {/* 発注先担当者 Field (Repurposing client_company_name column) */}
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700">発注先担当者</label>
+              <label className="text-sm font-bold text-slate-700">発注先担当者 <span className="text-red-500">*</span></label>
               <SearchableInput 
                 name="client_company_name" 
                 value={(formData as any).client_company_name || ''} 
                 onChange={(val) => setFormData((prev: any) => ({ ...prev, client_company_name: val }))}
                 suggestions={suggestions.contactNames}
                 placeholder="例: 佐藤一郎"
+                required
               />
             </div>
 
