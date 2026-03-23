@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../lib/supabase"
-import { Loader2, Search, Plus, Building2, Folder, Pencil } from "lucide-react"
+import { Loader2, Search, Plus, Building2, Folder, Pencil, ClipboardList } from "lucide-react"
 import { Link } from "react-router-dom"
 
 type Project = {
@@ -285,6 +285,15 @@ export default function Projects() {
                             <span className="text-[10px] uppercase font-semibold leading-none text-muted-foreground/70 group-hover:text-blue-500 transition-colors">DRIVE</span>
                           </a>
                         )}
+                        <Link 
+                          to="/reports/new" 
+                          state={{ projectId: project.id, category: project.category }}
+                          className="p-2 inline-flex flex-col items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors group align-middle" 
+                          title="作業日報を作成"
+                        >
+                          <ClipboardList className="w-5 h-5 mb-0.5 group-hover:text-amber-500 transition-colors" />
+                          <span className="text-[10px] uppercase font-semibold leading-none text-muted-foreground/70 group-hover:text-amber-500 transition-colors">REPORT</span>
+                        </Link>
                         <Link to={`/projects/${project.id}`} className="p-2 inline-flex flex-col items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors group align-middle" title="詳細編集">
                           <Pencil className="w-5 h-5 mb-0.5" />
                           <span className="text-[10px] uppercase font-semibold leading-none text-muted-foreground/70">EDIT</span>
