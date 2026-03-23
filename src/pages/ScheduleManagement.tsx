@@ -220,7 +220,7 @@ export default function ScheduleManagement() {
       setResources(newResources)
 
       const [memoRes, todoRes] = await Promise.all([
-        supabase.from('global_memos').select('*').limit(1).maybeSingle(),
+        supabase.from('global_memos').select('*').order('updated_at', { ascending: true }).limit(1).maybeSingle(),
         supabase.from('todos').select('*').order('created_at', { ascending: false })
       ])
       
@@ -334,7 +334,8 @@ export default function ScheduleManagement() {
   // --- Drag & Drop Handlers ---
   const canDragItem = (type: 'worker' | 'vehicle', assignmentId?: string) => {
     if (isAdmin) return true;
-    if (type !== 'vehicle' || !currentWorkerId) return false;
+    if (type === 'worker') return false;
+    if (!currentWorkerId) return false;
     if (!assignmentId) return true;
     const a = assignments.find(x => x.id === assignmentId);
     return a?.assigned_by === currentWorkerId;
@@ -540,7 +541,8 @@ export default function ScheduleManagement() {
 
   const handleDeleteAssignment = async (assignmentId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!isAdmin) return
+    const targetAssignment = assignments.find(a => a.id === assignmentId);
+    if (!isAdmin && targetAssignment?.assigned_by !== currentWorkerId) return;
     
     // Save previous state for optimistic UI rollback if needed
     const prevAssignments = [...assignments]
@@ -556,8 +558,37 @@ export default function ScheduleManagement() {
     }
   }
 
+  const sortAssignments = (asgs: any[]) => {
+    return [...asgs].sort((a, b) => {
+      const rIdA = a.worker_id || a.vehicle_id;
+      const rIdB = b.worker_id || b.vehicle_id;
+      
+      const resA = resources.find(r => r.id === rIdA);
+      const resB = resources.find(r => r.id === rIdB);
+      
+      const catOrder: Record<string, number> = {
+        'president': 1,
+        'employee': 2,
+        'partner': 3,
+        'vehicle': 4,
+        'machine': 5
+      };
+      
+      const catA = resA?.categoryId ? catOrder[resA.categoryId as string] || 99 : 99;
+      const catB = resB?.categoryId ? catOrder[resB.categoryId as string] || 99 : 99;
+      
+      if (catA !== catB) return catA - catB;
+      
+      const idxA = resources.findIndex(r => r.id === rIdA);
+      const idxB = resources.findIndex(r => r.id === rIdB);
+      
+      return idxA - idxB;
+    });
+  };
+
   const getAssignmentsForCell = (projectId: string, dateStr: string) => {
-    return assignments.filter(a => a.project_id === projectId && a.assignment_date === dateStr)
+    const asgs = assignments.filter(a => a.project_id === projectId && a.assignment_date === dateStr);
+    return sortAssignments(asgs);
   }
 
   const getUnassignedResources = (dateStr: string, categoryId: 'president'|'employee'|'partner'|'vehicle'|'machine') => {
@@ -968,7 +999,8 @@ export default function ScheduleManagement() {
     const project = projectsList.find(p => p.id === projectId);
     
     // Get existing assignments
-    const asg = assignments.filter(a => a.project_id === projectId && a.assignment_date === dateStr);
+    const asgRaw = assignments.filter(a => a.project_id === projectId && a.assignment_date === dateStr);
+    const asg = sortAssignments(asgRaw);
     
     return createPortal(
       <>
@@ -1187,7 +1219,7 @@ export default function ScheduleManagement() {
                                {p.no && <span className="text-[9px] font-bold text-blue-600 leading-none">[{p.no}]</span>}
                                <div className="font-bold text-[11px] text-slate-800 leading-snug break-all line-clamp-2">{p.name}</div>
                                <div className="text-[9px] text-slate-500 leading-tight truncate">
-                                  {(p.category === '一般' || p.category === '役所') ? (p.client_company_name || p.client_name) : p.site}
+                                  {(p.category === '一般' || p.category === '役所') ? (p.client_name || p.client_company_name) : p.site}
                                </div>
                             </div>
                          </td>
@@ -1311,11 +1343,9 @@ export default function ScheduleManagement() {
       <div className="bg-[#eef2f6] border-b px-4 py-2 flex items-center justify-between shrink-0 z-10 sticky top-0">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-0.5">
-            {isAdmin && (
-              <button onClick={() => setShowLeftPanel(!showLeftPanel)} className={`p-0.5 rounded transition-colors ${showLeftPanel ? 'bg-blue-100 text-blue-600' : 'text-slate-500 hover:bg-slate-100 hover:text-blue-600'}`} title="リソース一覧">
-                <PanelLeft className="w-5 h-5" />
-              </button>
-            )}
+            <button onClick={() => setShowLeftPanel(!showLeftPanel)} className={`p-0.5 rounded transition-colors ${showLeftPanel ? 'bg-blue-100 text-blue-600' : 'text-slate-500 hover:bg-slate-100 hover:text-blue-600'}`} title="リソース一覧">
+              <PanelLeft className="w-5 h-5" />
+            </button>
             <h1 className="text-xl font-bold flex items-center gap-0.5 text-slate-800 ml-1">
               <CalendarDays className="w-5 h-5 text-slate-600" /> 建設DX 工程管理
             </h1>
@@ -1586,7 +1616,7 @@ export default function ScheduleManagement() {
                                  <span className="truncate">{a.worker_id ? a.worker_master?.name : a.vehicle_master?.vehicle_name}</span>
                                  <div className="flex items-center gap-0.5">
                                     {a.notes && <MessageSquare className="w-3 h-3 text-yellow-500" />}
-                                    {isAdmin && <button onClick={(e) => handleDeleteAssignment(a.id, e)} className="opacity-0 group-hover/item:opacity-100 text-slate-300 hover:text-red-500 transition-opacity"><X className="w-3 h-3" /></button>}
+                                    {(isAdmin || a.assigned_by === currentWorkerId) && <button onClick={(e) => handleDeleteAssignment(a.id, e)} className="opacity-0 group-hover/item:opacity-100 text-slate-300 hover:text-red-500 transition-opacity"><X className="w-3 h-3" /></button>}
                                  </div>
                              </div>
                           ))}
@@ -1688,7 +1718,7 @@ export default function ScheduleManagement() {
                                 <span className="font-bold text-[0.95em] text-slate-800 leading-snug break-all">{p.name}</span>
                               </div>
                               {(cat === '一般' || cat === '役所') ? (
-                                 (p.client_company_name || p.client_name) && <span className="text-[0.85em] text-slate-500 mt-1 font-medium">{p.client_company_name || p.client_name}</span>
+                                  (p.client_name || p.client_company_name) && <span className="text-[0.85em] text-slate-500 mt-1 font-medium">{p.client_name || p.client_company_name}</span>
                               ) : (
                                  p.site && <span className="text-[0.85em] text-slate-500 mt-1">{p.site}</span>
                               )}
@@ -1789,10 +1819,30 @@ export default function ScheduleManagement() {
                                         <>
                                            {timeGroups.map((group, gIdx) => {
                                               const isDefault = !group.start && !group.end;
-                                              const regularAssignments = group.assignments.filter(a => a.worker_master?.type !== '協力会社');
+                                              const personnelAssignments = group.assignments.filter(a => a.worker_id && a.worker_master?.type !== '協力会社');
                                               const partnerAssignments = group.assignments.filter(a => a.worker_master?.type === '協力会社');
+                                              const vehicleAssignments = group.assignments.filter(a => a.vehicle_id && a.vehicle_master?.category !== '建設機械');
+                                              const machineAssignments = group.assignments.filter(a => a.vehicle_id && a.vehicle_master?.category === '建設機械');
                                               
                                               if (isDefault && group.assignments.length === 0 && timeGroups.length > 1) return null;
+
+                                              const renderAssignmentNode = (a: any) => (
+                                                  <div 
+                                                      key={a.id}
+                                                      draggable={canDragItem(a.worker_id ? 'worker' : 'vehicle', a.id)}
+                                                      onDragStart={(e) => handleDragStart(e, (a.worker_id || a.vehicle_id) as string, a.worker_id ? 'worker' : 'vehicle', p.id, dateStr, a.id)}
+                                                      className={`group/item flex items-center justify-between px-1 py-0 text-[0.85em] bg-white border rounded shadow-sm hover:shadow ${a.worker_id ? 'border-l-4 border-[#3b82f6] text-slate-700 font-bold border-y-slate-200 border-r-slate-200' : 'border-l-4 border-[#10b981] text-slate-700 font-bold border-y-slate-200 border-r-slate-200'} ${canDragItem(a.worker_id ? 'worker' : 'vehicle', a.id) ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                                                  >
+                                                      <span className="truncate">
+                                                          {a.worker_id ? a.worker_master?.name : a.vehicle_master?.vehicle_name}
+                                                          {a.start_time && a.end_time && isDefault && <span className="font-normal text-[0.85em] opacity-70 ml-1">({a.start_time.substring(0,5)}〜{a.end_time.substring(0,5)})</span>}
+                                                      </span>
+                                                      <div className="flex items-center gap-0.5">
+                                                          {a.notes && <MessageSquare className="w-3 h-3 text-yellow-500" />}
+                                                          {(isAdmin || a.assigned_by === currentWorkerId) && <button onClick={(e) => handleDeleteAssignment(a.id, e)} className="opacity-0 group-hover/item:opacity-100 text-slate-300 hover:text-red-500 transition-opacity"><X className="w-3 h-3" /></button>}
+                                                      </div>
+                                                  </div>
+                                              );
 
                                               return (
                                                 <div 
@@ -1805,36 +1855,20 @@ export default function ScheduleManagement() {
                                                    {(!isDefault || group.start || group.end) && (
                                                       <div className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1 py-[1px] rounded flex justify-between items-center shadow-sm">
                                                          <span>{group.start?.substring(0,5)} 〜 {group.end?.substring(0,5)}</span>
-                                                         {isAdmin && (
-                                                           <div className="flex items-center gap-0.5">
-                                                             <button className="text-slate-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors" onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, group.start || '', group.end || '', e, 'personnel')} title="この時間帯に人員を配置"><Plus className="w-3 h-3"/></button>
-                                                             <button className="text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors" onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, group.start || '', group.end || '', e, 'vehicle')} title="この時間帯に車両・機械を配置"><Truck className="w-3 h-3"/></button>
-                                                             {group.assignments.length === 0 && (
-                                                               <button className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" onClick={(e) => { e.stopPropagation(); setCustomTimeBlocks(prev => { const newB = {...prev}; newB[`${p.id}-${dateStr}`] = newB[`${p.id}-${dateStr}`].filter(b => b.start_time !== group.start || b.end_time !== group.end); return newB; }) }} title="時間枠を削除"><X className="w-3 h-3"/></button>
-                                                             )}
-                                                           </div>
-                                                         )}
+                                                          <div className="flex items-center gap-0.5">
+                                                            {isAdmin && (
+                                                              <button className="text-slate-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors" onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, group.start || '', group.end || '', e, 'personnel')} title="この時間帯に人員を配置"><Plus className="w-3 h-3"/></button>
+                                                            )}
+                                                            <button className="text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors" onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, group.start || '', group.end || '', e, 'vehicle')} title="この時間帯に車両・機械を配置"><Truck className="w-3 h-3"/></button>
+                                                            {isAdmin && group.assignments.length === 0 && (
+                                                              <button className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" onClick={(e) => { e.stopPropagation(); setCustomTimeBlocks(prev => { const newB = {...prev}; newB[`${p.id}-${dateStr}`] = newB[`${p.id}-${dateStr}`].filter(b => b.start_time !== group.start || b.end_time !== group.end); return newB; }) }} title="時間枠を削除"><X className="w-3 h-3"/></button>
+                                                            )}
+                                                          </div>
                                                       </div>
                                                    )}
 
-                                                   {/* Regulars */}
-                                                   {regularAssignments.map(a => (
-                                                      <div 
-                                                          key={a.id}
-                                                          draggable={canDragItem(a.worker_id ? 'worker' : 'vehicle', a.id)}
-                                                          onDragStart={(e) => handleDragStart(e, (a.worker_id || a.vehicle_id) as string, a.worker_id ? 'worker' : 'vehicle', p.id, dateStr, a.id)}
-                                                          className={`group/item flex items-center justify-between px-1 py-0 text-[0.85em] bg-white border rounded shadow-sm hover:shadow ${a.worker_id ? 'border-l-4 border-[#3b82f6] text-slate-700 font-bold border-y-slate-200 border-r-slate-200' : 'border-l-4 border-[#10b981] text-slate-700 font-bold border-y-slate-200 border-r-slate-200'} ${canDragItem(a.worker_id ? 'worker' : 'vehicle', a.id) ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
-                                                      >
-                                                          <span className="truncate">
-                                                              {a.worker_id ? a.worker_master?.name : a.vehicle_master?.vehicle_name}
-                                                              {a.start_time && a.end_time && isDefault && <span className="font-normal text-[0.85em] opacity-70 ml-1">({a.start_time.substring(0,5)}〜{a.end_time.substring(0,5)})</span>}
-                                                          </span>
-                                                          <div className="flex items-center gap-0.5">
-                                                              {a.notes && <MessageSquare className="w-3 h-3 text-yellow-500" />}
-                                                              {isAdmin && <button onClick={(e) => handleDeleteAssignment(a.id, e)} className="opacity-0 group-hover/item:opacity-100 text-slate-300 hover:text-red-500 transition-opacity"><X className="w-3 h-3" /></button>}
-                                                          </div>
-                                                      </div>
-                                                   ))}
+                                                   {/* Personnel */}
+                                                   {personnelAssignments.map(renderAssignmentNode)}
 
                                                    {/* Partners */}
                                                    {partnerAssignments.length > 0 && (
@@ -1857,28 +1891,34 @@ export default function ScheduleManagement() {
                                                               <td className="text-[0.75em] text-slate-600 py-0.5 border-b border-slate-100 truncate pl-1" style={{ width: '60%'}}>
                                                                 {pr.worker_master?.name}
                                                                 {pr.start_time && pr.end_time && isDefault && <span className="font-normal text-[0.85em] opacity-70 ml-1">({pr.start_time.substring(0,5)}〜{pr.end_time.substring(0,5)})</span>}
-                                                                {isAdmin && <button onClick={(e) => { e.stopPropagation(); handleDeleteAssignment(pr.id, e); }} className="text-slate-300 hover:text-red-500 float-right mr-0.5 opacity-0 group-hover/ptr:opacity-100 transition-opacity"><X className="w-3 h-3" /></button>}
+                                                                {(isAdmin || pr.assigned_by === currentWorkerId) && <button onClick={(e) => { e.stopPropagation(); handleDeleteAssignment(pr.id, e); }} className="text-slate-300 hover:text-red-500 float-right mr-0.5 opacity-0 group-hover/ptr:opacity-100 transition-opacity"><X className="w-3 h-3" /></button>}
                                                               </td>
                                                             </tr>
                                                           ))}
                                                         </tbody>
                                                       </table>
                                                    )}
+
+                                                   {/* Vehicles */}
+                                                   {vehicleAssignments.map(renderAssignmentNode)}
+
+                                                   {/* Machines */}
+                                                   {machineAssignments.map(renderAssignmentNode)}
                                                  </div>
                                               )
                                            })}
-                                            {isAdmin && (
-                                                <div className="w-full flex justify-end mt-1 opacity-0 group-hover/parent:opacity-100 transition-opacity">
-                                                  <div className="flex bg-slate-50 border border-slate-200 rounded shadow-sm overflow-hidden">
-                                                    <button onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, '', '', e, 'personnel')} className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-100 transition-colors" title="人員を配置">
-                                                        <Plus className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <button onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, '', '', e, 'vehicle')} className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-100 transition-colors border-l border-slate-200" title="車両・機械を配置">
-                                                        <Truck className="w-3.5 h-3.5" />
-                                                    </button>
-                                                  </div>
-                                                </div>
-                                            )}
+                                            <div className="w-full flex justify-end mt-1 opacity-0 group-hover/parent:opacity-100 transition-opacity">
+                                              <div className="flex bg-slate-50 border border-slate-200 rounded shadow-sm overflow-hidden">
+                                                {isAdmin && (
+                                                  <button onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, '', '', e, 'personnel')} className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-100 transition-colors" title="人員を配置">
+                                                      <Plus className="w-3.5 h-3.5" />
+                                                  </button>
+                                                )}
+                                                <button onClick={(e) => handleOpenAddModal(p.id, p.name, dateStr, '', '', e, 'vehicle')} className={`p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-100 transition-colors border-l border-slate-200`} title="車両・機械を配置">
+                                                    <Truck className="w-3.5 h-3.5" />
+                                                </button>
+                                              </div>
+                                            </div>
                                         </>
                                      )
                                   })()}
