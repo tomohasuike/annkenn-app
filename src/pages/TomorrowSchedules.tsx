@@ -24,6 +24,7 @@ export default function TomorrowSchedules() {
   const [schedules, setSchedules] = useState<TomorrowSchedule[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [searchDate, setSearchDate] = useState("")
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -94,6 +95,12 @@ export default function TomorrowSchedules() {
       }
     }
 
+    if (searchDate && schedule.schedule_date) {
+      if (!schedule.schedule_date.startsWith(searchDate)) {
+        return false;
+      }
+    }
+
     return true;
   })
 
@@ -130,6 +137,15 @@ export default function TomorrowSchedules() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full h-10 rounded-md border border-input bg-background pl-10 pr-4 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+            <div className="relative w-full sm:w-auto">
+              <input
+                type="date"
+                value={searchDate}
+                onChange={(e) => setSearchDate(e.target.value)}
+                className="w-full sm:w-auto h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                title="日付で絞り込み"
               />
             </div>
             <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap text-sm bg-card border px-3 py-2 rounded-md hover:bg-muted/50 transition-colors">
