@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Stage, Layer, Rect, RegularPolygon, Star, Arrow, Line, Transformer, Text as KonvaText, Group, Circle, Shape } from 'react-konva';
 import { v4 as uuidv4 } from 'uuid';
 
-export type ToolType = 'select' | 'pen' | 'text' | 'shape' | 'redact' | 'view';
+export type ToolType = 'select' | 'pen' | 'text' | 'shape' | 'redact' | 'view' | 'text_select';
 export type ShapeType = 'line' | 'arrow' | 'rect' | 'rounded_rect' | 'ellipse' | 'speech_bubble' | 'star' | 'polygon' | 'circle' | 'hexagon' | 'speech';
 
 export interface Annotation {
@@ -281,9 +281,9 @@ const PdfDrawingOverlay: React.FC<PdfDrawingOverlayProps> = ({
   return (
       <div style={{ 
           position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
-          pointerEvents: tool === 'view' ? 'none' : 'auto', 
+          pointerEvents: (tool === 'view' || tool === 'text_select') ? 'none' : 'auto', 
           // グーとパー、十字、テキストのカーソルを完璧に出し分けます
-          cursor: tool === 'view' ? 'grab' : (tool === 'select' ? 'default' : (tool === 'text' ? 'text' : 'crosshair')),
+          cursor: tool === 'view' ? 'grab' : (tool === 'text_select' ? 'text' : (tool === 'select' ? 'default' : (tool === 'text' ? 'text' : 'crosshair'))),
           zIndex: 50 
       }}>
           <Stage

@@ -4,7 +4,7 @@ const EMPTY_ARRAY: any[] = [];
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
-import { Sidebar, ZoomIn, ZoomOut, MousePointer2, PenLine, Type, Square, Info, ChevronDown, Upload, Eraser, RotateCcw, Trash2, Undo2, Redo2, Pencil, Plus, Shapes, Slash, MoveUpRight, AppWindow, Circle, MessageSquare, Star, Hexagon, Download, Cloud, Hand, Folder, Scissors } from 'lucide-react';
+import { Sidebar, ZoomIn, ZoomOut, MousePointer2, PenLine, Type, Square, Info, ChevronDown, Upload, Eraser, RotateCcw, Trash2, Undo2, Redo2, Pencil, Plus, Shapes, Slash, MoveUpRight, AppWindow, Circle, MessageSquare, Star, Hexagon, Download, Cloud, Hand, Folder, Scissors, TextSelect } from 'lucide-react';
 import { toast } from 'sonner';
 import PdfDrawingOverlay from './PdfDrawingOverlay';
 import { ColorPickerDropdown } from './ColorPickerDropdown';
@@ -1787,10 +1787,7 @@ export default function PdfEditor() {
                     <button onClick={() => setScale(Math.min(3, scale + 0.2))} className="w-7 h-7 rounded-md hover:bg-gray-200/50 transition-colors flex items-center justify-center" title="拡大">
                         <ZoomIn strokeWidth={1.5} className="w-[16px] h-[16px]"/>
                     </button>
-                    <div className="w-px h-3.5 bg-gray-300 mx-0.5"></div>
-                    <button onClick={() => setActiveTool('view')} className={`w-7 h-7 rounded-md transition-colors flex items-center justify-center ${activeTool === 'view' ? 'bg-gray-300/70 text-gray-900 shadow-inner' : 'hover:bg-gray-200/50 text-gray-700'}`} title="パン (移動)">
-                        <Hand strokeWidth={1.5} className="w-[16px] h-[16px]"/>
-                    </button>
+                    {/* フローティングツールバーの手のひらは削除されました */}
                  </div>
                  
                  <div className="w-px h-4 bg-gray-300 mx-2"></div>
@@ -2032,7 +2029,8 @@ export default function PdfEditor() {
                 <button onClick={() => setActiveTool('redact')} className={`flex items-center justify-center w-[28px] h-[28px] rounded-md transition-colors ${activeTool === 'redact' ? 'bg-gray-300/70 text-gray-900 shadow-inner' : 'hover:bg-gray-200/50 text-gray-700'}`} title="墨消し・塗りつぶし"><Eraser strokeWidth={1.5} className="w-[16px] h-[16px]"/></button>
                 
                 <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                <button onClick={() => setActiveTool('view')} className={`flex items-center justify-center w-[28px] h-[28px] rounded-md transition-colors ${activeTool === 'view' ? 'bg-gray-300/70 text-gray-900 shadow-inner' : 'hover:bg-gray-200/50 text-gray-700'}`} title="閲覧・テキスト選択"><Hand strokeWidth={1.5} className="w-[16px] h-[16px]"/></button>
+                <button onClick={() => setActiveTool('view')} className={`flex items-center justify-center w-[28px] h-[28px] rounded-md transition-colors ${activeTool === 'view' ? 'bg-gray-300/70 text-gray-900 shadow-inner' : 'hover:bg-gray-200/50 text-gray-700'}`} title="手のひら (移動)"><Hand strokeWidth={1.5} className="w-[16px] h-[16px]"/></button>
+                <button onClick={() => setActiveTool('text_select')} className={`flex items-center justify-center w-[28px] h-[28px] rounded-md transition-colors ${activeTool === 'text_select' ? 'bg-gray-300/70 text-gray-900 shadow-inner' : 'hover:bg-gray-200/50 text-gray-700'}`} title="テキスト選択"><TextSelect strokeWidth={1.5} className="w-[16px] h-[16px]"/></button>
                 <button onClick={() => setActiveTool('select')} className={`flex items-center justify-center w-[28px] h-[28px] rounded-md transition-colors ${activeTool === 'select' ? 'bg-gray-300/70 text-gray-900 shadow-inner' : 'hover:bg-gray-200/50 text-gray-700'}`} title="描画選択ツール"><MousePointer2 strokeWidth={1.5} className="w-[16px] h-[16px]"/></button>
              </div>
              
@@ -2165,7 +2163,7 @@ export default function PdfEditor() {
             ) : (
                 <div 
                     ref={docWrapperRef} 
-                    className={`relative mx-auto w-fit ${activeTool === 'view' ? 'select-none' : 'select-none'} origin-top-left flex flex-col items-center mb-32`} 
+                    className={`relative mx-auto w-fit ${activeTool === 'text_select' ? 'select-text' : 'select-none'} origin-top-left flex flex-col items-center mb-32`} 
                     style={{ 
                         width: 800,
                         cursor: activeTool === 'view' ? (isPanning ? 'grabbing' : 'grab') : 'default'
