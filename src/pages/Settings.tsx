@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase"
-import { Users, Truck, ShieldCheck, Loader2, Save, Plus, Trash2, Edit2, AlertTriangle, Settings as SettingsIcon } from "lucide-react"
+import { Users, Truck, ShieldCheck, Loader2, Save, Plus, Trash2, Edit2, AlertTriangle, Settings as SettingsIcon, CheckCircle2 } from "lucide-react"
 
 // Types
 export interface WorkerMaster {
@@ -71,6 +71,7 @@ export default function Settings() {
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false)
   const [editingVehicle, setEditingVehicle] = useState<Partial<VehicleMaster> | null>(null)
   const [vehicleSaving, setVehicleSaving] = useState(false)
+  const [modalMessage, setModalMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
   // Drag and Drop State
   const [draggedWorkerId, setDraggedWorkerId] = useState<string | null>(null);
@@ -156,7 +157,7 @@ export default function Settings() {
 
     } catch (e) {
       console.error("Error fetching admin data:", e)
-      alert("データの取得に失敗しました。SQLマイグレーションが完了しているか確認してください。")
+      setModalMessage({ type: 'error', text: "データの取得に失敗しました。SQLマイグレーションが完了しているか確認してください。" })
     } finally {
       setLoading(false)
     }
@@ -198,10 +199,10 @@ export default function Settings() {
             
           if (error) throw new Error(`権限更新エラー (${w.name}): ${error.message}`);
       }
-      alert('権限と表示順を保存しました。');
+      setModalMessage({ type: 'success', text: '権限と表示順を保存しました。' });
     } catch (e: any) {
       console.error(e)
-      alert(`保存に失敗しました: ${e.message}`)
+      setModalMessage({ type: 'error', text: `保存に失敗しました: ${e.message}` })
 
     } finally {
       setSaving(false)
@@ -274,10 +275,10 @@ export default function Settings() {
         }).select().single();
         if (data) setAppSettings(data);
       }
-      alert('アプリ設定を保存しました。');
+      setModalMessage({ type: 'success', text: 'アプリ設定を保存しました。' });
     } catch (e) {
       console.error(e);
-      alert('設定の保存に失敗しました。');
+      setModalMessage({ type: 'error', text: '設定の保存に失敗しました。' });
     } finally {
       setSaving(false);
     }
@@ -319,7 +320,7 @@ export default function Settings() {
           fetchData() // Refresh
       } catch(e: any) {
           console.error(e)
-          alert("保存に失敗しました: " + e.message)
+          setModalMessage({ type: 'error', text: "保存に失敗しました: " + e.message })
       } finally {
           setWorkerSaving(false)
       }
@@ -333,7 +334,7 @@ export default function Settings() {
           fetchData() // Refresh
       } catch (e: any) {
           console.error(e)
-          alert("削除に失敗しました: " + e.message)
+          setModalMessage({ type: 'error', text: "削除に失敗しました: " + e.message })
       }
   }
 
@@ -371,7 +372,7 @@ export default function Settings() {
           fetchData() // Refresh
       } catch(e: any) {
           console.error(e)
-          alert("保存に失敗しました: " + e.message)
+          setModalMessage({ type: 'error', text: "保存に失敗しました: " + e.message })
       } finally {
           setVehicleSaving(false)
       }
@@ -385,7 +386,7 @@ export default function Settings() {
           fetchData() // Refresh
       } catch (e: any) {
           console.error(e)
-          alert("削除に失敗しました: " + e.message)
+          setModalMessage({ type: 'error', text: "削除に失敗しました: " + e.message })
       }
   }
 
@@ -1012,6 +1013,35 @@ export default function Settings() {
                   </div>
               </div>
           </div>
+      )}
+
+      {/* Modal Message */}
+      {modalMessage && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
+            <div className={`p-4 flex items-center gap-3 border-b ${modalMessage.type === 'success' ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+              <div className={`p-2 rounded-full ${modalMessage.type === 'success' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                {modalMessage.type === 'success' ? <CheckCircle2 size={24} /> : <AlertTriangle size={24} />}
+              </div>
+              <div>
+                <h3 className={`font-bold text-lg ${modalMessage.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
+                  {modalMessage.type === 'success' ? '成功' : 'エラー'}
+                </h3>
+              </div>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-700 whitespace-pre-wrap">{modalMessage.text}</p>
+            </div>
+            <div className="p-4 bg-gray-50 border-t flex justify-end">
+              <button
+                onClick={() => setModalMessage(null)}
+                className="px-6 py-2 bg-gray-800 text-white rounded-md font-bold hover:bg-gray-700 transition"
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
