@@ -177,22 +177,23 @@ export default function CompletionReportForm() {
           const compressedFile = await imageCompression(file, options);
           const fileExt = compressedFile.name.split('.').pop();
           const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-          const filePath = `${report.project_id}/${fileName}`;
+          
+          const finalFile = new File([compressedFile], fileName, { type: compressedFile.type });
+          const formData = new FormData();
+          formData.append('file', finalFile);
 
-          const { error: uploadError, data: uploadData } = await supabase.storage
-            .from('daily_report_photos')
-            .upload(filePath, compressedFile);
+          const { error: uploadError, data: uploadData } = await supabase.functions.invoke('upload-drive-file', {
+              body: formData,
+          });
 
-          if (uploadError) {
-              console.error("Error uploading image:", uploadError);
-              throw uploadError;
+          if (uploadError || !uploadData?.success) {
+              console.error("Error uploading image:", uploadError || uploadData?.error);
+              throw new Error("画像のアップロードに失敗しました");
           }
 
           if (uploadData) {
-            const { data: { publicUrl } } = supabase.storage
-                .from('daily_report_photos')
-                .getPublicUrl(filePath);
-            uploadedUrls.push(publicUrl);
+              const driveImgUrl = uploadData.thumbnailLink ? uploadData.thumbnailLink.replace('=s220', '=s800') : uploadData.webViewLink;
+              uploadedUrls.push(driveImgUrl);
           }
         }
       }

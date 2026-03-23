@@ -498,16 +498,21 @@ export default function ReportForm() {
                 try {
                     const compressed = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1920 });
                     const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-                    const filePath = `${fileName}`;
                     
-                    const { data: uploadData, error: uploadError } = await supabase.storage.from('daily_report_photos').upload(filePath, compressed);
+                    const finalFile = new File([compressed], fileName, { type: compressed.type });
+                    const formData = new FormData();
+                    formData.append('file', finalFile);
+
+                    const { data: uploadData, error: uploadError } = await supabase.functions.invoke('upload-drive-file', {
+                        body: formData,
+                    });
                     
-                    if (uploadError) {
-                        console.error('Photo Upload error:', uploadError);
+                    if (uploadError || !uploadData?.success) {
+                        console.error('Photo Upload error:', uploadError || uploadData?.error);
                         // We tolerate single image failures rather than breaking the whole form
                     } else if (uploadData) {
-                        const { data: { publicUrl } } = supabase.storage.from('daily_report_photos').getPublicUrl(filePath);
-                        uploadedUrls.push(publicUrl);
+                        const driveImgUrl = uploadData.thumbnailLink ? uploadData.thumbnailLink.replace('=s220', '=s800') : uploadData.webViewLink;
+                        uploadedUrls.push(driveImgUrl);
                     }
                 } catch (err) {
                     console.error('Compression or upload failed:', err);
@@ -598,11 +603,18 @@ export default function ReportForm() {
                         for (const file of m.pending_photos) {
                             try {
                                 const compressed = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1920 });
-                                const fileName = `materials/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-                                const { data: uploadData, error } = await supabase.storage.from('daily_report_photos').upload(fileName, compressed);
-                                if (!error && uploadData) {
-                                    const { data: { publicUrl } } = supabase.storage.from('daily_report_photos').getPublicUrl(fileName);
-                                    uploadedPhotos.push(publicUrl);
+                                const fileName = `materials_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+                                const finalFile = new File([compressed], fileName, { type: compressed.type });
+                                const formData = new FormData();
+                                formData.append('file', finalFile);
+
+                                const { data: uploadData, error } = await supabase.functions.invoke('upload-drive-file', {
+                                    body: formData,
+                                });
+
+                                if (!error && uploadData?.success) {
+                                    const driveImgUrl = uploadData.thumbnailLink ? uploadData.thumbnailLink.replace('=s220', '=s800') : uploadData.webViewLink;
+                                    uploadedPhotos.push(driveImgUrl);
                                 }
                             } catch (err) { console.error('Material photo upload failed:', err); }
                         }
@@ -613,11 +625,18 @@ export default function ReportForm() {
                         for (const file of m.pending_docs) {
                             try {
                                 const ext = file.name.split('.').pop();
-                                const fileName = `materials_docs/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-                                const { data: uploadData, error } = await supabase.storage.from('daily_report_photos').upload(fileName, file, { contentType: file.type });
-                                if (!error && uploadData) {
-                                    const { data: { publicUrl } } = supabase.storage.from('daily_report_photos').getPublicUrl(fileName);
-                                    uploadedDocs.push(publicUrl);
+                                const fileName = `materials_docs_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+                                const finalFile = new File([file], fileName, { type: file.type });
+                                const formData = new FormData();
+                                formData.append('file', finalFile);
+
+                                const { data: uploadData, error } = await supabase.functions.invoke('upload-drive-file', {
+                                    body: formData,
+                                });
+
+                                if (!error && uploadData?.success) {
+                                    const driveDocUrl = uploadData.webViewLink;
+                                    uploadedDocs.push(driveDocUrl);
                                 }
                             } catch (err) { console.error('Material doc upload failed:', err); }
                         }
