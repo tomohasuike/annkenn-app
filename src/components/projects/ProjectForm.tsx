@@ -345,7 +345,9 @@ export default function ProjectForm() {
                   <button
                     key={cat}
                     type="button"
+                    disabled={isEditing}
                     onClick={() => {
+                        if (isEditing) return;
                         setFormData((prev: any) => {
                             if (prev.category === cat) return prev;
                             return { 
@@ -360,7 +362,7 @@ export default function ProjectForm() {
                     className={`flex-1 text-sm font-bold py-2.5 rounded-md transition-all ${
                       formData.category === cat 
                         ? 'bg-white shadow text-blue-700 outline outline-1 outline-blue-200' 
-                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                        : isEditing ? 'text-slate-400 bg-slate-50 cursor-not-allowed opacity-50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
                     }`}
                   >
                     {cat}
@@ -375,7 +377,8 @@ export default function ProjectForm() {
                 name="project_name" 
                 value={formData.project_name} 
                 onChange={handleChange}
-                className="flex h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base ring-offset-background placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" 
+                readOnly={isEditing}
+                className={`flex h-11 w-full rounded-lg border border-slate-200 px-3 py-2 text-base ring-offset-background placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all ${isEditing ? 'bg-slate-50 text-slate-500 cursor-not-allowed font-normal' : 'bg-white font-medium'}`} 
                 placeholder="〇〇ビル改修工事"
                 required
               />
