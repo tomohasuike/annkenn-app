@@ -8,7 +8,8 @@ import {
   Edit3,
   CheckCircle2,
   AlertTriangle,
-  Trash2
+  Trash2,
+  Mail
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
@@ -17,6 +18,7 @@ import generatePDF, { Resolution, Margin } from 'react-to-pdf';
 interface Worker {
   id: string;
   name: string;
+  email?: string;
 }
 
 type SafetyStatus = '無事' | '軽傷' | '重傷';
@@ -68,7 +70,7 @@ export default function SafetyDashboard() {
       // 1. Fetch Workers (Exclude subcontractors: 協力会社)
       const { data: workerData, error: workerErr } = await supabase
         .from('worker_master')
-        .select('id, name')
+        .select('id, name, email')
         .neq('type', '協力会社')
         .order('name');
       if (workerErr) throw workerErr;
@@ -232,6 +234,25 @@ export default function SafetyDashboard() {
     } catch (err: any) {
       setModalMessage({ type: 'error', text: `削除エラー: ${err.message}` });
     }
+  };
+
+  const handleSendReminderEmail = () => {
+    const emails = unconfirmedWorkers
+      .map(w => w.email)
+      .filter((e): e is string => !!e && e.trim() !== '');
+
+    if (emails.length === 0) {
+      alert('未回答の作業員に有効なメールアドレスが登録されていません。別途作業員マスタをご確認ください。');
+      return;
+    }
+
+    const bcc = emails.join(',');
+    const subject = encodeURIComponent('【再送】安否確認のお願い');
+    const bodyText = `未回答の方への再通知です。\n以下のURLより速やかにご自身の安否状況を報告してください。\n\n${settings?.safety_app_url || window.location.origin + '/safety-report'}`;
+    const body = encodeURIComponent(bodyText);
+
+    // Open default mail client
+    window.location.href = `mailto:?bcc=${bcc}&subject=${subject}&body=${body}`;
   };
 
   const handlePdfExport = async () => {
@@ -553,7 +574,17 @@ export default function SafetyDashboard() {
           <div className="bg-red-50 rounded-xl shadow-sm border border-red-100 flex flex-col overflow-hidden">
             <div className="px-5 py-4 bg-red-50 border-b border-red-100 flex justify-between items-center">
                <h3 className="text-sm font-bold text-red-800 tracking-wide">未回答者</h3>
-               <span className="bg-red-200 text-red-800 text-xs font-black px-2.5 py-1 rounded-full">{unconfirmedWorkers.length} 名</span>
+               <div className="flex items-center gap-2">
+                 <button 
+                   onClick={handleSendReminderEmail}
+                   className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 text-red-700 hover:bg-red-100 rounded-md text-xs font-bold transition-colors shadow-sm"
+                   title="未回答者に一斉メール（BCC）を送信"
+                 >
+                   <Mail size={14} />
+                   再通知メール
+                 </button>
+                 <span className="bg-red-200 text-red-800 text-xs font-black px-2.5 py-1 rounded-full">{unconfirmedWorkers.length} 名</span>
+               </div>
             </div>
             <div className="p-3">
               {unconfirmedWorkers.length > 0 ? (
