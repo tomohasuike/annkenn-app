@@ -79,8 +79,7 @@ const MainPage = React.memo(({
     setSelectedAnnotationIds,
     setActiveTool,
     stageRef,
-    onInitRotation,
-    zoomScale = 1
+    onInitRotation
 }: any) => {
     const { ref: inViewRef, inView } = useInView({
         rootMargin: '1000px 0px',
@@ -105,9 +104,12 @@ const MainPage = React.memo(({
 
     const currentMinHeight = pageSize.height > 0 ? pageSize.height : placeholderHeight;
 
-    // Retina/高DPI対応: Canvas自体の解像度を上げて鮮明に表示する（見た目のサイズや座標計算は維持）
+    // ★ フリッカー防止対策:
+    // Canvas自体の解像度をあらかじめ「最大ズーム(3倍)」に耐えうる超高解像度で固定生成します。
+    // これによりズーム操作中もreact-pdfの再レンダリング（Canvasの一瞬の消去）が一切発生せず、
+    // CSSのscaleのみで瞬時かつ完全に滑らかに（チラつきゼロで）拡大縮小できるようになります。
     const baseDpr = Math.max(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2);
-    const dpr = baseDpr * Math.max(1, zoomScale); // ズーム倍率を掛けてさらに高画質化
+    const dpr = baseDpr * 3; // 常に最大ズーム相当の超高画質を最初から確保しておく
 
     return (
         <div ref={setRefs} className="relative shadow-md bg-white mb-6 flex flex-col items-center shrink-0 transition-transform duration-200 scroll-mt-8" style={{ width: 800, minHeight: currentMinHeight }}>
@@ -2200,7 +2202,6 @@ export default function PdfEditor() {
                                             selectedAnnotationIds={selectedAnnotationIds}
                                             setSelectedAnnotationIds={setSelectedAnnotationIds}
                                             setActiveTool={setActiveTool}
-                                            zoomScale={scale}
                                             stageRef={(node: Konva.Stage | null) => {
                                                 if (node) {
                                                     stageRefs.current[pageId] = node;
