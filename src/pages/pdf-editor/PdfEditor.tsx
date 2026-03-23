@@ -387,6 +387,30 @@ export default function PdfEditor() {
   const [scale, setScale] = useState<number>(1);
   const scaleRef = useRef<number>(1);
   const [pageRotations, setPageRotations] = useState<Record<string, number>>({});
+
+  const headerRef = useRef<HTMLElement>(null);
+  
+  const toggleMenu = useCallback((menu: 'open' | 'add' | 'save' | 'extract' | 'info') => {
+      setIsOpenMenuOpen(menu === 'open' ? !isOpenMenuOpen : false);
+      setIsAddMenuOpen(menu === 'add' ? !isAddMenuOpen : false);
+      setIsDriveSaveMenuOpen(menu === 'save' ? !isDriveSaveMenuOpen : false);
+      setIsExtractMenuOpen(menu === 'extract' ? !isExtractMenuOpen : false);
+      setIsInfoOpen(menu === 'info' ? !isInfoOpen : false);
+  }, [isOpenMenuOpen, isAddMenuOpen, isDriveSaveMenuOpen, isExtractMenuOpen, isInfoOpen]);
+
+  useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+          if (headerRef.current && !headerRef.current.contains(event.target as Node)) {
+              setIsOpenMenuOpen(false);
+              setIsAddMenuOpen(false);
+              setIsDriveSaveMenuOpen(false);
+              setIsExtractMenuOpen(false);
+              setIsInfoOpen(false);
+          }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   
   const handleInitRotation = useCallback((pageId: string, nativeRotation: number) => {
       setPageRotations(prev => {
@@ -1652,7 +1676,7 @@ export default function PdfEditor() {
           </div>
       )}
 
-      <header className="flex-shrink-0 h-[52px] bg-gray-100 shadow-inner border-b border-gray-300 flex items-center justify-between px-4 relative z-[9999]">
+      <header ref={headerRef} className="flex-shrink-0 h-[52px] bg-gray-100 shadow-inner border-b border-gray-300 flex items-center justify-between px-4 relative z-[9999]">
         
         <div className="flex items-center gap-2">
           <button 
@@ -1668,7 +1692,7 @@ export default function PdfEditor() {
               <div className="flex items-center gap-1">
                   <div className="relative">
                       <button 
-                          onClick={() => { setIsOpenMenuOpen(!isOpenMenuOpen); setIsAddMenuOpen(false); }} 
+                          onClick={() => toggleMenu('open')} 
                           className={`flex items-center justify-center w-[28px] h-[28px] rounded-md transition-colors ${isOpenMenuOpen ? 'bg-gray-200/50 text-gray-800' : 'hover:bg-gray-200/50 text-gray-700'}`}
                           title="ファイルを開く"
                       >
@@ -1697,7 +1721,7 @@ export default function PdfEditor() {
                   </div>
                   <div className="relative">
                       <button 
-                          onClick={() => { setIsAddMenuOpen(!isAddMenuOpen); setIsOpenMenuOpen(false); }} 
+                          onClick={() => toggleMenu('add')} 
                           className={`flex items-center justify-center w-[28px] h-[28px] rounded-md transition-colors mr-2 ${isAddMenuOpen ? 'bg-gray-200/50 text-gray-800' : 'hover:bg-gray-200/50 text-gray-700'}`}
                           title="ページを追加"
                       >
@@ -1801,7 +1825,7 @@ export default function PdfEditor() {
                  
                   <div className="relative">
                       <button 
-                          onClick={() => setIsInfoOpen(!isInfoOpen)} 
+                          onClick={() => toggleMenu('info')} 
                           className={`flex items-center justify-center w-[28px] h-[28px] rounded-md transition-colors mx-0.5 ${isInfoOpen ? 'bg-gray-200/50 text-blue-600' : 'hover:bg-gray-200/50'}`}
                       >
                           <Info strokeWidth={1.5} className="w-[16px] h-[16px]"/>
@@ -1831,7 +1855,7 @@ export default function PdfEditor() {
                   {selectedPages.length > 0 && selectedPages.length < pageOrder.length && (
                       <div className="relative">
                           <button 
-                              onClick={() => setIsExtractMenuOpen(!isExtractMenuOpen)}
+                              onClick={() => toggleMenu('extract')}
                               disabled={isExporting}
                               className="relative flex items-center justify-center w-10 h-10 rounded-md text-indigo-600 bg-white border border-indigo-200 hover:bg-indigo-50 transition-colors shadow-sm ml-2 disabled:opacity-50"
                               title="ページ抽出"
@@ -1873,7 +1897,7 @@ export default function PdfEditor() {
 
                   <div className="relative z-[9999]">
                       <button 
-                          onClick={() => setIsDriveSaveMenuOpen(!isDriveSaveMenuOpen)}
+                          onClick={() => toggleMenu('save')}
                           disabled={isExporting}
                           // ★背景を青、文字・アイコンを白に変更
                           className="relative flex items-center justify-center w-10 h-10 rounded-md text-white bg-blue-600 border border-blue-600 hover:bg-blue-700 transition-colors shadow-sm ml-2 disabled:opacity-50"
