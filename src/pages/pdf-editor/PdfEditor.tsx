@@ -39,12 +39,16 @@ const PDFThumbnail = React.memo(({ pageId, rotation, onInitRotation }: { pageId:
     const isLandscape = (rotation || 0) % 180 !== 0;
     const placeholderHeight = isLandscape ? 60 : 120;
 
+    // Retina/高DPI対応: 最低でも2倍のピクセル密度を担保して鮮明に描画する
+    const dpr = Math.max(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2);
+
     return (
         <div ref={ref} className="w-[85px] flex items-center justify-center bg-white transition-all duration-200" style={{ minHeight: inView ? 'auto' : placeholderHeight }}>
             {inView ? (
                 <Page 
                     pageNumber={typeof pageId === 'string' ? parseInt(pageId.split('-')[1]) : pageId} 
                     width={85} 
+                    devicePixelRatio={dpr}
                     renderTextLayer={false} 
                     renderAnnotationLayer={false} 
                     rotate={rotation}
@@ -75,7 +79,8 @@ const MainPage = React.memo(({
     setSelectedAnnotationIds,
     setActiveTool,
     stageRef,
-    onInitRotation
+    onInitRotation,
+    zoomScale = 1
 }: any) => {
     const { ref: inViewRef, inView } = useInView({
         rootMargin: '1000px 0px',
@@ -100,6 +105,10 @@ const MainPage = React.memo(({
 
     const currentMinHeight = pageSize.height > 0 ? pageSize.height : placeholderHeight;
 
+    // Retina/高DPI対応: Canvas自体の解像度を上げて鮮明に表示する（見た目のサイズや座標計算は維持）
+    const baseDpr = Math.max(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2);
+    const dpr = baseDpr * Math.max(1, zoomScale); // ズーム倍率を掛けてさらに高画質化
+
     return (
         <div ref={setRefs} className="relative shadow-md bg-white mb-6 flex flex-col items-center shrink-0 transition-transform duration-200 scroll-mt-8" style={{ width: 800, minHeight: currentMinHeight }}>
             {inView ? (
@@ -110,6 +119,7 @@ const MainPage = React.memo(({
                         renderAnnotationLayer={false}
                         rotate={rotation}
                         width={800}
+                        devicePixelRatio={dpr}
                         onLoadSuccess={(page) => {
                             if (onInitRotation) onInitRotation(pageId, page.rotate || 0);
                             setPageSize({ width: 800, height: page.getViewport({ scale: 800 / page.getViewport({ scale: 1 }).width }).height });
@@ -2166,6 +2176,7 @@ export default function PdfEditor() {
                                             selectedAnnotationIds={selectedAnnotationIds}
                                             setSelectedAnnotationIds={setSelectedAnnotationIds}
                                             setActiveTool={setActiveTool}
+                                            zoomScale={scale}
                                             stageRef={(node: Konva.Stage | null) => {
                                                 if (node) {
                                                     stageRefs.current[pageId] = node;
