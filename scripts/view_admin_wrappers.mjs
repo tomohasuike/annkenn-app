@@ -1,0 +1,10 @@
+import fs from 'fs';
+const txt = fs.readFileSync('src/pages/ScheduleManagement.tsx', 'utf8').split('\n');
+console.log("--- Left Panel ---");
+console.log(txt.slice(1295, 1310).join('\n'));
+console.log("--- Left Panel Draggable ---");
+console.log(txt.slice(1335, 1345).join('\n'));
+console.log("--- Time Group Buttons ---");
+console.log(txt.slice(1856, 1863).join('\n'));
+console.log("--- Cell Buttons ---");
+console.log(txt.slice(1909, 1920).join('\n'));

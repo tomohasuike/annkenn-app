@@ -635,18 +635,12 @@ export default function Billing() {
           </div>
 
           {/* List Area */}
-          {loading ? (
+           {loading ? (
             <div className="flex items-center justify-center p-12">
               <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
             </div>
           ) : activeTab === "projects" ? (
              /* Projects Tab Content */
-             filteredProjects.length === 0 ? (
-              <div className="bg-white border text-center py-16 rounded-xl shadow-sm">
-                <Building2 className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-                <p className="text-slate-500 font-medium">案件が見つかりません</p>
-              </div>
-             ) : (
               <div className="space-y-4">
                 {/* Status Pills and Refresh Button */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -671,6 +665,12 @@ export default function Billing() {
                   </button>
                 </div>
 
+                {filteredProjects.length === 0 ? (
+                  <div className="bg-white border text-center py-16 rounded-xl shadow-sm">
+                    <Building2 className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                    <p className="text-slate-500 font-medium">案件が見つかりません</p>
+                  </div>
+                ) : (
                 <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-slate-50 border-b text-slate-500 font-semibold text-xs">
@@ -741,8 +741,8 @@ export default function Billing() {
                     </tbody>
                   </table>
                 </div>
+                )}
               </div>
-             )
           ) : (activeTab === "pending" && displayPending.length === 0) || (activeTab === "completed" && displayCompleted.length === 0) ? (
             <div className="bg-white border text-center py-16 rounded-xl shadow-sm">
               <FileText className="w-12 h-12 text-slate-200 mx-auto mb-3" />

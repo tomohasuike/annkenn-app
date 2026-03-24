@@ -48,6 +48,7 @@ export default function ScheduleManagement() {
   const [showRightPanel, setShowRightPanel] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('すべての状態')
+  const [showCompleted, setShowCompleted] = useState(false)
   const [showLeftPanel, setShowLeftPanel] = useState(false)
   const [collapsedResources, setCollapsedResources] = useState<Record<string, boolean>>({})
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({})
@@ -288,6 +289,13 @@ export default function ScheduleManagement() {
   const groupedProjects = projectsList.reduce((acc, p) => {
     if (p.id === vacationProjId) return acc
 
+    const isBaseStatus = p.status === '着工前' || p.status === '着工中';
+    const isCompletedStatus = p.status === '完工';
+    
+    if (!isBaseStatus && !(showCompleted && isCompletedStatus)) {
+      return acc;
+    }
+
     if (statusFilter !== 'すべての状態' && p.status !== statusFilter) return acc
 
     if (searchTerm) {
@@ -309,7 +317,32 @@ export default function ScheduleManagement() {
     acc[cat].push(p)
     return acc
   }, {} as Record<string, ProjectData[]>)
-  
+
+  // 親子関係のソート（ベース番号が同じなら、親が上、子が下になるように並び替え）
+  Object.keys(groupedProjects).forEach(cat => {
+    const baseGroups: Record<string, ProjectData[]> = {};
+    const baseOrder: string[] = [];
+
+    groupedProjects[cat].forEach(p => {
+       const no = p.no || '';
+       const base = no ? no.split('-')[0] : p.id;
+       if (!baseGroups[base]) {
+         baseGroups[base] = [];
+         baseOrder.push(base);
+       }
+       baseGroups[base].push(p);
+    });
+
+    const sortedProjects: ProjectData[] = [];
+    baseOrder.forEach(base => {
+       // 同じベース内では suffix (無印、-k01等) の昇順で並び替え
+       baseGroups[base].sort((a, b) => (a.no || '').localeCompare(b.no || ''));
+       sortedProjects.push(...baseGroups[base]);
+    });
+
+    groupedProjects[cat] = sortedProjects;
+  });
+
   const sortedCategories = Object.keys(groupedProjects).sort((a, b) => {
       const idxA = categoryOrder.indexOf(a)
       const idxB = categoryOrder.indexOf(b)
@@ -1470,19 +1503,30 @@ export default function ScheduleManagement() {
             <thead className="sticky top-0 z-40 bg-[#f8f9fa]">
               <tr>
                 <th className="p-0.5 py-3 border-b-2 border-r border-[#dee2e6] text-left text-[0.95em] font-bold text-slate-700 sticky left-0 z-50 bg-[#eef2f6]" style={{ width: `${cellWidth}px`, minWidth: `${cellWidth}px` }}>
-                  <div className="flex items-center justify-between mb-2 px-1">
-                    <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-transparent text-[0.95em] font-bold text-slate-700 cursor-pointer outline-none">
-                       <option>すべての状態</option>
-                       <option>着工前</option>
-                       <option>着工中</option>
-                    </select>
-                    <button 
-                       onClick={toggleAllCategories}
-                       title="すべての区分を開閉（一括表示）"
-                       className="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors ml-2 flex items-center gap-0.5"
-                    >
-                       <List className="w-4 h-4" />
-                    </button>
+                  <div className="flex flex-col gap-1 px-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-transparent text-[0.95em] font-bold text-slate-700 cursor-pointer outline-none w-full">
+                         <option>すべての状態</option>
+                         <option>着工前</option>
+                         <option>着工中</option>
+                      </select>
+                      <button 
+                         onClick={toggleAllCategories}
+                         title="すべての区分を開閉（一括表示）"
+                         className="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors ml-1 shrink-0 flex items-center gap-0.5"
+                      >
+                         <List className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <label className="flex items-center gap-1.5 text-[0.8em] font-normal text-slate-500 cursor-pointer hover:text-slate-700 transition-colors w-max select-none">
+                      <input 
+                        type="checkbox" 
+                        checked={showCompleted} 
+                        onChange={(e) => setShowCompleted(e.target.checked)} 
+                        className="rounded border-slate-300 text-blue-500 focus:ring-blue-500"
+                      />
+                      完工物件も含める
+                    </label>
                   </div>
                   <div className="relative px-1">
                      <span className="absolute left-3 top-0.5 text-slate-400 font-normal">🔍</span>

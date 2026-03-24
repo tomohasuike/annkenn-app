@@ -9,3 +9,25 @@ entrypoint = "./functions/debug-drive/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/debug-drive/*.html" ]
+
+[functions.upload-drive-file]
+enabled = true
+verify_jwt = true
+import_map = "./functions/upload-drive-file/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/upload-drive-file/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/upload-drive-file/*.html" ]
+
+[functions.migrate-drive-photos]
+enabled = true
+verify_jwt = true
+import_map = "./functions/migrate-drive-photos/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/migrate-drive-photos/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/migrate-drive-photos/*.html" ]
