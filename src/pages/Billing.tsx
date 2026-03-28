@@ -11,6 +11,16 @@ type ProjectData = {
   site_name?: string
   status_flag?: string
   legacy_id?: string
+  category?: string
+}
+
+const getDisplayClientName = (proj: Partial<ProjectData> | null | undefined): string => {
+  if (!proj) return "";
+  const cName = (proj.client_name || "").trim();
+  if (cName !== "" && cName !== "未設定") return cName;
+  if (proj.category === '川北') return '川北';
+  if (proj.category === 'bpe' || proj.category === 'BPE') return 'BPE';
+  return "";
 }
 
 type InvoiceDetailData = {
@@ -133,7 +143,7 @@ export default function Billing() {
         .from('invoices')
         .select(`
           *,
-          projects ( project_name ),
+          projects ( project_name, client_name, category, project_number, site_name, legacy_id ),
           invoice_details ( * )
         `)
         .order('created_at', { ascending: false })
@@ -319,7 +329,7 @@ export default function Billing() {
     if (p.project_number === 'VACATION' || (p.project_name && p.project_name.includes('休暇'))) return false
     return (p.project_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
            (p.project_number || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-           (p.client_name || "").toLowerCase().includes(searchTerm.toLowerCase())
+           getDisplayClientName(p).toLowerCase().includes(searchTerm.toLowerCase())
   })
   
   if (projectStatusFilter === "着工中 (未請求)") {
@@ -411,7 +421,7 @@ export default function Billing() {
     const q = searchTerm.toLowerCase()
     const matchesProj = (inv.primaryProj.project_name || "").toLowerCase().includes(q) ||
                         (inv.primaryProj.project_number || "").toLowerCase().includes(q) ||
-                        (inv.primaryProj.client_name || "").toLowerCase().includes(q)
+                        getDisplayClientName(inv.primaryProj).toLowerCase().includes(q)
     const matchesInv = (inv.billing_subject || "").toLowerCase().includes(q) ||
                        (inv.billing_destination || "").toLowerCase().includes(q)
     return matchesProj || matchesInv
@@ -700,7 +710,7 @@ export default function Billing() {
                             )}
                           </td>
                           <td className="px-5 py-4 align-top text-slate-600 text-sm font-medium">
-                            {proj.client_name || ""}
+                            {getDisplayClientName(proj)}
                           </td>
                           <td className="px-5 py-4 align-top">
                              <span className={`inline-flex items-center whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border ${
@@ -785,8 +795,8 @@ export default function Billing() {
                   const amt = inv.totalBilled // amount paid
                   grandTotal += amt
                   
-                  // Priority for client name: billing_destination > primaryProj.client_name > "未設定"
-                  const clientName = (inv.billing_destination || (inv.primaryProj as Partial<ProjectData>)?.client_name || "未設定").trim()
+                  // Priority for client name: billing_destination > primaryProj.client_name/category > "未設定"
+                  const clientName = (inv.billing_destination || getDisplayClientName(inv.primaryProj as Partial<ProjectData>) || "未設定").trim()
                   const categoryName = (inv.primaryProj as any)?.category || "未設定"
                   
                   if (!categoryTotals[categoryName]) {
@@ -968,8 +978,8 @@ export default function Billing() {
 
                     grandTotal += amt
                     
-                    // Priority for client name: billing_destination > primaryProj.client_name > "未設定"
-                    const clientName = (inv.billing_destination || (inv.primaryProj as Partial<ProjectData>)?.client_name || "未設定").trim()
+                    // Priority for client name: billing_destination > primaryProj.client_name/category > "未設定"
+                    const clientName = (inv.billing_destination || getDisplayClientName(inv.primaryProj as Partial<ProjectData>) || "未設定").trim()
                     const categoryName = (inv.primaryProj as any)?.category || "未設定"
                     
                     if (!monthTotals[monthKey]) {
@@ -1130,7 +1140,7 @@ export default function Billing() {
                 const isExpanded = expandedInvoiceId === inv.id
                 const pName = inv.primaryProj?.project_name || "案件名未設定"
                 const pNum = inv.primaryProj?.project_number || "---"
-                const cName = inv.billing_destination || inv.primaryProj?.client_name || "請求先未設定"
+                const cName = inv.billing_destination || getDisplayClientName(inv.primaryProj) || "請求先未設定"
 
                 return (
                   // Conditional Wrapper (Dark vs Light Card)

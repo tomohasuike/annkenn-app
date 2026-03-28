@@ -15,6 +15,7 @@ import {
   FileText
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import imageCompression from 'browser-image-compression';
 import { AutocompleteInput } from '../../components/ui/AutocompleteInput';
 
 interface CompletionReportFormData {
@@ -259,20 +260,31 @@ export function CompletionReportForm() {
 
   // --- Save Logic ---
   const uploadFileToSupabase = async (file: File): Promise<string> => {
-    const fileExt = file.name.split('.').pop();
+    const options = {
+      maxSizeMB: 0.5,
+      maxWidthOrHeight: 1280,
+      useWebWorker: true,
+    }
+    const compressed = await imageCompression(file, options)
+
+    const fileExt = compressed.name.split('.').pop() || 'jpg';
     const fileName = `${uuidv4()}.${fileExt}`;
-    // Using existing daily_report_photos bucket
-    const filePath = `completion_reports/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('daily_report_photos')
-      .upload(filePath, file, { upsert: true });
+    const finalFile = new File([compressed], fileName, { type: compressed.type });
+    const formData = new FormData();
+    formData.append('file', finalFile);
 
-    if (uploadError) throw uploadError;
+    const { error: uploadError, data: uploadData } = await supabase.functions.invoke('upload-drive-file', {
+        body: formData,
+    });
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('daily_report_photos')
-      .getPublicUrl(filePath);
+    if (uploadError || !uploadData?.success) {
+        console.error("Error uploading image:", uploadError || uploadData?.error);
+        throw new Error("画像のアップロードに失敗しました");
+    }
+
+    // Google Drive URL
+    const publicUrl = uploadData.thumbnailLink ? uploadData.thumbnailLink.replace('=s220', '=s800') : uploadData.webViewLink;
 
     return publicUrl;
   };

@@ -176,12 +176,21 @@ export default function VehicleInspection() {
       try {
           const compressed = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1280 })
           const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`
-          const { data, error } = await supabase.storage.from('inspection_photos').upload(fileName, compressed)
-          if (error) throw error
-          if (data) {
-              const { data: { publicUrl } } = supabase.storage.from('inspection_photos').getPublicUrl(fileName)
-              return publicUrl
+          
+          const finalFile = new File([compressed], fileName, { type: compressed.type || 'image/jpeg' });
+          const formData = new FormData();
+          formData.append('file', finalFile);
+
+          const { error: uploadError, data: uploadData } = await supabase.functions.invoke('upload-drive-file', {
+              body: formData,
+          });
+
+          if (uploadError || !uploadData?.success) {
+              console.error("Error uploading image:", uploadError || uploadData?.error);
+              throw new Error("画像のアップロードに失敗しました");
           }
+
+          return uploadData.thumbnailLink ? uploadData.thumbnailLink.replace('=s220', '=s800') : uploadData.webViewLink;
       } catch (e) {
           console.error("Upload error", e)
           return null
