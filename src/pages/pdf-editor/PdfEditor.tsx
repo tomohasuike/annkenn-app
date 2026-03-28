@@ -2116,7 +2116,8 @@ export default function PdfEditor() {
                                     {filePageCounts[fileIndex] && Array.from({ length: filePageCounts[fileIndex] }, (_, i) => {
                                         const globalId = `${fileIndex}-${i + 1}`;
                                         const rank = pageOrder.indexOf(globalId);
-                                        const order = rank !== -1 ? rank : 9999;
+                                        if (rank === -1) return null;
+                                        const order = rank;
                                         return (
                                             <div key={globalId} style={{ order }} className="w-full flex justify-center mb-2">
                                                 <SortableThumbnail 
@@ -2181,7 +2182,8 @@ export default function PdfEditor() {
                             {filePageCounts[fileIndex] && Array.from({ length: filePageCounts[fileIndex] }, (_, i) => {
                                 const pageId = `${fileIndex}-${i + 1}`;
                                 const rank = pageOrder.indexOf(pageId);
-                                const order = rank !== -1 ? rank : 9999;
+                                if (rank === -1) return null;
+                                const order = rank;
                                 return (
                                     <div key={pageId} style={{ order }} ref={el => { if (mainPageRefs.current) mainPageRefs.current[pageId] = el; }} className="mb-4">
                                         <MainPage 
