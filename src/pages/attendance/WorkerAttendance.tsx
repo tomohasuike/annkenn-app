@@ -565,22 +565,49 @@ export default function WorkerAttendance() {
                         ) : <span className="text-slate-400">-</span>}
                       </td>
                       <td className="px-4 py-3 text-sm">
-                         {record?.site_declarations && record.site_declarations.length > 0 ? (
-                           <div className="flex flex-col gap-1 text-xs">
-                             {record.site_declarations.map((p:any, i:number) => (
-                               <span key={i} className="text-slate-700 font-medium truncate w-full block bg-slate-100 px-1.5 py-0.5 rounded border">
-                                 {p.project_name} ({p.start_time}〜{p.end_time})
-                               </span>
-                             ))}
-                           </div>
-                         ) : <span className="text-xs text-slate-400 italic">日報未登録</span>}
+                         {(() => {
+                            const decls = record?.site_declarations || [];
+                            const assigned = assignedProjects[dateStr] || [];
+                            
+                            if (decls.length > 0) {
+                               return (
+                                 <div className="flex flex-col gap-1 text-xs">
+                                   {decls.map((p:any, i:number) => (
+                                     <span key={i} className={`font-medium truncate w-full block px-1.5 py-0.5 rounded border ${p.project_id === 'imported' ? 'bg-slate-50 text-slate-400' : 'bg-slate-100 text-slate-700'}`}>
+                                       {p.project_name} {p.start_time ? `(${p.start_time}〜${p.end_time || '?'})` : ''}
+                                     </span>
+                                   ))}
+                                 </div>
+                               );
+                            } else if (assigned.length > 0) {
+                               return (
+                                 <div className="flex flex-col gap-1 text-xs">
+                                   {assigned.map((ap:any, i:number) => (
+                                     <span key={i} className="text-blue-600 font-medium truncate w-full block bg-blue-50/50 border-blue-200 px-1.5 py-0.5 rounded border border-dashed">
+                                       [予定] {ap.project_name}
+                                     </span>
+                                   ))}
+                                 </div>
+                               );
+                            }
+                            return <span className="text-xs text-slate-400 italic">日報なし</span>;
+                         })()}
                       </td>
                       <td className="px-4 py-3">
-                         {record?.site_declarations && record.site_declarations.length > 0 ? (
-                           <div className="flex flex-col gap-1 text-xs">{record.site_declarations.map((sd:any, i:number) => (
-                               <span key={i} className={`truncate w-fit block px-1.5 py-0.5 rounded border ${sd.role === '職長' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100'}`}>{sd.role || '一般'}</span>
-                           ))}</div>
-                         ) : <span className="text-slate-400">-</span>}
+                         {(() => {
+                           const decls = record?.site_declarations || [];
+                           const assigned = assignedProjects[dateStr] || [];
+                           if (decls.length > 0) {
+                             return (
+                               <div className="flex flex-col gap-1 text-xs">{decls.map((sd:any, i:number) => (
+                                 <span key={i} className={`truncate w-fit block px-1.5 py-0.5 rounded border ${sd.role === '職長' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100'}`}>{sd.role || '一般'}</span>
+                               ))}</div>
+                             );
+                           } else if (assigned.length > 0) {
+                             return <span className="text-xs text-slate-400 italic">-</span>;
+                           }
+                           return <span className="text-slate-400">-</span>;
+                         })()}
                       </td>
                       <td className="px-4 py-3">{record?.travel_time_minutes ? `${record.travel_time_minutes}分` : '-'}</td>
                       <td className="px-4 py-3">{record?.prep_time_minutes ? `${record.prep_time_minutes}分` : '-'}</td>
