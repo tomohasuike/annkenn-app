@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Clock, X, Plus, Trash2, ArrowRight } from 'lucide-react';
+import { Clock, X, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface DailyAttendance {
