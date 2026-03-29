@@ -46,6 +46,8 @@ const APPS = [
   { id: 'schedule-management', name: '工程管理' },
   { id: 'schedule-admin', name: '工程管理(フル)' },
   { id: 'work-summary', name: '作業集計管理' },
+  { id: 'attendance', name: '勤怠申告' },
+  { id: 'attendance-admin', name: '勤怠管理' },
   { id: 'billing', name: '請求管理' },
   { id: 'vehicle-inspection', name: '車両点検' },
   { id: 'safety-dashboard', name: '安否確認管理' }
@@ -80,10 +82,10 @@ export default function Settings() {
   // Styling helper for roles
   const getRoleColorClass = (type?: string) => {
       switch (type) {
-          case '社長': return 'bg-yellow-50/50';
-          case '事務員': return 'bg-purple-50/50';
-          case '協力会社': return 'bg-orange-50/50';
-          case '作業員': return 'bg-blue-50/30';
+          case '社長': return 'bg-yellow-50';
+          case '事務員': return 'bg-purple-50';
+          case '協力会社': return 'bg-orange-50';
+          case '作業員': return 'bg-blue-50';
           default: return 'bg-white';
       }
   };
@@ -464,14 +466,14 @@ export default function Settings() {
                     </button>
                 </div>
 
-                <div className="overflow-x-auto border rounded-lg">
-                    <table className="w-full text-sm text-left">
-                        <thead className="text-xs text-muted-foreground bg-muted/50 border-b">
+                <div className="overflow-auto border rounded-lg max-h-[70vh]">
+                    <table className="w-full text-sm text-left relative">
+                        <thead className="text-xs text-muted-foreground bg-slate-50 border-b sticky top-0 z-30 shadow-sm">
                             <tr>
-                                <th className="px-4 py-3 font-medium sticky left-0 bg-muted/50 z-20 shadow-[1px_0_0_0_theme(colors.border)] min-w-[140px]">作業員名</th>
-                                <th className="px-4 py-3 font-medium text-center sticky left-[140px] bg-muted/50 z-20 shadow-[1px_0_0_0_theme(colors.border)]">管理者</th>
+                                <th className="px-4 py-3 font-medium sticky left-0 bg-slate-50 z-40 shadow-[1px_0_0_0_theme(colors.border)] min-w-[140px]">作業員名</th>
+                                <th className="px-4 py-3 font-medium text-center sticky left-[140px] bg-slate-50 z-40 shadow-[1px_0_0_0_theme(colors.border)]">管理者</th>
                                 {APPS.map(app => (
-                                    <th key={app.id} className="px-4 py-3 font-medium text-center writing-mode-vertical sm:writing-mode-horizontal whitespace-nowrap">
+                                    <th key={app.id} className="px-4 py-3 font-medium text-center writing-mode-vertical sm:writing-mode-horizontal whitespace-nowrap bg-slate-50 z-30">
                                         <div className="flex items-center justify-center gap-1">
                                             <span className="truncate max-w-[80px]" title={app.name}>{app.name}</span>
                                         </div>
@@ -562,14 +564,14 @@ export default function Settings() {
                     </div>
                   </div>
                   
-                  <div className="overflow-x-auto border rounded-lg">
-                      <table className="w-full text-sm text-left">
-                          <thead className="text-xs text-muted-foreground bg-muted/50 border-b">
+                  <div className="overflow-auto border rounded-lg max-h-[70vh]">
+                      <table className="w-full text-sm text-left relative">
+                          <thead className="text-xs text-muted-foreground bg-slate-50 border-b sticky top-0 z-30 shadow-sm">
                               <tr>
-                                  <th className="px-4 py-3 font-medium min-w-[140px]">名前</th>
-                                  <th className="px-4 py-3 font-medium">区分</th>
-                                  <th className="px-4 py-3 font-medium">メールアドレス</th>
-                                  <th className="px-4 py-3 font-medium text-right">操作</th>
+                                  <th className="px-4 py-3 font-medium min-w-[140px] bg-slate-50">名前</th>
+                                  <th className="px-4 py-3 font-medium bg-slate-50">区分</th>
+                                  <th className="px-4 py-3 font-medium bg-slate-50">メールアドレス</th>
+                                  <th className="px-4 py-3 font-medium text-right bg-slate-50">操作</th>
                               </tr>
                           </thead>
                           <tbody className="divide-y relative">

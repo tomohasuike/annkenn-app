@@ -375,10 +375,9 @@ export default function ProjectForm() {
               <label className="text-sm font-bold text-slate-700">案件名 / 工事名称 <span className="text-red-500">*</span></label>
               <input 
                 name="project_name" 
-                value={formData.project_name} 
+                value={formData.project_name || ''} 
                 onChange={handleChange}
-                readOnly={isEditing}
-                className={`flex h-11 w-full rounded-lg border border-slate-200 px-3 py-2 text-base ring-offset-background placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all ${isEditing ? 'bg-slate-50 text-slate-500 cursor-not-allowed font-normal' : 'bg-white font-medium'}`} 
+                className="flex h-11 w-full rounded-lg border border-slate-200 px-3 py-2 text-base ring-offset-background placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white font-medium text-slate-900" 
                 placeholder="〇〇ビル改修工事"
                 required
               />

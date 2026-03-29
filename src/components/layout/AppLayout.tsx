@@ -119,23 +119,34 @@ export default function AppLayout() {
             </NavLink>
             )}
 
+            {hasAccess('schedule-management') && (
+            <NavLink to="/schedule-management" className={getNavClass}>
+              {({ isActive }) => (
+                <>
+                  <CalendarDays className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
+                  工程管理
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
+                </>
+              )}
+            </NavLink>
+            )}
+            {true && (
+            <NavLink to="/attendance" className={getNavClass}>
+              {({ isActive }) => (
+                <>
+                  <ClipboardList className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
+                  勤怠申告
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
+                </>
+              )}
+            </NavLink>
+            )}
             {hasAccess('reports') && (
             <NavLink to="/reports" className={getNavClass}>
               {({ isActive }) => (
                 <>
                   <ClipboardList className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
                   日報管理
-                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
-                </>
-              )}
-            </NavLink>
-            )}
-            {hasAccess('completion-reports') && (
-            <NavLink to="/completion-reports" className={getNavClass}>
-              {({ isActive }) => (
-                <>
-                  <CheckSquare className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
-                  完了報告
                   {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
                 </>
               )}
@@ -152,12 +163,12 @@ export default function AppLayout() {
               )}
             </NavLink>
             )}
-            {hasAccess('schedule-management') && (
-            <NavLink to="/schedule-management" className={getNavClass}>
+            {hasAccess('completion-reports') && (
+            <NavLink to="/completion-reports" className={getNavClass}>
               {({ isActive }) => (
                 <>
-                  <CalendarDays className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
-                  工程管理
+                  <CheckSquare className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
+                  完了報告
                   {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
                 </>
               )}
@@ -169,6 +180,17 @@ export default function AppLayout() {
                 <>
                   <PieChart className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
                   作業集計管理
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
+                </>
+              )}
+            </NavLink>
+            )}
+            {(hasAccess('attendance-admin') || isAdmin) && (
+            <NavLink to="/attendance-admin" className={getNavClass}>
+              {({ isActive }) => (
+                <>
+                  <ClipboardList className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
+                  勤怠管理
                   {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
                 </>
               )}

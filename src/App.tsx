@@ -19,6 +19,8 @@ import SafetyDashboard from "./pages/SafetyDashboard"
 import Settings from './pages/Settings'
 import VehicleInspection from "./pages/VehicleInspection"
 import PdfEditor from "./pages/pdf-editor/PdfEditor"
+import AttendanceAdmin from "./pages/attendance/AttendanceAdmin"
+import WorkerAttendance from "./pages/attendance/WorkerAttendance"
 
 import Login from "./pages/Login"
 import ProtectedRoute from "./components/auth/ProtectedRoute"
@@ -61,6 +63,8 @@ function App() {
               <Route path="billing/new" element={<BillingForm />} />
               <Route path="billing/:id" element={<BillingForm />} />
               <Route path="work-summary" element={<WorkSummary />} />
+              <Route path="attendance" element={<WorkerAttendance />} />
+              <Route path="attendance-admin" element={<AttendanceAdmin />} />
               <Route path="workers" element={<WorkersPlaceholder />} />
               <Route path="safety-dashboard" element={<SafetyDashboard />} />
               <Route path="vehicle-inspection" element={<VehicleInspection />} />
