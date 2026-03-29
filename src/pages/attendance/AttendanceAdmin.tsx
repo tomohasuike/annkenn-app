@@ -564,6 +564,40 @@ export default function AttendanceAdmin() {
                           return false;
                        })();
 
+                       const combinedRecords: any[] = [];
+                       projs.forEach((p: any) => {
+                           combinedRecords.push({
+                               type: 'assigned',
+                               reportId: p.reportId,
+                               projectId: p.projectId,
+                               projectName: p.name,
+                               reportStart: p.sStr,
+                               reportEnd: p.eStr,
+                               clientName: p.cn,
+                               order: p.ord,
+                               declStart: getDeclaredTime(p.projectId, 'start_time'),
+                               declEnd: getDeclaredTime(p.projectId, 'end_time'),
+                               declRole: getDeclaredRole(p.projectId)
+                           });
+                       });
+                       siteDecls.forEach((sd: any) => {
+                           if (!combinedRecords.some(cr => cr.projectId === sd.project_id)) {
+                               combinedRecords.push({
+                                   type: sd.project_id === 'imported' ? 'imported' : 'unassigned',
+                                   reportId: undefined,
+                                   projectId: sd.project_id,
+                                   projectName: sd.project_name || (sd.project_id === 'imported' ? '過去インポートデータ' : '割当外の現場'),
+                                   reportStart: null,
+                                   reportEnd: null,
+                                   clientName: undefined,
+                                   order: undefined,
+                                   declStart: sd.start_time,
+                                   declEnd: sd.end_time,
+                                   declRole: sd.role || '一般'
+                               });
+                           }
+                       });
+
                        const openAttendanceModal = () => {
                           if (!selectedWorkerId) return;
                           setEditingAttendance({ 
@@ -596,178 +630,147 @@ export default function AttendanceAdmin() {
                            <td onClick={openAttendanceModal} className="p-2 border-r font-medium text-slate-700 cursor-pointer hover:bg-slate-100 transition-colors">
                               {formatTime(record?.clock_out_time)}
                            </td>
+                           
                            {/* 現場入 Column */}
                            <td className={`p-2 border-r font-medium align-top pt-2 px-1 text-left min-w-[80px] ${hasOverlap ? "bg-red-50/50 text-slate-700" : "bg-blue-50/10 text-slate-700"}`}>
-                              {projs.length > 0 ? (
+                              {combinedRecords.length > 0 ? (
                                 <div className="flex flex-col gap-1 w-full">
                                    {hasOverlap && (
                                       <div className="h-[20px] bg-red-600 text-white rounded text-[10px] font-bold flex items-center justify-center shadow-md w-full border border-red-700 animate-pulse">
                                          🚨 重複エラー
                                       </div>
                                    )}
-                                  {projs.map((pObj: any, idx: number) => {
-                                     const declaredStart = getDeclaredTime(pObj.projectId, 'start_time');
-                                     const isMismatch = declaredStart && declaredStart !== (pObj.sStr || '');
+                                  {combinedRecords.map((cr, idx) => {
+                                     const isMismatch = cr.type === 'assigned' && cr.declStart && cr.declStart !== (cr.reportStart || '');
                                      
                                      return (
-                                       <div key={idx} onClick={() => { if (!dateStr || !pObj) return; setEditingTime({ dateStr, reportId: pObj.reportId, projectId: pObj.projectId, projectName: pObj.name, recordId: record?.id, siteDecls: record?.site_declarations || [], reportStart: pObj.sStr, reportEnd: pObj.eStr, declStart: getDeclaredTime(pObj.projectId, "start_time"), declEnd: getDeclaredTime(pObj.projectId, "end_time"), role: getDeclaredRole(pObj.projectId) }); }} className={`cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all h-[44px] flex flex-col justify-center text-[11px] rounded px-1.5 box-border border ${
+                                       <div key={idx} onClick={() => { if (!dateStr) return; setEditingTime({ dateStr, reportId: cr.reportId, projectId: cr.projectId, projectName: cr.projectName, recordId: record?.id, siteDecls: record?.site_declarations || [], reportStart: cr.reportStart, reportEnd: cr.reportEnd, declStart: cr.declStart, declEnd: cr.declEnd, role: cr.declRole }); }} className={`cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all h-[44px] flex flex-col justify-center text-[11px] rounded px-1.5 box-border border ${
                                           isMismatch ? 'border-red-400 bg-red-50 text-red-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700'
                                        }`}>
-                                         <div className="flex justify-between items-center w-full">
-                                            <span className="text-[9px] text-slate-500 mr-1">日報</span>
-                                            <span className={isMismatch ? "font-bold" : ""}>{pObj.sStr || '-'}</span>
-                                         </div>
-                                         <div className={`flex justify-between items-center w-full mt-0.5 pt-0.5 border-t ${isMismatch ? 'border-red-200' : 'border-slate-100 text-blue-700'}`}>
-                                            <span className={`text-[9px] mr-1 ${isMismatch ? 'text-red-500' : 'text-blue-400'}`}>本人</span>
-                                            <span className={isMismatch ? "font-bold" : "font-medium"}>{declaredStart || '-'}</span>
-                                         </div>
+                                         {cr.type === 'assigned' ? (
+                                             <>
+                                                 <div className="flex justify-between items-center w-full">
+                                                    <span className="text-[9px] text-slate-500 mr-1">日報</span>
+                                                    <span className={isMismatch ? "font-bold" : ""}>{cr.reportStart || '-'}</span>
+                                                 </div>
+                                                 <div className={`flex justify-between items-center w-full mt-0.5 pt-0.5 border-t ${isMismatch ? 'border-red-200' : 'border-slate-100 text-blue-700'}`}>
+                                                    <span className={`text-[9px] mr-1 ${isMismatch ? 'text-red-500' : 'text-blue-400'}`}>本人</span>
+                                                    <span className={isMismatch ? "font-bold" : "font-medium"}>{cr.declStart || '-'}</span>
+                                                 </div>
+                                             </>
+                                         ) : (
+                                             <div className="flex justify-between items-center w-full mt-0.5 pt-0.5">
+                                                <span className="text-[9px] mr-1 text-blue-400">本人</span>
+                                                <span className="font-medium text-blue-700">{cr.declStart || '-'}</span>
+                                             </div>
+                                         )}
                                        </div>
                                      );
                                   })}
                                 </div>
-                              ) : (() => {
-                                 const recordToShow = siteDecls.find(s => s.project_id === 'imported' || s.project_id === 'unassigned');
-                                 if (recordToShow && recordToShow.start_time) {
-                                    return (
-                                       <div className="h-[44px] flex flex-col justify-center text-[11px] rounded px-1.5 box-border border border-slate-200 bg-white text-slate-700 w-full mb-1 flex-shrink-0 cursor-pointer hover:bg-slate-50"
-                                            onClick={() => setEditingTime({ dateStr, reportId: undefined, projectId: recordToShow.project_id, projectName: recordToShow.project_name || '割当外の現場', recordId: record?.id, siteDecls: record?.site_declarations || [], reportStart: null, reportEnd: null, declStart: getDeclaredTime(recordToShow.project_id, "start_time"), declEnd: getDeclaredTime(recordToShow.project_id, "end_time"), role: getDeclaredRole(recordToShow.project_id) })}
-                                       >
-                                         <div className="flex justify-between items-center w-full mt-0.5 pt-0.5">
-                                            <span className="text-[9px] mr-1 text-blue-400">本人</span>
-                                            <span className="font-medium text-blue-700">{recordToShow.start_time}</span>
-                                         </div>
-                                       </div>
-                                    );
-                                 }
-                                 return <span className="text-slate-300 flex items-center justify-center h-[34px]">-</span>;
-                              })()}
+                              ) : (
+                                 <span className="text-slate-300 flex items-center justify-center h-[34px]">-</span>
+                              )}
                            </td>
 
                            {/* 現場出 Column */}
                            <td className={`p-2 border-r font-medium align-top pt-2 px-1 text-left min-w-[80px] ${hasOverlap ? "bg-red-50/50 text-slate-700" : "bg-blue-50/10 text-slate-700"}`}>
-                              {projs.length > 0 ? (
+                              {combinedRecords.length > 0 ? (
                                 <div className="flex flex-col gap-1 w-full">
                                    {hasOverlap && (
                                       <div className="h-[20px] bg-red-50 text-red-600 rounded text-[10px] font-bold flex items-center justify-center shadow-sm w-full border border-red-200">
                                          要確認
                                       </div>
                                    )}
-                                  {projs.map((pObj: any, idx: number) => {
-                                     const declaredEnd = getDeclaredTime(pObj.projectId, 'end_time');
-                                     const isMismatch = declaredEnd && declaredEnd !== (pObj.eStr || '');
+                                  {combinedRecords.map((cr, idx) => {
+                                     const isMismatch = cr.type === 'assigned' && cr.declEnd && cr.declEnd !== (cr.reportEnd || '');
                                      
                                      return (
-                                       <div key={idx} onClick={() => { if (!dateStr || !pObj) return; setEditingTime({ dateStr, reportId: pObj.reportId, projectId: pObj.projectId, projectName: pObj.name, recordId: record?.id, siteDecls: record?.site_declarations || [], reportStart: pObj.sStr, reportEnd: pObj.eStr, declStart: getDeclaredTime(pObj.projectId, "start_time"), declEnd: getDeclaredTime(pObj.projectId, "end_time"), role: getDeclaredRole(pObj.projectId) }); }} className={`cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all h-[44px] flex flex-col justify-center text-[11px] rounded px-1.5 box-border border ${
+                                       <div key={idx} onClick={() => { if (!dateStr) return; setEditingTime({ dateStr, reportId: cr.reportId, projectId: cr.projectId, projectName: cr.projectName, recordId: record?.id, siteDecls: record?.site_declarations || [], reportStart: cr.reportStart, reportEnd: cr.reportEnd, declStart: cr.declStart, declEnd: cr.declEnd, role: cr.declRole }); }} className={`cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all h-[44px] flex flex-col justify-center text-[11px] rounded px-1.5 box-border border ${
                                           isMismatch ? 'border-red-400 bg-red-50 text-red-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700'
                                        }`}>
-                                         <div className="flex justify-between items-center w-full">
-                                            <span className="text-[9px] text-slate-500 mr-1">日報</span>
-                                            <span className={isMismatch ? "font-bold" : ""}>{pObj.eStr || '-'}</span>
-                                         </div>
-                                         <div className={`flex justify-between items-center w-full mt-0.5 pt-0.5 border-t ${isMismatch ? 'border-red-200' : 'border-slate-100 text-blue-700'}`}>
-                                            <span className={`text-[9px] mr-1 ${isMismatch ? 'text-red-500' : 'text-blue-400'}`}>本人</span>
-                                            <span className={isMismatch ? "font-bold" : "font-medium"}>{declaredEnd || '-'}</span>
-                                         </div>
+                                         {cr.type === 'assigned' ? (
+                                             <>
+                                                 <div className="flex justify-between items-center w-full">
+                                                    <span className="text-[9px] text-slate-500 mr-1">日報</span>
+                                                    <span className={isMismatch ? "font-bold" : ""}>{cr.reportEnd || '-'}</span>
+                                                 </div>
+                                                 <div className={`flex justify-between items-center w-full mt-0.5 pt-0.5 border-t ${isMismatch ? 'border-red-200' : 'border-slate-100 text-blue-700'}`}>
+                                                    <span className={`text-[9px] mr-1 ${isMismatch ? 'text-red-500' : 'text-blue-400'}`}>本人</span>
+                                                    <span className={isMismatch ? "font-bold" : "font-medium"}>{cr.declEnd || '-'}</span>
+                                                 </div>
+                                             </>
+                                         ) : (
+                                             <div className="flex justify-between items-center w-full mt-0.5 pt-0.5">
+                                                <span className="text-[9px] mr-1 text-blue-400">本人</span>
+                                                <span className="font-medium text-blue-700">{cr.declEnd || '-'}</span>
+                                             </div>
+                                         )}
                                        </div>
                                      );
                                   })}
                                 </div>
-                              ) : (() => {
-                                 const recordToShow = siteDecls.find(s => s.project_id === 'imported' || s.project_id === 'unassigned');
-                                 if (recordToShow && recordToShow.end_time) {
-                                    return (
-                                       <div className="h-[44px] flex flex-col justify-center text-[11px] rounded px-1.5 box-border border border-slate-200 bg-white text-slate-700 w-full mb-1 flex-shrink-0 cursor-pointer hover:bg-slate-50"
-                                            onClick={() => setEditingTime({ dateStr, reportId: undefined, projectId: recordToShow.project_id, projectName: recordToShow.project_name || '割当外の現場', recordId: record?.id, siteDecls: record?.site_declarations || [], reportStart: null, reportEnd: null, declStart: getDeclaredTime(recordToShow.project_id, "start_time"), declEnd: getDeclaredTime(recordToShow.project_id, "end_time"), role: getDeclaredRole(recordToShow.project_id) })}
-                                       >
-                                         <div className="flex justify-between items-center w-full mt-0.5 pt-0.5">
-                                            <span className="text-[9px] mr-1 text-blue-400">本人</span>
-                                            <span className="font-medium text-blue-700">{recordToShow.end_time}</span>
-                                         </div>
-                                       </div>
-                                    );
-                                 }
-                                 return <span className="text-slate-300 flex items-center justify-center h-[34px]">-</span>;
-                              })()}
+                              ) : (
+                                 <span className="text-slate-300 flex items-center justify-center h-[34px]">-</span>
+                              )}
                            </td>
 
                            <td className={`p-2 border-r text-left max-w-[250px] font-medium h-[48px] overflow-hidden align-top pt-2 ${hasOverlap ? "bg-red-50/50 text-red-700" : "text-slate-600"}`}>
-                              {projs.length > 0 ? (
+                              {combinedRecords.length > 0 ? (
                                  <div className="flex flex-col gap-1 w-full">
                                     {hasOverlap && (
                                        <div className="h-[20px] bg-red-50 text-red-600 rounded text-[10px] font-bold flex items-center justify-center shadow-sm w-full border border-red-200">
                                           日報重複
                                        </div>
                                     )}
-                                   {projs.map((pObj: any, idx: number) => (
-                                      <div key={idx} className="min-h-[44px] flex flex-col justify-center w-full px-1 py-1 box-border">
-                                        {pObj.reportId ? (
-                                           <Link to={`/reports/${pObj.reportId}`} className="w-full block hover:opacity-80 transition-opacity" title={pObj.name} target="_blank" rel="noopener noreferrer">
-                                              <div className="flex flex-col items-start w-full whitespace-normal break-all">
-                                                {pObj.cn && <span className="text-[10px] text-blue-500 leading-tight block">{pObj.cn}</span>}
-                                                {pObj.pName && <span className="text-[12px] text-blue-700 font-bold leading-tight block">{pObj.pName}</span>}
-                                                {pObj.ord && <span className="text-[10px] text-slate-500 leading-tight block">{pObj.ord}</span>}
-                                              </div>
-                                           </Link>
+                                   {combinedRecords.map((cr, idx) => (
+                                      <div key={idx} className="min-h-[44px] flex flex-col justify-center w-full px-1 py-1 box-border mb-1" title={cr.type === 'imported' ? '過去インポートデータ' : cr.type === 'unassigned' ? '日報に割当がない状態での申告時間' : cr.projectName}>
+                                         {cr.type === 'assigned' ? (
+                                             cr.reportId ? (
+                                                <Link to={`/reports/${cr.reportId}`} className="w-full block hover:opacity-80 transition-opacity" target="_blank" rel="noopener noreferrer">
+                                                   <div className="flex flex-col items-start w-full whitespace-normal break-all">
+                                                     {cr.clientName && <span className="text-[10px] text-blue-500 leading-tight block">{cr.clientName}</span>}
+                                                     {cr.projectName && <span className="text-[12px] text-blue-700 font-bold leading-tight block">{cr.projectName}</span>}
+                                                     {cr.order && <span className="text-[10px] text-slate-500 leading-tight block">{cr.order}</span>}
+                                                   </div>
+                                                </Link>
+                                              ) : (
+                                                 <div className="w-full block text-slate-700 whitespace-normal break-all text-[12px] font-bold">
+                                                   {cr.projectName}
+                                                 </div>
+                                              )
                                          ) : (
-                                            <div className="w-full block" title={pObj.name}>
-                                              <div className="flex flex-col items-start w-full whitespace-normal break-all">
-                                                {pObj.cn && <span className="text-[10px] text-slate-400 leading-tight block">{pObj.cn}</span>}
-                                                {pObj.pName && <span className="text-[12px] text-slate-700 font-bold leading-tight block">{pObj.pName}</span>}
-                                                {pObj.ord && <span className="text-[10px] text-slate-500 leading-tight block">{pObj.ord}</span>}
-                                              </div>
-                                            </div>
+                                              <span className={`w-full block text-[12px] italic whitespace-normal line-clamp-2 leading-tight ${cr.type === 'imported' ? 'text-slate-400' : 'text-blue-500 font-bold'}`}>
+                                                 {cr.projectName}
+                                              </span>
                                          )}
                                       </div>
                                    ))}
                                  </div>
-                               ) : (() => {
-                                 const recordToShow = siteDecls.find(s => s.project_id === 'imported' || s.project_id === 'unassigned');
-                                 if (recordToShow && (recordToShow.start_time || recordToShow.end_time)) {
-                                    return (
-                                       <div className="min-h-[44px] flex flex-col justify-center w-full px-1 py-1 box-border mb-1" title={recordToShow.project_id === 'imported' ? '過去インポートデータ' : '日報に割当がない状態での申告時間'}>
-                                         <span className={`w-full block text-[12px] italic whitespace-normal line-clamp-2 ${recordToShow.project_id === 'imported' ? 'text-slate-400' : 'text-blue-500'}`}>
-                                            {recordToShow.project_name || '割当外の現場'}
-                                         </span>
-                                       </div>
-                                    );
-                                 }
-                                 return <span className="text-slate-300 flex items-center justify-center h-[34px]">-</span>;
-                              })()}
+                               ) : (
+                                 <span className="text-slate-300 flex items-center justify-center h-[34px]">-</span>
+                               )}
                            </td>
 
                            <td className={`p-2 border-r align-top pt-2 ${hasOverlap ? "bg-red-50/50" : ""}`}>
-                              {projs.length > 0 ? (
+                              {combinedRecords.length > 0 ? (
                                 <div className="flex flex-col gap-1 w-full text-xs">
                                    {hasOverlap && (
                                       <div className="h-[20px] bg-red-50 text-transparent rounded border border-transparent"></div>
                                    )}
-                                  {projs.map((pObj: any, idx: number) => {
-                                      const siteRole = getDeclaredRole(pObj.projectId);
+                                  {combinedRecords.map((cr, idx) => {
                                       return (
-                                        <div key={idx} onClick={() => { if (!dateStr || !pObj) return; setEditingTime({ dateStr, reportId: pObj.reportId, projectId: pObj.projectId, projectName: pObj.name, recordId: record?.id, siteDecls: record?.site_declarations || [], reportStart: pObj.sStr, reportEnd: pObj.eStr, declStart: getDeclaredTime(pObj.projectId, "start_time"), declEnd: getDeclaredTime(pObj.projectId, "end_time"), role: getDeclaredRole(pObj.projectId) }); }} className="min-h-[44px] flex items-center justify-center px-1 py-1 box-border cursor-pointer hover:bg-slate-100 transition-colors">
-                                          <span className={`text-[11px] whitespace-nowrap px-1 py-0.5 rounded border ${siteRole === '職長' ? 'bg-blue-100 text-blue-800 border-blue-200 font-bold' : siteRole === '現場代理人' ? 'bg-amber-100 text-amber-800 border-amber-200 font-bold' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
-                                            {siteRole}
+                                        <div key={idx} onClick={() => { if (!dateStr) return; setEditingTime({ dateStr, reportId: cr.reportId, projectId: cr.projectId, projectName: cr.projectName, recordId: record?.id, siteDecls: record?.site_declarations || [], reportStart: cr.reportStart, reportEnd: cr.reportEnd, declStart: cr.declStart, declEnd: cr.declEnd, role: cr.declRole }); }} className="min-h-[44px] flex items-center justify-center px-1 py-1 box-border cursor-pointer hover:bg-slate-100 transition-colors mb-1">
+                                          <span className={`text-[11px] whitespace-nowrap px-1 py-0.5 rounded border ${cr.declRole === '職長' ? 'bg-blue-100 text-blue-800 border-blue-200 font-bold' : cr.declRole === '現場代理人' ? 'bg-amber-100 text-amber-800 border-amber-200 font-bold' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                                            {cr.declRole}
                                           </span>
                                         </div>
                                       );
                                   })}
                                 </div>
-                              ) : (() => {
-                                  const recordToShow = siteDecls.find(s => s.project_id === 'imported' || s.project_id === 'unassigned');
-                                  if (recordToShow && (recordToShow.start_time || recordToShow.end_time)) {
-                                     const siteRole = recordToShow.role || '一般';
-                                     return (
-                                       <div className="min-h-[44px] flex items-center justify-center px-1 box-border mb-1 cursor-pointer hover:bg-slate-100 transition-colors"
-                                            onClick={() => setEditingTime({ dateStr, reportId: undefined, projectId: recordToShow.project_id, projectName: recordToShow.project_name || '割当外の現場', recordId: record?.id, siteDecls: record?.site_declarations || [], reportStart: null, reportEnd: null, declStart: getDeclaredTime(recordToShow.project_id, "start_time"), declEnd: getDeclaredTime(recordToShow.project_id, "end_time"), role: getDeclaredRole(recordToShow.project_id) })}
-                                       >
-                                          <span className={`text-[11px] whitespace-nowrap px-1 py-0.5 rounded border ${siteRole === '職長' ? 'bg-blue-100 text-blue-800 border-blue-200 font-bold' : siteRole === '現場代理人' ? 'bg-amber-100 text-amber-800 border-amber-200 font-bold' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
-                                            {siteRole}
-                                          </span>
-                                       </div>
-                                     );
-                                  }
-                                  return <span className="text-slate-300 flex justify-center items-center h-[34px]">-</span>;
-                              })()}
+                              ) : (
+                                  <span className="text-slate-300 flex justify-center items-center h-[34px]">-</span>
+                              )}
                            </td>
 
                            <td onClick={openAttendanceModal} className="p-2 border-r font-medium text-blue-700 cursor-pointer hover:bg-slate-100 transition-colors">
