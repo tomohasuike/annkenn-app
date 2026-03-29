@@ -277,8 +277,26 @@ export default function WorkerAttendance() {
         const ci = formatTime(existingRecord.clock_in_time);
         if (ci) initialEvents.push({ id: crypto.randomUUID(), time: ci, type: 'clock_in' });
         
-        const decls = [...(existingRecord.site_declarations || [])].sort((a,b) => (a.start_time || '').localeCompare(b.start_time || ''));
+        let decls = [...(existingRecord.site_declarations || [])].sort((a,b) => (a.start_time || '').localeCompare(b.start_time || ''));
+        const assignedForDate = assignedProjects[dateStr] || [];
+        const isAllImported = decls.length > 0 && decls.every(p => p.project_id === 'imported' || p.project_id === 'unassigned');
         
+        if (isAllImported && assignedForDate.length > 0) {
+             const originalTimes = { 
+                 start: decls[0]?.start_time || '08:30', 
+                 end: decls[decls.length - 1]?.end_time || '17:00' 
+             };
+             decls = assignedForDate.map(ap => ({
+                   project_id: ap.project_id,
+                   project_name: ap.project_name,
+                   start_time: originalTimes.start,
+                   end_time: originalTimes.end,
+                   role: '一般'
+             }));
+        } else if (isAllImported) {
+             decls = [];
+        }
+
         let lastEnd = ci;
         for (const d of decls) {
              if (d.start_time) {
@@ -568,12 +586,14 @@ export default function WorkerAttendance() {
                          {(() => {
                             const decls = record?.site_declarations || [];
                             const assigned = assignedProjects[dateStr] || [];
+                            const isAllImported = decls.length > 0 && decls.every(p => p.project_id === 'imported' || p.project_id === 'unassigned');
+                            const realDecls = isAllImported ? [] : decls;
                             
-                            if (decls.length > 0) {
+                            if (realDecls.length > 0) {
                                return (
                                  <div className="flex flex-col gap-1 text-xs">
-                                   {decls.map((p:any, i:number) => (
-                                     <span key={i} className={`font-medium truncate w-full block px-1.5 py-0.5 rounded border ${p.project_id === 'imported' ? 'bg-slate-50 text-slate-400' : 'bg-slate-100 text-slate-700'}`}>
+                                   {realDecls.map((p:any, i:number) => (
+                                     <span key={i} className={`font-medium truncate w-full block px-1.5 py-0.5 rounded border bg-slate-100 text-slate-700`}>
                                        {p.project_name} {p.start_time ? `(${p.start_time}〜${p.end_time || '?'})` : ''}
                                      </span>
                                    ))}
@@ -585,10 +605,13 @@ export default function WorkerAttendance() {
                                    {assigned.map((ap:any, i:number) => (
                                      <span key={i} className="text-blue-600 font-medium truncate w-full block bg-blue-50/50 border-blue-200 px-1.5 py-0.5 rounded border border-dashed">
                                        [予定] {ap.project_name}
+                                       {isAllImported && <span className="ml-1 text-[10px] text-slate-400 font-normal">(インポート済)</span>}
                                      </span>
                                    ))}
                                  </div>
                                );
+                            } else if (isAllImported) {
+                                return <span className="text-xs text-slate-400 italic bg-slate-50 px-1.5 py-0.5 rounded border">データインポート</span>;
                             }
                             return <span className="text-xs text-slate-400 italic">日報なし</span>;
                          })()}
@@ -597,9 +620,12 @@ export default function WorkerAttendance() {
                          {(() => {
                            const decls = record?.site_declarations || [];
                            const assigned = assignedProjects[dateStr] || [];
-                           if (decls.length > 0) {
+                           const isAllImported = decls.length > 0 && decls.every(p => p.project_id === 'imported' || p.project_id === 'unassigned');
+                           const realDecls = isAllImported ? [] : decls;
+                           
+                           if (realDecls.length > 0) {
                              return (
-                               <div className="flex flex-col gap-1 text-xs">{decls.map((sd:any, i:number) => (
+                               <div className="flex flex-col gap-1 text-xs">{realDecls.map((sd:any, i:number) => (
                                  <span key={i} className={`truncate w-fit block px-1.5 py-0.5 rounded border ${sd.role === '職長' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100'}`}>{sd.role || '一般'}</span>
                                ))}</div>
                              );
