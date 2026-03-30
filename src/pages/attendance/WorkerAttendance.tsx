@@ -779,12 +779,16 @@ export default function WorkerAttendance() {
                                )}
                               {combinedRecords.map((cr, idx) => {
                                  const isMismatch = cr.type === 'assigned' && cr.declStart && cr.declStart !== (cr.reportStart || '');
+                                 const isVacation = cr.projectId === 'VACATION' || cr.projectName?.includes('休暇');
                                  
                                  return (
                                    <div key={idx} className={`h-[44px] flex flex-col justify-center text-[11px] rounded px-1.5 box-border border ${
+                                      isVacation ? 'border-transparent bg-transparent text-slate-300 items-center' :
                                       isMismatch ? 'border-red-400 bg-red-50 text-red-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700'
                                    }`}>
-                                     {cr.type === 'assigned' ? (
+                                     {isVacation ? (
+                                         <span>-</span>
+                                     ) : cr.type === 'assigned' ? (
                                          <>
                                              <div className="flex justify-between items-center w-full">
                                                 <span className="text-[9px] text-slate-500 mr-1">日報</span>
@@ -821,12 +825,16 @@ export default function WorkerAttendance() {
                                )}
                               {combinedRecords.map((cr, idx) => {
                                  const isMismatch = cr.type === 'assigned' && cr.declEnd && cr.declEnd !== (cr.reportEnd || '');
+                                 const isVacation = cr.projectId === 'VACATION' || cr.projectName?.includes('休暇');
                                  
                                  return (
                                    <div key={idx} className={`h-[44px] flex flex-col justify-center text-[11px] rounded px-1.5 box-border border ${
+                                      isVacation ? 'border-transparent bg-transparent text-slate-300 items-center' :
                                       isMismatch ? 'border-red-400 bg-red-50 text-red-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700'
                                    }`}>
-                                     {cr.type === 'assigned' ? (
+                                     {isVacation ? (
+                                         <span>-</span>
+                                     ) : cr.type === 'assigned' ? (
                                          <>
                                              <div className="flex justify-between items-center w-full">
                                                 <span className="text-[9px] text-slate-500 mr-1">日報</span>
@@ -861,12 +869,14 @@ export default function WorkerAttendance() {
                                       日報重複
                                    </div>
                                 )}
-                               {combinedRecords.map((cr, idx) => (
+                               {combinedRecords.map((cr, idx) => {
+                                  const isVacation = cr.projectId === 'VACATION' || cr.projectName?.includes('休暇');
+                                  return (
                                   <div key={idx} className="min-h-[44px] flex flex-col justify-center w-full px-1 py-1 box-border mb-1">
                                      {cr.type === 'assigned' ? (
                                         <div className="flex flex-col items-start w-full whitespace-normal break-all">
                                           {cr.projectName && (
-                                              cr.reportId ? (
+                                              (!isVacation && cr.reportId) ? (
                                                 <Link
                                                   to={`/reports/${cr.reportId}`}
                                                   className="text-[12px] text-blue-700 font-bold leading-tight block hover:text-blue-500 hover:underline flex items-start gap-1"
@@ -875,17 +885,17 @@ export default function WorkerAttendance() {
                                                   {cr.projectName}
                                                 </Link>
                                               ) : (
-                                                <span className="text-[12px] text-blue-700 font-bold leading-tight block">{cr.projectName}</span>
+                                                <span className={`text-[12px] ${isVacation ? 'text-slate-500 font-medium' : 'text-blue-700 font-bold'} leading-tight block`}>{cr.projectName}</span>
                                               )
                                           )}
                                         </div>
                                      ) : (
-                                        <span className={`text-[11px] leading-tight block whitespace-normal ${cr.type === 'imported' ? 'text-slate-400 italic' : 'text-slate-700'}`}>
+                                        <span className={`text-[11px] leading-tight block whitespace-normal ${isVacation ? 'text-slate-500 font-medium' : cr.type === 'imported' ? 'text-slate-400 italic' : 'text-slate-700'}`}>
                                           {cr.projectName}
                                         </span>
                                      )}
                                   </div>
-                               ))}
+                               )})}
                              </div>
                           ) : (
                              <span className="text-slate-300 flex items-center h-[34px]">-</span>
@@ -896,13 +906,19 @@ export default function WorkerAttendance() {
                        <td className="p-2 border-r text-center align-top pt-2">
                           <div className="flex flex-col gap-1 items-center h-full">
                              {hasOverlap && <div className="h-[20px] w-full" />}
-                             {combinedRecords.length > 0 ? combinedRecords.map((cr, idx) => (
+                             {combinedRecords.length > 0 ? combinedRecords.map((cr, idx) => {
+                                const isVacation = cr.projectId === 'VACATION' || cr.projectName?.includes('休暇');
+                                return (
                                 <div key={idx} className="h-[44px] flex items-center justify-center text-[10px] w-full mb-1">
-                                  <span className={`border px-1.5 py-0.5 rounded leading-none ${cr.declRole === '職長' ? 'bg-blue-100 text-blue-700 border-blue-200 font-bold' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                    {cr.declRole || '一般'}
-                                  </span>
+                                  {isVacation ? (
+                                    <span className="text-slate-300">-</span>
+                                  ) : (
+                                    <span className={`border px-1.5 py-0.5 rounded leading-none ${cr.declRole === '職長' ? 'bg-blue-100 text-blue-700 border-blue-200 font-bold' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                      {cr.declRole || '一般'}
+                                    </span>
+                                  )}
                                 </div>
-                             )) : <div className="h-[44px] flex items-center justify-center text-slate-300">-</div>}
+                             )}) : <div className="h-[44px] flex items-center justify-center text-slate-300">-</div>}
                           </div>
                        </td>
 
