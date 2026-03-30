@@ -140,7 +140,7 @@ export default function WorkerAttendance() {
         const { data: fallbackWorker } = await supabase
           .from('worker_master')
           .select('id, name')
-          .limit(1)
+          .eq('name', '鈴木　好幸')
           .single();
         
         if (fallbackWorker) {
