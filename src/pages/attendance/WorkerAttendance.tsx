@@ -588,32 +588,31 @@ export default function WorkerAttendance() {
                             const assigned = assignedProjects[dateStr] || [];
                             const isAllImported = decls.length > 0 && decls.every(p => p.project_id === 'imported' || p.project_id === 'unassigned');
                             const realDecls = isAllImported ? [] : decls;
+                            const formatTm = (t: string | null | undefined) => t ? t.slice(0,5) : '';
                             
-                            if (realDecls.length > 0) {
-                               return (
-                                 <div className="flex flex-col gap-1 text-xs">
+                            return (
+                               <div className="flex flex-col gap-1 text-xs">
                                    {realDecls.map((p:any, i:number) => (
-                                     <span key={i} className={`font-medium truncate w-full block px-1.5 py-0.5 rounded border bg-slate-100 text-slate-700`}>
-                                       {p.project_name} {p.start_time ? `(${p.start_time}〜${p.end_time || '?'})` : ''}
+                                     <span key={`real-${i}`} className={`font-medium truncate w-full block px-1.5 py-0.5 rounded border bg-slate-100 text-slate-700 shadow-sm`}>
+                                       <span className="text-[10px] text-slate-500 mr-1">[申告]</span>
+                                       {p.project_name} {p.start_time ? `(${formatTm(p.start_time)}〜${formatTm(p.end_time) || '?'})` : ''}
                                      </span>
                                    ))}
-                                 </div>
-                               );
-                            } else if (assigned.length > 0) {
-                               return (
-                                 <div className="flex flex-col gap-1 text-xs">
                                    {assigned.map((ap:any, i:number) => (
-                                     <span key={i} className="text-blue-600 font-medium truncate w-full block bg-blue-50/50 border-blue-200 px-1.5 py-0.5 rounded border border-dashed">
-                                       [予定] {ap.project_name}
-                                       {isAllImported && <span className="ml-1 text-[10px] text-slate-400 font-normal">(インポート済)</span>}
+                                     <span key={`asg-${i}`} className={`text-blue-600 font-medium truncate w-full block bg-blue-50/50 border-blue-200 px-1.5 py-0.5 rounded border border-dashed ${realDecls.length > 0 ? 'opacity-70 mt-0.5' : ''}`}>
+                                       <span className="text-[10px] text-blue-500 mr-1">[予定]</span>
+                                       {ap.project_name} {ap.foreman_start ? `(${formatTm(ap.foreman_start)}〜${formatTm(ap.foreman_end) || '?'})` : ''}
+                                       {isAllImported && realDecls.length === 0 && <span className="ml-1 text-[10px] text-slate-400 font-normal">(インポート済)</span>}
                                      </span>
                                    ))}
-                                 </div>
-                               );
-                            } else if (isAllImported) {
-                                return <span className="text-xs text-slate-400 italic bg-slate-50 px-1.5 py-0.5 rounded border">データインポート</span>;
-                            }
-                            return <span className="text-xs text-slate-400 italic">日報なし</span>;
+                                   {realDecls.length === 0 && assigned.length === 0 && isAllImported && (
+                                       <span className="text-xs text-slate-400 italic bg-slate-50 px-1.5 py-0.5 rounded border w-fit">データインポート</span>
+                                   )}
+                                   {realDecls.length === 0 && assigned.length === 0 && !isAllImported && (
+                                       <span className="text-xs text-slate-400 italic">日報なし</span>
+                                   )}
+                               </div>
+                            );
                          })()}
                       </td>
                       <td className="px-4 py-3">
