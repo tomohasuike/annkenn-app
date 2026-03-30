@@ -330,7 +330,6 @@ export default function WorkerAttendance() {
            const rEnd = formatTimeSafe(_r.end_time);
 
            const existingIdx = projectsByDate[date].findIndex(p => p.project_id === _r.project_id);
-           
            if (existingIdx >= 0) {
               // Only override if the personnel query didn't already populate it (or it's null)
               if (!projectsByDate[date][existingIdx].report_id) {
@@ -338,14 +337,6 @@ export default function WorkerAttendance() {
                   projectsByDate[date][existingIdx].foreman_end = rEnd;
                   projectsByDate[date][existingIdx].report_id = _r.id;
               }
-           } else {
-              projectsByDate[date].push({
-                project_id: _r.project_id,
-                project_name: pName,
-                foreman_start: rStart,
-                foreman_end: rEnd,
-                report_id: _r.id
-              });
            }
         }
       });
