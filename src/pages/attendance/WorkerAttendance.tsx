@@ -197,7 +197,15 @@ export default function WorkerAttendance() {
       setAttendanceRecords(recordsByDate);
     }
 
-    const { data: reportData } = await supabase
+    const { data: assignmentsData } = await supabase
+      .from('assignments')
+      .select('project_id, assignment_date, projects(project_name)')
+      .eq('worker_id', wId)
+      .gte('assignment_date', startDate)
+      .lte('assignment_date', endDate);
+
+    // Fetch reports where the worker is explicitly listed in report_personnel
+    const { data: reportPersonnelData } = await supabase
       .from('report_personnel')
       .select(`
         worker_id,
@@ -216,12 +224,26 @@ export default function WorkerAttendance() {
       .gte('daily_reports.report_date', startDate)
       .lte('daily_reports.report_date', endDate);
 
-    const { data: assignmentsData } = await supabase
-      .from('assignments')
-      .select('project_id, assignment_date, projects(project_name)')
-      .eq('worker_id', wId)
-      .gte('assignment_date', startDate)
-      .lte('assignment_date', endDate);
+    // Fetch reports for projects the worker is ASSIGNED to, even if they aren't explicitly in report_personnel
+    const assignedProjectIds = assignmentsData ? Array.from(new Set(assignmentsData.map(a => a.project_id))) : [];
+    
+    let assignedReportsData: any[] = [];
+    if (assignedProjectIds.length > 0) {
+      const { data } = await supabase
+        .from('daily_reports')
+        .select(`
+          id,
+          project_id,
+          report_date,
+          start_time,
+          end_time,
+          projects(project_name)
+        `)
+        .in('project_id', assignedProjectIds)
+        .gte('report_date', startDate)
+        .lte('report_date', endDate);
+      if (data) assignedReportsData = data;
+    }
 
     const projectsByDate: Record<string, any[]> = {};
     
@@ -242,27 +264,29 @@ export default function WorkerAttendance() {
       });
     }
 
-    if (reportData) {
-      const formatTimeSafe = (timeString: string | null) => {
-         if (!timeString) return null;
-         try {
-            const match = timeString.toString().match(/([0-9]{1,2}):([0-9]{2})/);
-            if (match) {
-               const hour = match[1].padStart(2, '0');
-               const min = match[2];
-               return `${hour}:${min}`;
-            }
-            return null;
-         } catch(e) {
-           return null;
-         }
-      };
+    const formatTimeSafe = (timeString: string | null) => {
+       if (!timeString) return null;
+       try {
+          const match = timeString.toString().match(/([0-9]{1,2}):([0-9]{2})/);
+          if (match) {
+             const hour = match[1].padStart(2, '0');
+             const min = match[2];
+             return `${hour}:${min}`;
+          }
+          return null;
+       } catch(e) {
+         return null;
+       }
+    };
 
-      reportData.forEach((r: any) => {
+    if (reportPersonnelData) {
+      reportPersonnelData.forEach((r: any) => {
         const _r = Array.isArray(r.daily_reports) ? r.daily_reports[0] : r.daily_reports;
         if (!_r) return;
         
-        const date = _r.report_date;
+        const date = _r.report_date ? _r.report_date.substring(0, 10) : null;
+        if (!date) return;
+        
         const p_obj = _r.projects;
         const p_obj_first = Array.isArray(p_obj) ? p_obj[0] : p_obj;
         const pName = p_obj_first?.project_name;
@@ -290,7 +314,42 @@ export default function WorkerAttendance() {
         }
       });
     }
-    
+
+    // Overlay any missing reports from assigned projects
+    if (assignedReportsData && assignedReportsData.length > 0) {
+      assignedReportsData.forEach((_r: any) => {
+        const date = _r.report_date ? _r.report_date.substring(0, 10) : null;
+        if (!date) return;
+        
+        const pName = Array.isArray(_r.projects) ? _r.projects[0]?.project_name : _r.projects?.project_name;
+        
+        if (pName) {
+           if (!projectsByDate[date]) projectsByDate[date] = [];
+           
+           const rStart = formatTimeSafe(_r.start_time);
+           const rEnd = formatTimeSafe(_r.end_time);
+
+           const existingIdx = projectsByDate[date].findIndex(p => p.project_id === _r.project_id);
+           
+           if (existingIdx >= 0) {
+              // Only override if the personnel query didn't already populate it (or it's null)
+              if (!projectsByDate[date][existingIdx].report_id) {
+                  projectsByDate[date][existingIdx].foreman_start = rStart;
+                  projectsByDate[date][existingIdx].foreman_end = rEnd;
+                  projectsByDate[date][existingIdx].report_id = _r.id;
+              }
+           } else {
+              projectsByDate[date].push({
+                project_id: _r.project_id,
+                project_name: pName,
+                foreman_start: rStart,
+                foreman_end: rEnd,
+                report_id: _r.id
+              });
+           }
+        }
+      });
+    }
     setAssignedProjects(projectsByDate);
   };
 
