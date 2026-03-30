@@ -248,9 +248,17 @@ export default function WorkerAttendance() {
 
     const projectsByDate: Record<string, any[]> = {};
     
+    const getLocalDateString = (dateStr: string | null | undefined) => {
+      if (!dateStr) return null;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return null;
+      return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+    };
+
     if (assignmentsData) {
       assignmentsData.forEach((asg: any) => {
-        const date = asg.assignment_date;
+        const date = getLocalDateString(asg.assignment_date);
+        if (!date) return;
         const pName = asg.projects?.project_name;
         if (pName) {
            if (!projectsByDate[date]) projectsByDate[date] = [];
@@ -285,7 +293,7 @@ export default function WorkerAttendance() {
         const _r = Array.isArray(r.daily_reports) ? r.daily_reports[0] : r.daily_reports;
         if (!_r) return;
         
-        const date = _r.report_date ? _r.report_date.substring(0, 10) : null;
+        const date = getLocalDateString(_r.report_date);
         if (!date) return;
         
         const p_obj = _r.projects;
@@ -319,7 +327,7 @@ export default function WorkerAttendance() {
     // Overlay any missing reports from assigned projects
     if (assignedReportsData && assignedReportsData.length > 0) {
       assignedReportsData.forEach((_r: any) => {
-        const date = _r.report_date ? _r.report_date.substring(0, 10) : null;
+        const date = getLocalDateString(_r.report_date);
         if (!date) return;
         
         const pName = Array.isArray(_r.projects) ? _r.projects[0]?.project_name : _r.projects?.project_name;
