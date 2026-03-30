@@ -135,7 +135,7 @@ export default function WorkerAttendance() {
         .eq('email', user.email)
         .single();
         
-      if (user.email === 'tomo.hasuike@hitec-inc.co.jp') {
+      if (user.email && user.email.includes('hasuike')) {
           // 社長アカウントの場合、強制的に「鈴木　好幸」さんのデータを表示する
           const { data: suzukiWorker } = await supabase
             .from('worker_master')
@@ -197,20 +197,24 @@ export default function WorkerAttendance() {
       setAttendanceRecords(recordsByDate);
     }
 
-    const { data: reportsData } = await supabase
-      .from('daily_reports')
+    const { data: reportData } = await supabase
+      .from('report_personnel')
       .select(`
-        id,
-        report_date,
-        project_id,
+        worker_id,
         start_time,
         end_time,
-        projects ( project_name ),
-        report_personnel!inner ( worker_id, start_time, end_time )
+        daily_reports!inner(
+          id,
+          project_id,
+          report_date,
+          start_time,
+          end_time,
+          projects(project_name)
+        )
       `)
-      .eq('report_personnel.worker_id', wId)
-      .gte('report_date', startDate)
-      .lte('report_date', endDate);
+      .eq('worker_id', wId)
+      .gte('daily_reports.report_date', startDate)
+      .lte('daily_reports.report_date', endDate);
 
     const { data: assignmentsData } = await supabase
       .from('assignments')
@@ -238,7 +242,7 @@ export default function WorkerAttendance() {
       });
     }
 
-    if (reportsData) {
+    if (reportData) {
       const formatTimeSafe = (timeString: string | null) => {
          if (!timeString) return null;
          try {
@@ -254,32 +258,33 @@ export default function WorkerAttendance() {
          }
       };
 
-      reportsData.forEach((report: any) => {
-        const date = report.report_date;
-        const pName = Array.isArray(report.projects) 
-           ? report.projects[0]?.project_name 
-           : report.projects?.project_name;
+      reportData.forEach((r: any) => {
+        const _r = Array.isArray(r.daily_reports) ? r.daily_reports[0] : r.daily_reports;
+        if (!_r) return;
         
-        const personnelRow = Array.isArray(report.report_personnel) ? report.report_personnel[0] : report.report_personnel;
-
+        const date = _r.report_date;
+        const p_obj = _r.projects;
+        const p_obj_first = Array.isArray(p_obj) ? p_obj[0] : p_obj;
+        const pName = p_obj_first?.project_name;
+        
         if (pName) {
            if (!projectsByDate[date]) projectsByDate[date] = [];
            
-           const rStart = formatTimeSafe(personnelRow?.start_time || report.start_time);
-           const rEnd = formatTimeSafe(personnelRow?.end_time || report.end_time);
+           const rStart = formatTimeSafe(r.start_time || _r.start_time);
+           const rEnd = formatTimeSafe(r.end_time || _r.end_time);
 
-           const existingIdx = projectsByDate[date].findIndex(p => p.project_id === report.project_id);
+           const existingIdx = projectsByDate[date].findIndex(p => p.project_id === _r.project_id);
            if (existingIdx >= 0) {
               projectsByDate[date][existingIdx].foreman_start = rStart;
               projectsByDate[date][existingIdx].foreman_end = rEnd;
-              projectsByDate[date][existingIdx].report_id = report.id;
+              projectsByDate[date][existingIdx].report_id = _r.id;
            } else {
               projectsByDate[date].push({
-                project_id: report.project_id,
+                project_id: _r.project_id,
                 project_name: pName,
                 foreman_start: rStart,
                 foreman_end: rEnd,
-                report_id: report.id
+                report_id: _r.id
               });
            }
         }
