@@ -104,50 +104,85 @@ export function AttendanceImportModal({ isOpen, onClose, workers, onSuccess }: A
       let currentMonth = new Date().getMonth() + 1; // fallback
       const year = 2026; // R8 is 2026
       
+      // Try to parse month from header
+      for (let i = 0; i < Math.min(rows.length, 10); i++) {
+         const joined = rows[i].join('');
+         const mMatch = joined.match(/([0-9０-９]+)月分/);
+         if (mMatch) {
+            currentMonth = parseInt(mMatch[1]);
+            break;
+         }
+      }
+      
       const pData = [];
+      let lastDay = -1;
 
       for (const row of rows) {
         if (row.length < 10) continue;
-        const m = row[0];
-        const dot = row[1];
-        const d = row[2];
+        let dowIdx = row.findIndex(cell => ['月', '火', '水', '木', '金', '土', '日'].includes(cell.trim()));
+        if (dowIdx === -1) continue;
         
-        if (dot === '.' && d && !isNaN(parseInt(d))) {
-          if (m && !isNaN(parseInt(m))) currentMonth = parseInt(m);
-          const day = parseInt(d);
+        const dStr = row[dowIdx - 1]?.trim();
+        if (!dStr || isNaN(parseInt(dStr))) continue;
+        
+        const day = parseInt(dStr);
+        const maybeMonth = row[dowIdx - 3]?.trim();
+        if (maybeMonth && !isNaN(parseInt(maybeMonth))) {
+           currentMonth = parseInt(maybeMonth);
+        } else if (lastDay > 20 && day < 10) {
+           // Rollover: e.g. 31 -> 1
+           currentMonth++;
+           if (currentMonth > 12) currentMonth = 1;
+        }
+        lastDay = day;
+        
+        // After the Day of Week, all subsequent cells up to the project name contain the times.
+        // We join them and extract all numeric groups. This gracefully handles variable columns (e.g. '7', ':', '50' vs '7:50' vs '6: : 20').
+        const timeStr = row.slice(dowIdx + 1, dowIdx + 15).join(' ');
+        const digits = timeStr.match(/[0-9０-９]+/g);
+        
+        if (!digits || digits.length < 4) continue; // Not enough numbers to form HH:MM HH:MM
+        
+        const toNum = (str: string) => parseInt(str.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)));
+        
+        const inH = toNum(digits[0]);
+        const inM = toNum(digits[1]);
+        const outH = toNum(digits[2]);
+        const outM = toNum(digits[3]);
+        
+        let siteInH = NaN, siteInM = NaN, siteOutH = NaN, siteOutM = NaN;
+        if (digits.length >= 8) {
+           siteInH = toNum(digits[4]);
+           siteInM = toNum(digits[5]);
+           siteOutH = toNum(digits[6]);
+           siteOutM = toNum(digits[7]);
+        }
           
-          const inH = parseInt(row[4]?.replace(/[０-９]/g, (s: string) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)) || 'NaN');
-          const inM = parseInt(row[6]?.replace(/[０-９]/g, (s: string) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)) || 'NaN');
-          const outH = parseInt(row[7]?.replace(/[０-９]/g, (s: string) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)) || 'NaN');
-          const outM = parseInt(row[9]?.replace(/[０-９]/g, (s: string) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)) || 'NaN');
-          
-          const siteInH = parseInt(row[10]?.replace(/[０-９]/g, (s: string) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)) || 'NaN');
-          const siteInM = parseInt(row[12]?.replace(/[０-９]/g, (s: string) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)) || 'NaN');
-          const siteOutH = parseInt(row[13]?.replace(/[０-９]/g, (s: string) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)) || 'NaN');
-          const siteOutM = parseInt(row[15]?.replace(/[０-９]/g, (s: string) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)) || 'NaN');
-          
-          if (!isNaN(inH) && !isNaN(inM) && !isNaN(outH) && !isNaN(outM)) {
+        if (!isNaN(inH) && !isNaN(inM) && !isNaN(outH) && !isNaN(outM)) {
             const dateStr = `${year}-${currentMonth.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
             
+            let role = '一般';
+            const rowStr = row.join('');
+            if (rowStr.includes('職長')) role = '職長';
+            if (rowStr.includes('現場代理人')) role = '現場代理人';
+
             let travelTime = 0;
             let siteDecls: any[] = [];
             if (!isNaN(siteInH) && !isNaN(siteInM) && !isNaN(siteOutH) && !isNaN(siteOutM)) {
                const morningCommute = (siteInH * 60 + siteInM) - (inH * 60 + inM);
                const eveningCommute = (outH * 60 + outM) - (siteOutH * 60 + siteOutM);
                travelTime = (morningCommute > 0 ? morningCommute : 0) + (eveningCommute > 0 ? eveningCommute : 0);
-
+ 
                const sTime = `${siteInH.toString().padStart(2, '0')}:${siteInM.toString().padStart(2, '0')}`;
                const eTime = `${siteOutH.toString().padStart(2, '0')}:${siteOutM.toString().padStart(2, '0')}`;
                siteDecls = [{
                   project_id: 'imported',
-                  project_name: 'インポートデータ',
+                  project_name: '日報なし',
                   start_time: sTime,
-                  end_time: eTime
+                  end_time: eTime,
+                  role: role
                }];
             }
-            
-            let role = '一般';
-            if (row.length > 17 && row[17] === '職長') role = '職長';
             
             pData.push({
               target_date: dateStr,
@@ -160,12 +195,14 @@ export function AttendanceImportModal({ isOpen, onClose, workers, onSuccess }: A
               site_declarations: siteDecls
             });
           }
-        }
       }
 
       setParsedData(pData);
       if (pData.length === 0) {
-        toast.error('出退勤の時間が読み取れませんでした。時間の列が含まれているか確認してください。');
+        // Collect debug info from the first 5 non-empty rows
+        const debugDump = rows.map((r, i) => `行${i + 1}(長さ${r.length}): [${r.join(', ')}]`).slice(0, 10).join('\n');
+        setText(`【デバッグ情報: 読み取り失敗原因の解析】\n${debugDump}\n\n===上書きした部分の下にペーストしたテキストがあります===\n${text}`);
+        toast.error('出退勤の時間が読み取れませんでした。テキストエリアにデバッグ情報を表示しました。');
       } else {
         toast.success(`${pData.length}日分のデータを読み込みました`);
       }

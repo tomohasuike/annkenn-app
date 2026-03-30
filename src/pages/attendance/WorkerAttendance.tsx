@@ -13,6 +13,7 @@ interface DailyAttendance {
   role: '職長' | '現場代理人' | '一般' | null;
   prep_time_minutes: number;
   travel_time_minutes: number;
+  misc_time_minutes?: number;
   personal_out_minutes?: number;
   personal_outs?: { start_time: string; end_time: string }[];
   is_locked: boolean;
@@ -23,7 +24,7 @@ interface DailyAttendance {
 interface TimelineEvent {
   id: string;
   time: string;
-  type: 'clock_in' | 'travel' | 'prep' | 'site_work' | 'clock_out';
+  type: 'clock_in' | 'travel' | 'prep' | 'misc' | 'site_work' | 'clock_out';
   project_id?: string;
   project_name?: string;
   role?: string;
@@ -176,11 +177,12 @@ export default function WorkerAttendance() {
   };
 
   const fetchMonthRecords = async (wId: string, date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
-    const lastDay = new Date(year, month, 0).getDate();
-    const endDate = `${year}-${month.toString().padStart(2, '0')}-${lastDay}`;
+    const targetYear = date.getFullYear();
+    const targetMonth = date.getMonth() + 1;
+    const stDate = new Date(targetYear, targetMonth - 2, 26);
+    const enDate = new Date(targetYear, targetMonth - 1, 25);
+    const startDate = `${stDate.getFullYear()}-${(stDate.getMonth()+1).toString().padStart(2,'0')}-26`;
+    const endDate = `${enDate.getFullYear()}-${(enDate.getMonth()+1).toString().padStart(2,'0')}-25`;
 
     const { data } = await supabase
       .from('daily_attendance')
@@ -200,7 +202,7 @@ export default function WorkerAttendance() {
 
     const { data: assignmentsData } = await supabase
       .from('assignments')
-      .select('project_id, assignment_date, projects(project_name)')
+      .select('project_id, assignment_date, projects(project_number, project_name, client_name, client_company_name, site_name, category)')
       .eq('worker_id', wId)
       .gte('assignment_date', startDate)
       .lte('assignment_date', endDate);
@@ -218,7 +220,7 @@ export default function WorkerAttendance() {
           report_date,
           start_time,
           end_time,
-          projects(project_name)
+          projects(project_number, project_name, client_name, client_company_name, site_name, category)
         )
       `)
       .eq('worker_id', wId)
@@ -238,7 +240,7 @@ export default function WorkerAttendance() {
           report_date,
           start_time,
           end_time,
-          projects(project_name)
+          projects(project_number, project_name, client_name, client_company_name, site_name, category)
         `)
         .in('project_id', assignedProjectIds)
         .gte('report_date', startDate)
@@ -265,6 +267,10 @@ export default function WorkerAttendance() {
            projectsByDate[date].push({
              project_id: asg.project_id,
              project_name: pName,
+             client_company_name: asg.projects?.client_name,
+             site_name: asg.projects?.site_name,
+             category: asg.projects?.category,
+             project_number: asg.projects?.project_number,
              foreman_start: null, 
              foreman_end: null,
              report_id: null
@@ -299,6 +305,10 @@ export default function WorkerAttendance() {
         const p_obj = _r.projects;
         const p_obj_first = Array.isArray(p_obj) ? p_obj[0] : p_obj;
         const pName = p_obj_first?.project_name;
+        const cn = p_obj_first?.project_number;
+        const ord = p_obj_first?.client_name;
+        const siteName = p_obj_first?.site_name;
+        const category = p_obj_first?.category;
         
         if (pName) {
            if (!projectsByDate[date]) projectsByDate[date] = [];
@@ -315,6 +325,10 @@ export default function WorkerAttendance() {
               projectsByDate[date].push({
                 project_id: _r.project_id,
                 project_name: pName,
+                client_company_name: ord,
+                site_name: siteName,
+                category: category,
+                project_number: cn,
                 foreman_start: rStart,
                 foreman_end: rEnd,
                 report_id: _r.id
@@ -510,6 +524,7 @@ export default function WorkerAttendance() {
     let clock_out_time = null;
     let travel_time_minutes = 0;
     let prep_time_minutes = 0;
+    let misc_time_minutes = 0;
     const site_declarations: any[] = [];
     
     const validEvents = processedEvents.filter(e => e.time).sort((a,b) => a.time.localeCompare(b.time));
@@ -535,6 +550,8 @@ export default function WorkerAttendance() {
                 prep_time_minutes += diffMins;
             } else if (prev.type === 'travel') {
                 travel_time_minutes += diffMins;
+            } else if (prev.type === 'misc') {
+                misc_time_minutes += diffMins;
             } else if (prev.type === 'site_work' && prev.project_id) {
                 site_declarations.push({
                     project_id: prev.project_id,
@@ -564,6 +581,7 @@ export default function WorkerAttendance() {
       clock_out_time,
       prep_time_minutes,
       travel_time_minutes,
+      misc_time_minutes,
       personal_out_minutes: totalPrivateOutMins,
       personal_outs: personalOuts,
       memo: memo,
@@ -611,10 +629,16 @@ export default function WorkerAttendance() {
       }
   };
 
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth() + 1;
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const targetYear = currentDate.getFullYear();
+  const targetMonth = currentDate.getMonth() + 1;
+  const stDate = new Date(targetYear, targetMonth - 2, 26);
+  const enDate = new Date(targetYear, targetMonth - 1, 25);
+    
+  // Generate date array
+  const displayDates: Date[] = [];
+  for (let d = new Date(stDate); d <= enDate; d.setDate(d.getDate() + 1)) {
+    displayDates.push(new Date(d));
+  }
 
   return (
     <div className="flex-1 flex flex-col min-h-0 w-full max-w-5xl mx-auto space-y-6">
@@ -639,7 +663,7 @@ export default function WorkerAttendance() {
       <div className="flex-1 min-h-0 rounded-xl border bg-card shadow-sm flex flex-col overflow-hidden relative">
         <div className="flex bg-slate-50 border-b p-4 justify-between items-center">
             <button onClick={handlePrevMonth} className="border bg-white hover:bg-slate-100 h-9 px-4 rounded-md font-medium text-sm">&lt; 前月</button>
-            <h3 className="text-xl font-bold">{year}年 {month}月</h3>
+            <h3 className="text-xl font-bold">{targetYear}年 {targetMonth}月</h3>
             <button onClick={handleNextMonth} className="border bg-white hover:bg-slate-100 h-9 px-4 rounded-md font-medium text-sm">次月 &gt;</button>
         </div>
         
@@ -660,16 +684,16 @@ export default function WorkerAttendance() {
                   <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-12 text-center">役割</th>
                   <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-16 text-center">移動</th>
                   <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-16 text-center">準備</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-16 text-center">雑務</th>
                   <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-20 text-center">私用外出</th>
                   <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 min-w-[150px]">備考</th>
                   <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-24 bg-blue-50/50 text-blue-800 text-center">操作</th>
                 </tr>
               </thead>
               <tbody>
-                {days.map(day => {
-                  const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                {displayDates.map(dateObj => {
+                  const dateStr = `${dateObj.getFullYear()}-${(dateObj.getMonth() + 1).toString().padStart(2, '0')}-${dateObj.getDate().toString().padStart(2, '0')}`;
                   const record = attendanceRecords[dateStr];
-                  const dateObj = new Date(year, month - 1, day);
                   const dow = dateObj.getDay();
                   const isWeekend = dow === 0 || dow === 6;
                   const dowStr = ['日', '月', '火', '水', '木', '金', '土'][dow];
@@ -743,7 +767,7 @@ export default function WorkerAttendance() {
                               type: sd.project_id === 'imported' ? 'imported' : 'unassigned',
                               reportId: undefined,
                               projectId: sd.project_id,
-                              projectName: sd.project_name || (sd.project_id === 'imported' ? '過去インポートデータ' : '割当外の現場'),
+                              projectName: sd.project_name || (sd.project_id === 'imported' ? '日報なし' : '割当外の現場'),
                               reportStart: null,
                               reportEnd: null,
                               declStart: sd.start_time,
@@ -754,9 +778,9 @@ export default function WorkerAttendance() {
                   });
 
                   return (
-                    <tr key={day} className={`border-b hover:bg-slate-50 transition-colors ${isWeekend ? (dow===0?'bg-red-50/20':'bg-blue-50/20') : ''}`}>
+                    <tr key={dateStr} className={`border-b hover:bg-slate-50 transition-colors ${isWeekend ? (dow===0?'bg-red-50/20':'bg-blue-50/20') : ''}`}>
                        <td className={`p-2 border-r text-center ${dow===0 ? 'text-red-500 font-bold' : dow===6 ? 'text-blue-500 font-bold' : 'text-slate-700'}`}>
-                          {month}/{day}
+                          {dateObj.getMonth() + 1}/{dateObj.getDate()}
                        </td>
                        <td className={`p-2 border-r text-center ${dow===0 ? 'text-red-500 font-bold' : dow===6 ? 'text-blue-500 font-bold' : 'text-slate-700'}`}>
                           {dowStr}
@@ -875,19 +899,43 @@ export default function WorkerAttendance() {
                                   <div key={idx} className="min-h-[44px] flex flex-col justify-center w-full px-1 py-1 box-border mb-1">
                                      {cr.type === 'assigned' ? (
                                         <div className="flex flex-col items-start w-full whitespace-normal break-all">
-                                          {cr.projectName && (
-                                              (!isVacation && cr.reportId) ? (
-                                                <Link
-                                                  to={`/reports/${cr.reportId}`}
-                                                  className="text-[12px] text-blue-700 font-bold leading-tight block hover:text-blue-500 hover:underline flex items-start gap-1"
-                                                >
-                                                  <FileText className="w-3 h-3 min-w-[12px] mt-[1px] text-blue-500" />
-                                                  {cr.projectName}
-                                                </Link>
-                                              ) : (
-                                                <span className={`text-[12px] ${isVacation ? 'text-slate-500 font-medium' : 'text-blue-700 font-bold'} leading-tight block`}>{cr.projectName}</span>
-                                              )
-                                          )}
+                                          {(() => {
+                                             let thirdLineText = '';
+                                             const cat = cr.category;
+                                             if (cat === '一般' || cat === '役所') {
+                                                 thirdLineText = cr.order || '';
+                                             } else if (cat === '川北' || cat === 'BPE') {
+                                                 const parts = [];
+                                                 if (cr.siteName) parts.push(cr.siteName);
+                                                 parts.push(cat);
+                                                 thirdLineText = parts.join(' / ');
+                                             } else {
+                                                 const parts = [];
+                                                 if (cr.siteName) parts.push(cr.siteName);
+                                                 if (cr.order) parts.push(cr.order);
+                                                 thirdLineText = parts.join(' / ');
+                                             }
+
+                                             return (
+                                               <>
+                                                 {!isVacation && cr.clientName && <span className="text-[10px] text-blue-500 leading-tight block">{cr.clientName}</span>}
+                                                 {cr.projectName && (
+                                                     (!isVacation && cr.reportId) ? (
+                                                       <Link
+                                                         to={`/reports/${cr.reportId}`}
+                                                         className="text-[12px] text-blue-700 font-bold leading-tight block hover:text-blue-500 hover:underline flex items-start gap-1"
+                                                       >
+                                                         <FileText className="w-3 h-3 min-w-[12px] mt-[1px] text-blue-500" />
+                                                         {cr.projectName}
+                                                       </Link>
+                                                     ) : (
+                                                       <span className={`text-[12px] ${isVacation ? 'text-slate-500 font-medium' : 'text-blue-700 font-bold'} leading-tight block`}>{cr.projectName}</span>
+                                                     )
+                                                 )}
+                                                 {!isVacation && thirdLineText && <span className="text-[10px] text-slate-500 leading-tight block">{thirdLineText}</span>}
+                                               </>
+                                             );
+                                          })()}
                                         </div>
                                      ) : (
                                         <span className={`text-[11px] leading-tight block whitespace-normal ${isVacation ? 'text-slate-500 font-medium' : cr.type === 'imported' ? 'text-slate-400 italic' : 'text-slate-700'}`}>
@@ -922,7 +970,7 @@ export default function WorkerAttendance() {
                           </div>
                        </td>
 
-                       {/* 移動、準備、私用外出、備考 Column */}
+                       {/* 移動、準備、雑務、私用外出、備考 Column */}
                        <td className="p-2 border-r text-center align-top pt-2">
                            <div className="h-full flex items-center justify-center text-blue-600 font-medium text-xs">
                               {record?.travel_time_minutes ? `${record.travel_time_minutes} 分` : <span className="text-slate-300 font-normal">-</span>}
@@ -931,6 +979,11 @@ export default function WorkerAttendance() {
                        <td className="p-2 border-r text-center align-top pt-2">
                            <div className="h-full flex items-center justify-center text-emerald-600 font-medium text-xs">
                               {record?.prep_time_minutes ? `${record.prep_time_minutes} 分` : <span className="text-slate-300 font-normal">-</span>}
+                           </div>
+                       </td>
+                       <td className="p-2 border-r text-center align-top pt-2">
+                           <div className="h-full flex items-center justify-center text-purple-600 font-medium text-xs">
+                              {record?.misc_time_minutes ? `${record.misc_time_minutes} 分` : <span className="text-slate-300 font-normal">-</span>}
                            </div>
                        </td>
                        <td className="p-2 border-r text-center align-top pt-2">
@@ -1023,6 +1076,7 @@ export default function WorkerAttendance() {
                                             >
                                             <option value="travel">🚕 移動</option>
                                             <option value="prep">🔧 準備</option>
+                                            <option value="misc">🧹 雑務</option>
                                             <option value="site_work">👷 現場で作業</option>
                                             </select>
                                         </div>

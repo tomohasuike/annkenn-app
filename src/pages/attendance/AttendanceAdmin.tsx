@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { ShieldCheck, Search, Lock, Unlock, FileSpreadsheet, Plus, Trash2 } from 'lucide-react';
+import { ShieldCheck, Search, Lock, Unlock, FileSpreadsheet, Plus, Trash2, Save } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { AttendanceImportModal } from '../../components/attendance/AttendanceImportModal';
@@ -22,9 +22,11 @@ interface DailyAttendance {
   role: '職長' | '現場代理人' | '一般' | null;
   prep_time_minutes: number;
   travel_time_minutes: number;
+  misc_time_minutes?: number;
   personal_out_minutes: number;
   personal_outs?: { start_time: string; end_time: string }[];
   memo: string | null;
+  admin_memo?: string | null;
   is_locked: boolean;
   tot_clock_in_time?: string | null;
   tot_clock_out_time?: string | null;
@@ -32,6 +34,28 @@ interface DailyAttendance {
   clock_out_time?: string | null;
   site_declarations?: { project_id: string; project_name: string; start_time: string; end_time: string; role?: string }[];
 }
+
+interface DraftSite {
+  siteIndex: number;
+  recordId?: string;
+  projectId?: string;
+  projectName: string;
+  reportId?: string;
+  declStart: string | null;
+  declEnd: string | null;
+  declRole: string;
+  type: string;
+}
+
+interface DraftRecord {
+  recordId?: string;
+  workerId: string;
+  clockIn: string | null;
+  clockOut: string | null;
+  sites: DraftSite[];
+  isModified?: boolean;
+}
+
 
 export default function AttendanceAdmin() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -44,34 +68,17 @@ export default function AttendanceAdmin() {
   const [showTotModal, setShowTotModal] = useState(false);
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
 
-  const [editingTime, setEditingTime] = useState<{
-    dateStr: string;
-    reportId?: string;
-    projectId?: string;
-    projectName: string;
-    recordId?: string;
-    reportStart: string | null;
-    reportEnd: string | null;
-    declStart: string | null;
-    declEnd: string | null;
-    siteDecls: any[];
-    role?: string;
-  } | null>(null);
+  // Drafts array holds edits before explicitly saving. key = dateStr
+  const [drafts, setDrafts] = useState<Record<string, DraftRecord>>({});
+  const hasUnsavedChanges = Object.keys(drafts).length > 0;
 
-
-  const [editingAttendance, setEditingAttendance] = useState<{
+  const [editingExtra, setEditingExtra] = useState<{
     dateStr: string;
     recordId?: string;
     workerId: string;
-    clockIn: string | null;
-    clockOut: string | null;
-    totClockIn: string | null;
-    totClockOut: string | null;
-    travel: number;
-    prep: number;
-    personal_out: number;
     personal_outs?: { start_time: string; end_time: string }[];
     memo: string | null;
+    admin_memo: string | null;
   } | null>(null);
 
   const [savingTime, setSavingTime] = useState(false);
@@ -94,131 +101,142 @@ export default function AttendanceAdmin() {
     return (h.toString().padStart(2, "0") + ":" + m.toString().padStart(2, "0"));
   };
 
-  const handleSaveTime = async () => {
-    if (!editingTime || !selectedWorkerId) return;
+
+
+
+  const handleBulkSave = async () => {
+    if (!selectedWorkerId) return;
+    const modifiedDates = Object.keys(drafts);
+    if (modifiedDates.length === 0) return;
+    
     setSavingTime(true);
     try {
-      // 1. Update Report Time
-      if (editingTime.reportId) {
-        let rsStr = editingTime.reportStart;
-        let reStr = editingTime.reportEnd;
-        if (rsStr) rsStr = `2000-01-01T${rsStr.length === 5 ? rsStr + ":00" : rsStr}`;
-        if (reStr) reStr = `2000-01-01T${reStr.length === 5 ? reStr + ":00" : reStr}`;
-        
-        const { error: err1 } = await supabase.from("report_personnel")
-          .update({
-             start_time: rsStr || null,
-             end_time: reStr || null
-          })
-          .eq("report_id", editingTime.reportId)
-          .eq("worker_id", selectedWorkerId);
-        if (err1) throw err1;
-      }
-
-      // 2. Update Self-Declaration Time
-      if (editingTime.recordId) {
-         let newDecls = [...(editingTime.siteDecls || [])];
-         const targetPid = editingTime.projectId || "imported";
-         
-         const existIdx = newDecls.findIndex(s => s.project_id === targetPid || s.project_name === editingTime.projectName);
-         if (existIdx >= 0) {
-            newDecls[existIdx].start_time = normalizeTime(editingTime.declStart) || "";
-            newDecls[existIdx].end_time = normalizeTime(editingTime.declEnd) || "";
-            newDecls[existIdx].role = editingTime.role || "一般";
-         } else if (editingTime.declStart || editingTime.declEnd) {
-            newDecls.push({
-               project_id: editingTime.projectId || "",
-               project_name: editingTime.projectName || "",
-               start_time: normalizeTime(editingTime.declStart) || "",
-               end_time: normalizeTime(editingTime.declEnd) || "",
-               role: editingTime.role || "一般"
-            });
-         }
-         const validDecls = newDecls.filter(d => d.start_time && d.end_time);
-         const toMins = (hhmm: string) => {
-            const [h, m] = hhmm.split(':').map(Number);
-            return (h * 60) + (m || 0);
+      for (const dateStr of modifiedDates) {
+         const draft = drafts[dateStr];
+         const payload = {
+            worker_id: selectedWorkerId,
+            target_date: dateStr,
+            clock_in_time: draft.clockIn ? new Date(`${dateStr}T${draft.clockIn}:00+09:00`).toISOString() : null,
+            clock_out_time: draft.clockOut ? new Date(`${dateStr}T${draft.clockOut}:00+09:00`).toISOString() : null,
          };
-         for (let i = 0; i < validDecls.length; i++) {
-             for (let j = i + 1; j < validDecls.length; j++) {
-                 const a = validDecls[i];
-                 const b = validDecls[j];
-                 const aS = toMins(a.start_time);
-                 const aE = toMins(a.end_time);
-                 const bS = toMins(b.start_time);
-                 const bE = toMins(b.end_time);
 
-                 if (aS < bE && aE > bS) {
-                     toast.error(`時間重複エラー: 申告時間（${a.project_name} と ${b.project_name}）が一部重なっています。修正してください。`);
-                     setSavingTime(false);
-                     return;
+         let recId = draft.recordId;
+         if (recId) {
+             const { error } = await supabase.from('daily_attendance').update(payload).eq('id', recId);
+             if (error) throw error;
+         } else {
+             const { data: newRow, error } = await supabase.from('daily_attendance').insert([{ ...payload, is_locked: false }]).select().single();
+             if (error) throw error;
+             recId = newRow.id;
+         }
+
+         const toMins = (hhmm: string) => {
+             const [h, m] = hhmm.split(':').map(Number);
+             return (h * 60) + (m || 0);
+         };
+
+         const validDecls = draft.sites.filter(s => s.type !== 'inherited' && s.type !== 'imported' && s.type !== 'unassigned').map(s => ({
+             project_id: s.projectId || '',
+             project_name: s.projectName || '',
+             start_time: s.declStart ? (normalizeTime(s.declStart) || '') : '',
+             end_time: s.declEnd ? (normalizeTime(s.declEnd) || '') : '',
+             role: s.declRole || '一般',
+             reportId: s.reportId
+         }));
+
+         const filledDecls = validDecls.filter(d => d.start_time && d.end_time);
+         for (let i = 0; i < filledDecls.length; i++) {
+             for (let j = i + 1; j < filledDecls.length; j++) {
+                 const a = filledDecls[i];
+                 const b = filledDecls[j];
+                 if (toMins(a.start_time) < toMins(b.end_time) && toMins(a.end_time) > toMins(b.start_time)) {
+                     throw new Error(`日付 ${dateStr} の申告時間（${a.project_name}と${b.project_name}）が一部重なっています。`);
                  }
              }
          }
-         
-         const { error: err2 } = await supabase.from("daily_attendance").update({ site_declarations: newDecls }).eq("id", editingTime.recordId);
-         if (err2) throw err2;
+
+         const { error: declsError } = await supabase
+             .from('daily_attendance')
+             .update({ site_declarations: validDecls.length > 0 ? validDecls.map(({reportId, ...rest}) => rest) : [] })
+             .eq('id', recId);
+         if (declsError) throw declsError;
+
+         for (const d of validDecls) {
+             if (d.reportId) {
+                 let rsStr = d.start_time;
+                 let reStr = d.end_time;
+                 if (rsStr) rsStr = `1899-12-31T${rsStr.length === 5 ? rsStr + ":00" : rsStr}`;
+                 if (reStr) reStr = `1899-12-31T${reStr.length === 5 ? reStr + ":00" : reStr}`;
+                 
+                 await supabase.from("report_personnel")
+                    .update({ start_time: rsStr || null, end_time: reStr || null })
+                    .eq("report_id", d.reportId)
+                    .eq("worker_id", selectedWorkerId);
+             }
+         }
       }
       
-      toast.success("時間を更新しました");
-      setEditingTime(null);
+      toast.success("すべての変更を保存しました");
+      setDrafts({});
       fetchWorkerData(selectedWorkerId);
     } catch (err: any) {
-      toast.error("更新エラー: " + err.message);
+      toast.error("保存エラー: " + err.message);
     } finally {
       setSavingTime(false);
     }
   };
 
-  const handleSaveAttendance = async () => {
-    if (!editingAttendance || !selectedWorkerId) return;
+  const updateDraft = (dateStr: string, updater: (prev: DraftRecord) => DraftRecord) => {
+    setDrafts(prev => {
+        const existing = prev[dateStr] || { 
+            recordId: undefined, 
+            isModified: true, 
+             // We'll initialize these correctly lazily or exactly when updated
+            sites: [] 
+        };
+        return {
+            ...prev,
+            [dateStr]: updater(existing)
+        };
+    });
+  };
+
+  const handleSaveExtra = async () => {
+    if (!editingExtra || !selectedWorkerId || !editingExtra.recordId) {
+        toast.error("勤怠データが存在しないため、付加情報を保存できません。まず出退勤等を入力して保存してください。");
+        return;
+    }
     setSavingTime(true);
     try {
-      const payload = {
-        worker_id: selectedWorkerId,
-        target_date: editingAttendance.dateStr,
-        clock_in_time: editingAttendance.clockIn ? new Date(`${editingAttendance.dateStr}T${editingAttendance.clockIn}:00+09:00`).toISOString() : null,
-        clock_out_time: editingAttendance.clockOut ? new Date(`${editingAttendance.dateStr}T${editingAttendance.clockOut}:00+09:00`).toISOString() : null,
-        tot_clock_in_time: editingAttendance.totClockIn ? new Date(`${editingAttendance.dateStr}T${editingAttendance.totClockIn}:00+09:00`).toISOString() : null,
-        tot_clock_out_time: editingAttendance.totClockOut ? new Date(`${editingAttendance.dateStr}T${editingAttendance.totClockOut}:00+09:00`).toISOString() : null,
-        travel_time_minutes: editingAttendance.travel,
-        prep_time_minutes: editingAttendance.prep,
-        
-        // Save both the full dynamic array and the calculated total minutes for easy aggregation
-        personal_outs: editingAttendance.personal_outs || [],
-        personal_out_minutes: (() => {
-           let sum = 0;
-           (editingAttendance.personal_outs || []).forEach(out => {
-              if (out.start_time && out.end_time) {
-                 const [sh, sm] = out.start_time.split(':').map(Number);
-                 const [eh, em] = out.end_time.split(':').map(Number);
-                 const diff = (eh * 60 + em) - (sh * 60 + sm);
-                 if (diff > 0) sum += diff;
-              }
-           });
-           return sum;
-        })(),
-
-        memo: editingAttendance.memo
-      };
-
-      if (editingAttendance.recordId) {
-        const { error } = await supabase.from('daily_attendance').update(payload).eq('id', editingAttendance.recordId);
+        const payload = {
+           personal_outs: editingExtra.personal_outs || [],
+           personal_out_minutes: (() => {
+               let sum = 0;
+               (editingExtra.personal_outs || []).forEach(out => {
+                  if (out.start_time && out.end_time) {
+                     const [sh, sm] = out.start_time.split(':').map(Number);
+                     const [eh, em] = out.end_time.split(':').map(Number);
+                     const diff = (eh * 60 + em) - (sh * 60 + sm);
+                     if (diff > 0) sum += diff;
+                  }
+               });
+               return sum;
+            })(),
+           memo: editingExtra.memo,
+           admin_memo: editingExtra.admin_memo
+        };
+        const { error } = await supabase.from('daily_attendance').update(payload).eq('id', editingExtra.recordId);
         if (error) throw error;
-      } else {
-        const { error } = await supabase.from('daily_attendance').insert([{ ...payload, is_locked: false }]);
-        if (error) throw error;
-      }
-      
-      toast.success("勤怠データを更新しました");
-      setEditingAttendance(null);
-      fetchWorkerData(selectedWorkerId);
-    } catch (err: any) {
-      toast.error("更新エラー: " + err.message);
+        toast.success("メモと私用外出を保存しました");
+        setEditingExtra(null);
+        fetchWorkerData(selectedWorkerId);
+    } catch (e: any) {
+        toast.error("保存失敗: " + e.message);
     } finally {
-      setSavingTime(false);
+        setSavingTime(false);
     }
   };
+
 
   // Set the "Target Month" based on currentDate
   const targetYear = currentDate.getFullYear();
@@ -300,14 +318,14 @@ export default function AttendanceAdmin() {
             report_date,
             start_time,
             end_time,
-            projects(project_number, project_name, client_company_name)
+            projects(project_number, project_name, client_name, client_company_name, site_name, category)
           )
         `)
         .eq('worker_id', workerId)
         .gte('daily_reports.report_date', startDateStr)
         .lte('daily_reports.report_date', endDateStr);
 
-      const projMap: Record<string, {name: string, sStr: string | null, eStr: string | null, reportId?: string, projectId?: string, cn?: string, pName?: string, ord?: string}[]> = {};
+      const projMap: Record<string, {name: string, sStr: string | null, eStr: string | null, reportId?: string, projectId?: string, cn?: string, pName?: string, ord?: string, siteName?: string, category?: string}[]> = {};
       if (reportData) {
         reportData.forEach((r: any) => {
            const rawDateStr = Array.isArray(r.daily_reports) ? r.daily_reports[0]?.report_date : r.daily_reports?.report_date;
@@ -320,9 +338,11 @@ export default function AttendanceAdmin() {
            
            const cn = p_obj_first?.project_number;
            const pName = p_obj_first?.project_name;
-           const ord = p_obj_first?.client_company_name;
+           const ord = p_obj_first?.client_name;
+           const siteName = p_obj_first?.site_name;
+           const category = p_obj_first?.category;
            
-           const p = [cn, pName, ord ? `(${ord})` : null].filter(Boolean).join(' ');
+           const p = pName || '不明な案件'; // Just use the project name as the core identifier for deduplication
            
            const workerStart = r.start_time || _r?.start_time;
            const workerEnd = r.end_time || _r?.end_time;
@@ -351,7 +371,7 @@ export default function AttendanceAdmin() {
              if (!projMap[d]) projMap[d] = [];
              // Check for duplicate by name
              if (!projMap[d].find(x => x.name === p)) {
-                projMap[d].push({ name: p, sStr, eStr, reportId, projectId, cn, pName, ord });
+                projMap[d].push({ name: p, sStr, eStr, reportId, projectId, cn, pName, ord, siteName, category });
              }
            }
         });
@@ -421,6 +441,35 @@ export default function AttendanceAdmin() {
             </p>
           </div>
           <div className="flex gap-2 shrink-0">
+             <button
+                onClick={async () => {
+                   if (window.confirm('1月24日以前の勤怠データを完全に一括消去します。よろしいですか？\n※操作を元に戻すことはできません。')) {
+                      try {
+                        const { error } = await supabase.from('daily_attendance').delete().lt('target_date', '2026-01-25');
+                        if (error) throw error;
+                        alert('1月24日以前の勤怠データの全消去が完了しました。');
+                        if (selectedWorkerId) fetchWorkerData(selectedWorkerId);
+                      } catch(err: any) {
+                        alert('消去エラー: ' + err.message);
+                      }
+                   }
+                }}
+                className="inline-flex items-center justify-center rounded-md font-medium transition-colors bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 h-8 px-3 gap-1 shadow-sm text-xs"
+             >
+                🗑️ 1/24以前を一括消去
+             </button>
+            <button
+               onClick={() => setShowTotModal(true)}
+               className="inline-flex items-center justify-center rounded-md font-medium transition-colors bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-8 px-3 gap-1 shadow-sm text-xs"
+            >
+               TOT実績取込
+            </button>
+            <button
+               onClick={() => setShowImportModal(true)}
+               className="inline-flex items-center justify-center rounded-md font-medium transition-colors bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-8 px-3 gap-1 shadow-sm text-xs"
+            >
+               スプレッドシート一括貼付
+            </button>
             <button className="inline-flex items-center justify-center rounded-md font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3 gap-1 shadow-sm text-xs">
               <FileSpreadsheet className="w-3.5 h-3.5" /> 締日CSV出力
             </button>
@@ -491,6 +540,39 @@ export default function AttendanceAdmin() {
                <span className="text-muted-foreground animate-pulse font-medium">読み込み中...</span>
              </div>
           ) : selectedWorkerId ? (
+            <div className="flex-1 flex flex-col min-h-0 relative">
+               {/* 変更がある場合のみ表示される固定バナー */}
+               {hasUnsavedChanges && (
+                  <div className="bg-amber-50 border-b border-amber-200 p-3 flex justify-between items-center z-10 sticky top-0 shadow-[0_2px_4px_rgba(251,191,36,0.1)]">
+                     <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                           <Save className="w-4 h-4" />
+                        </div>
+                        <div>
+                           <p className="text-sm font-bold text-amber-800">保存されていない変更があります</p>
+                           <p className="text-xs text-amber-600">編集内容を保存するか、キャンセルしてください</p>
+                        </div>
+                     </div>
+                     <div className="flex gap-2">
+                        <button 
+                           onClick={() => setDrafts({})} 
+                           className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors shadow-sm"
+                           disabled={savingTime}
+                        >
+                           キャンセル
+                        </button>
+                        <button 
+                           onClick={handleBulkSave} 
+                           className="px-4 py-2 text-sm font-medium text-white bg-amber-500 rounded hover:bg-amber-600 transition-colors shadow-sm flex items-center gap-2"
+                           disabled={savingTime}
+                        >
+                           {savingTime ? <span className="animate-spin text-sm">↻</span> : <Save className="w-4 h-4"/>}
+                           一括保存する
+                        </button>
+                     </div>
+                  </div>
+               )}
+            
             <div className="flex-1 overflow-auto">
                <table className="w-full text-sm text-center border-collapse whitespace-nowrap min-w-max">
                  <thead className="sticky top-0 z-20 bg-slate-100 shadow-sm border-b">
@@ -505,6 +587,7 @@ export default function AttendanceAdmin() {
                      <th className="p-3 border-r w-16 font-bold text-slate-700 text-center">役割</th>
                      <th className="p-3 border-r w-16 font-bold text-slate-700">移動</th>
                      <th className="p-3 border-r w-16 font-bold text-slate-700">準備</th>
+                     <th className="p-3 border-r w-16 font-bold text-slate-700">雑務</th>
                      <th className="p-3 border-r w-16 font-bold text-slate-700">私用外出</th>
                      <th className="p-3 border-r min-w-[150px] font-bold text-slate-700 text-left">備考</th>
                    </tr>
@@ -534,9 +617,18 @@ export default function AttendanceAdmin() {
                           return specific && specific.role ? specific.role : (imported && imported.role ? imported.role : (record?.role || '一般'));
                        };
 
-                       const formatTime = (tString?: string | null) => {
-                         if (!tString) return '-';
-                         return new Date(tString).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+
+
+                       const formatInputTime = (tString?: string | null) => {
+                          if (!tString) return '';
+                          if (/^\d{1,2}:\d{2}/.test(tString)) {
+                              return tString.substring(0, 5);
+                          }
+                          const d = new Date(tString);
+                          if (!isNaN(d.getTime())) {
+                              return format(d, 'HH:mm');
+                          }
+                          return '';
                        };
 
                        const hasOverlap = (() => {
@@ -570,11 +662,13 @@ export default function AttendanceAdmin() {
                                type: 'assigned',
                                reportId: p.reportId,
                                projectId: p.projectId,
-                               projectName: p.name,
+                               projectName: p.name, // this is now just the project_name without concat
                                reportStart: p.sStr,
                                reportEnd: p.eStr,
-                               clientName: p.cn,
-                               order: p.ord,
+                               clientName: p.cn, // project_number
+                               order: p.ord, // client_company_name
+                               siteName: p.siteName,
+                               category: p.category,
                                declStart: getDeclaredTime(p.projectId, 'start_time'),
                                declEnd: getDeclaredTime(p.projectId, 'end_time'),
                                declRole: getDeclaredRole(p.projectId)
@@ -590,7 +684,7 @@ export default function AttendanceAdmin() {
                                    type: sd.project_id === 'imported' ? 'imported' : 'unassigned',
                                    reportId: undefined,
                                    projectId: sd.project_id,
-                                   projectName: sd.project_name || (sd.project_id === 'imported' ? '過去インポートデータ' : '割当外の現場'),
+                                   projectName: sd.project_name || (sd.project_id === 'imported' ? '日報なし' : '割当外の現場'),
                                    reportStart: null,
                                    reportEnd: null,
                                    clientName: undefined,
@@ -602,37 +696,84 @@ export default function AttendanceAdmin() {
                            }
                        });
 
-                       const openAttendanceModal = () => {
+                       const draft = drafts[dateStr];
+                       
+                       const openExtraModal = () => {
                           if (!selectedWorkerId) return;
-                          setEditingAttendance({ 
+                          setEditingExtra({ 
                             dateStr, 
                             workerId: selectedWorkerId, 
                             recordId: record?.id, 
-                            clockIn: record?.clock_in_time ? format(new Date(record.clock_in_time), 'HH:mm') : null, 
-                            clockOut: record?.clock_out_time ? format(new Date(record.clock_out_time), 'HH:mm') : null, 
-                            totClockIn: record?.tot_clock_in_time ? format(new Date(record.tot_clock_in_time), 'HH:mm') : null, 
-                            totClockOut: record?.tot_clock_out_time ? format(new Date(record.tot_clock_out_time), 'HH:mm') : null, 
-                            travel: record?.travel_time_minutes || 0, 
-                            prep: record?.prep_time_minutes || 0, 
-                            personal_out: record?.personal_out_minutes || 0,
                             personal_outs: record?.personal_outs || [],
-                            memo: record?.memo || null
+                            memo: record?.memo || null,
+                            admin_memo: record?.admin_memo || null,
                           });
                        };
 
+                       const currentClockIn = draft?.clockIn !== undefined ? draft.clockIn : formatInputTime(record?.clock_in_time);
+                       const currentClockOut = draft?.clockOut !== undefined ? draft.clockOut : formatInputTime(record?.clock_out_time);
+
+                       const handleClockInChange = (val: string) => updateDraft(dateStr, d => ({...d, clockIn: val, recordId: record?.id}));
+                       const handleClockOutChange = (val: string) => updateDraft(dateStr, d => ({...d, clockOut: val, recordId: record?.id}));
+
+                       const updateSiteField = (idx: number, field: string, val: string) => {
+                           updateDraft(dateStr, d => {
+                               const newSites = [...(d.sites || [])];
+                               const existingSiteIdx = newSites.findIndex(s => s.siteIndex === idx);
+                               
+                               if (existingSiteIdx >= 0) {
+                                   newSites[existingSiteIdx] = { ...newSites[existingSiteIdx], [field]: val };
+                               } else {
+                                   const cr = combinedRecords[idx];
+                                   newSites.push({
+                                       siteIndex: idx,
+                                       projectId: cr.projectId,
+                                       projectName: cr.projectName,
+                                       declStart: cr.declStart,
+                                       declEnd: cr.declEnd,
+                                       declRole: cr.declRole,
+                                       type: cr.type,
+                                       reportId: cr.reportId,
+                                       [field]: val
+                                   });
+                               }
+                               return { ...d, sites: newSites, recordId: record?.id };
+                           });
+                       };
+
+                       const mergedCombinedRecords = combinedRecords.map((cr, idx) => {
+                          const draftSite = draft?.sites?.find(s => s.siteIndex === idx);
+                          return {
+                              ...cr,
+                              currentDeclStart: draftSite?.declStart !== undefined ? draftSite.declStart : formatInputTime(cr.declStart),
+                              currentDeclEnd: draftSite?.declEnd !== undefined ? draftSite.declEnd : formatInputTime(cr.declEnd),
+                              currentRole: draftSite?.declRole !== undefined ? draftSite.declRole : (cr.declRole || '一般')
+                          };
+                       });
+
                        return (
-                         <tr key={dateStr} className={`border-b hover:bg-slate-50 transition-colors ${isWeekend ? (dow===0?'bg-red-50/20':'bg-blue-50/20') : ''}`}>
+                         <tr key={dateStr} className={`border-b hover:bg-slate-50 transition-colors ${isWeekend ? (dow===0?'bg-red-50/20':'bg-blue-50/20') : ''} ${draft ? 'bg-yellow-50/20' : ''}`}>
                            <td className={`p-2 border-r ${dow===0 ? 'text-red-500 font-bold' : dow===6 ? 'text-blue-500 font-bold' : 'text-slate-700'}`}>
                               {d.getMonth() + 1}/{d.getDate()}
                            </td>
                            <td className={`p-2 border-r ${dow===0 ? 'text-red-500 font-bold' : dow===6 ? 'text-blue-500 font-bold' : 'text-slate-700'}`}>
                               {dowStr}
                            </td>
-                           <td onClick={openAttendanceModal} className="p-2 border-r font-medium text-slate-700 cursor-pointer hover:bg-slate-100 transition-colors">
-                              {formatTime(record?.clock_in_time)}
+                           <td className="p-1 border-r font-medium text-slate-700 hover:bg-slate-100 transition-colors">
+                              <input 
+                                 type="time" 
+                                 value={currentClockIn || ''} 
+                                 onChange={e => handleClockInChange(e.target.value)} 
+                                 className={`w-full text-center bg-transparent outline-none focus:ring-1 focus:ring-blue-500 rounded p-1 ${draft?.clockIn !== undefined ? 'text-amber-600 font-bold bg-amber-50' : ''}`}
+                              />
                            </td>
-                           <td onClick={openAttendanceModal} className="p-2 border-r font-medium text-slate-700 cursor-pointer hover:bg-slate-100 transition-colors">
-                              {formatTime(record?.clock_out_time)}
+                           <td className="p-1 border-r font-medium text-slate-700 hover:bg-slate-100 transition-colors">
+                              <input 
+                                 type="time" 
+                                 value={currentClockOut || ''} 
+                                 onChange={e => handleClockOutChange(e.target.value)} 
+                                 className={`w-full text-center bg-transparent outline-none focus:ring-1 focus:ring-blue-500 rounded p-1 ${draft?.clockOut !== undefined ? 'text-amber-600 font-bold bg-amber-50' : ''}`}
+                              />
                            </td>
                            
                            {/* 現場入 Column */}
@@ -644,11 +785,11 @@ export default function AttendanceAdmin() {
                                          🚨 重複エラー
                                       </div>
                                    )}
-                                  {combinedRecords.map((cr, idx) => {
-                                     const isMismatch = cr.type === 'assigned' && cr.declStart && cr.declStart !== (cr.reportStart || '');
+                                  {mergedCombinedRecords.map((cr, idx) => {
+                                     const isMismatch = cr.type === 'assigned' && cr.currentDeclStart && cr.currentDeclStart !== (cr.reportStart || '');
                                      
                                      return (
-                                       <div key={idx} onClick={() => { if (!dateStr) return; setEditingTime({ dateStr, reportId: cr.reportId, projectId: cr.projectId, projectName: cr.projectName, recordId: record?.id, siteDecls: record?.site_declarations || [], reportStart: cr.reportStart, reportEnd: cr.reportEnd, declStart: cr.declStart, declEnd: cr.declEnd, role: cr.declRole }); }} className={`cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all h-[44px] flex flex-col justify-center text-[11px] rounded px-1.5 box-border border ${
+                                       <div key={idx} className={`h-[44px] flex flex-col justify-center text-[11px] rounded px-1.5 box-border border ${
                                           isMismatch ? 'border-red-400 bg-red-50 text-red-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700'
                                        }`}>
                                          {cr.type === 'assigned' ? (
@@ -659,13 +800,23 @@ export default function AttendanceAdmin() {
                                                  </div>
                                                  <div className={`flex justify-between items-center w-full mt-0.5 pt-0.5 border-t ${isMismatch ? 'border-red-200' : 'border-slate-100 text-blue-700'}`}>
                                                     <span className={`text-[9px] mr-1 ${isMismatch ? 'text-red-500' : 'text-blue-400'}`}>本人</span>
-                                                    <span className={isMismatch ? "font-bold" : "font-medium"}>{cr.declStart || '-'}</span>
+                                                    <input 
+                                                       type="time" 
+                                                       value={cr.currentDeclStart || ''} 
+                                                       onChange={e => updateSiteField(idx, 'declStart', e.target.value)} 
+                                                       className={`w-16 text-center bg-transparent outline-none focus:ring-1 focus:ring-blue-500 rounded text-[11px] font-medium leading-[1] p-0 m-0 ${draft?.sites?.find(s => s.siteIndex === idx)?.declStart !== undefined ? 'text-amber-600 font-bold bg-amber-50' : ''}`}
+                                                    />
                                                  </div>
                                              </>
                                          ) : (
                                              <div className="flex justify-between items-center w-full mt-0.5 pt-0.5">
                                                 <span className="text-[9px] mr-1 text-blue-400">本人</span>
-                                                <span className="font-medium text-blue-700">{cr.declStart || '-'}</span>
+                                                <input 
+                                                   type="time" 
+                                                   value={cr.currentDeclStart || ''} 
+                                                   onChange={e => updateSiteField(idx, 'declStart', e.target.value)} 
+                                                   className={`w-16 text-center bg-transparent outline-none focus:ring-1 focus:ring-blue-500 rounded text-[11px] font-medium leading-[1] p-0 m-0 ${draft?.sites?.find(s => s.siteIndex === idx)?.declStart !== undefined ? 'text-amber-600 font-bold bg-amber-50' : ''}`}
+                                                />
                                              </div>
                                          )}
                                        </div>
@@ -686,11 +837,11 @@ export default function AttendanceAdmin() {
                                          要確認
                                       </div>
                                    )}
-                                  {combinedRecords.map((cr, idx) => {
-                                     const isMismatch = cr.type === 'assigned' && cr.declEnd && cr.declEnd !== (cr.reportEnd || '');
+                                  {mergedCombinedRecords.map((cr, idx) => {
+                                     const isMismatch = cr.type === 'assigned' && cr.currentDeclEnd && cr.currentDeclEnd !== (cr.reportEnd || '');
                                      
                                      return (
-                                       <div key={idx} onClick={() => { if (!dateStr) return; setEditingTime({ dateStr, reportId: cr.reportId, projectId: cr.projectId, projectName: cr.projectName, recordId: record?.id, siteDecls: record?.site_declarations || [], reportStart: cr.reportStart, reportEnd: cr.reportEnd, declStart: cr.declStart, declEnd: cr.declEnd, role: cr.declRole }); }} className={`cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all h-[44px] flex flex-col justify-center text-[11px] rounded px-1.5 box-border border ${
+                                       <div key={idx} className={`h-[44px] flex flex-col justify-center text-[11px] rounded px-1.5 box-border border ${
                                           isMismatch ? 'border-red-400 bg-red-50 text-red-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700'
                                        }`}>
                                          {cr.type === 'assigned' ? (
@@ -701,13 +852,23 @@ export default function AttendanceAdmin() {
                                                  </div>
                                                  <div className={`flex justify-between items-center w-full mt-0.5 pt-0.5 border-t ${isMismatch ? 'border-red-200' : 'border-slate-100 text-blue-700'}`}>
                                                     <span className={`text-[9px] mr-1 ${isMismatch ? 'text-red-500' : 'text-blue-400'}`}>本人</span>
-                                                    <span className={isMismatch ? "font-bold" : "font-medium"}>{cr.declEnd || '-'}</span>
+                                                    <input 
+                                                       type="time" 
+                                                       value={cr.currentDeclEnd || ''} 
+                                                       onChange={e => updateSiteField(idx, 'declEnd', e.target.value)} 
+                                                       className={`w-16 text-center bg-transparent outline-none focus:ring-1 focus:ring-blue-500 rounded text-[11px] font-medium leading-[1] p-0 m-0 ${draft?.sites?.find(s => s.siteIndex === idx)?.declEnd !== undefined ? 'text-amber-600 font-bold bg-amber-50' : ''}`}
+                                                    />
                                                  </div>
                                              </>
                                          ) : (
                                              <div className="flex justify-between items-center w-full mt-0.5 pt-0.5">
                                                 <span className="text-[9px] mr-1 text-blue-400">本人</span>
-                                                <span className="font-medium text-blue-700">{cr.declEnd || '-'}</span>
+                                                <input 
+                                                   type="time" 
+                                                   value={cr.currentDeclEnd || ''} 
+                                                   onChange={e => updateSiteField(idx, 'declEnd', e.target.value)} 
+                                                   className={`w-16 text-center bg-transparent outline-none focus:ring-1 focus:ring-blue-500 rounded text-[11px] font-medium leading-[1] p-0 m-0 ${draft?.sites?.find(s => s.siteIndex === idx)?.declEnd !== undefined ? 'text-amber-600 font-bold bg-amber-50' : ''}`}
+                                                />
                                              </div>
                                          )}
                                        </div>
@@ -728,26 +889,46 @@ export default function AttendanceAdmin() {
                                        </div>
                                     )}
                                    {combinedRecords.map((cr, idx) => (
-                                      <div key={idx} className="min-h-[44px] flex flex-col justify-center w-full px-1 py-1 box-border mb-1" title={cr.type === 'imported' ? '過去インポートデータ' : cr.type === 'unassigned' ? '日報に割当がない状態での申告時間' : cr.projectName}>
-                                         {cr.type === 'assigned' ? (
-                                             cr.reportId ? (
-                                                <Link to={`/reports/${cr.reportId}`} className="w-full block hover:opacity-80 transition-opacity" target="_blank" rel="noopener noreferrer">
-                                                   <div className="flex flex-col items-start w-full whitespace-normal break-all">
-                                                     {cr.clientName && <span className="text-[10px] text-blue-500 leading-tight block">{cr.clientName}</span>}
-                                                     {cr.projectName && <span className="text-[12px] text-blue-700 font-bold leading-tight block">{cr.projectName}</span>}
-                                                     {cr.order && <span className="text-[10px] text-slate-500 leading-tight block">{cr.order}</span>}
-                                                   </div>
-                                                </Link>
-                                              ) : (
-                                                 <div className="w-full block text-slate-700 whitespace-normal break-all text-[12px] font-bold">
-                                                   {cr.projectName}
-                                                 </div>
-                                              )
-                                         ) : (
-                                              <span className={`w-full block text-[12px] italic whitespace-normal line-clamp-2 leading-tight ${cr.type === 'imported' ? 'text-slate-400' : 'text-blue-500 font-bold'}`}>
-                                                 {cr.projectName}
-                                              </span>
-                                         )}
+                                      <div key={idx} className="min-h-[44px] flex flex-col justify-center w-full px-1 py-1 box-border mb-1" title={cr.type === 'imported' ? '日報なし' : cr.type === 'unassigned' ? '日報に割当がない状態での申告時間' : cr.projectName}>
+                                         {(() => {
+                                            let thirdLineText = '';
+                                            const cat = cr.category;
+                                            if (cat === '一般' || cat === '役所') {
+                                                thirdLineText = cr.order || '';
+                                            } else if (cat === '川北' || cat === 'BPE') {
+                                                const parts = [];
+                                                if (cr.siteName) parts.push(cr.siteName);
+                                                parts.push(cat);
+                                                thirdLineText = parts.join(' / ');
+                                            } else {
+                                                const parts = [];
+                                                if (cr.siteName) parts.push(cr.siteName);
+                                                if (cr.order) parts.push(cr.order);
+                                                thirdLineText = parts.join(' / ');
+                                            }
+
+                                            return cr.type === 'assigned' ? (
+                                                cr.reportId ? (
+                                                   <Link to={`/reports/${cr.reportId}`} className="w-full block hover:opacity-80 transition-opacity" target="_blank" rel="noopener noreferrer">
+                                                      <div className="flex flex-col items-start w-full whitespace-normal break-all">
+                                                        {cr.clientName && <span className="text-[10px] text-blue-500 leading-tight block">{cr.clientName}</span>}
+                                                        {cr.projectName && <span className="text-[12px] text-blue-700 font-bold leading-tight block">{cr.projectName}</span>}
+                                                        {thirdLineText && <span className="text-[10px] text-slate-500 leading-tight block">{thirdLineText}</span>}
+                                                      </div>
+                                                   </Link>
+                                                 ) : (
+                                                    <div className="w-full flex-col justify-start items-start flex block text-slate-700 whitespace-normal break-all">
+                                                      {cr.clientName && <span className="text-[10px] text-slate-500 leading-tight block">{cr.clientName}</span>}
+                                                      <span className="text-[12px] font-bold leading-tight block">{cr.projectName}</span>
+                                                      {thirdLineText && <span className="text-[10px] text-slate-400 leading-tight block">{thirdLineText}</span>}
+                                                    </div>
+                                                 )
+                                            ) : (
+                                                 <span className={`w-full block text-[12px] italic whitespace-normal line-clamp-2 leading-tight ${cr.type === 'imported' ? 'text-slate-400' : 'text-blue-500 font-bold'}`}>
+                                                    {cr.projectName}
+                                                 </span>
+                                            );
+                                         })()}
                                       </div>
                                    ))}
                                  </div>
@@ -756,18 +937,30 @@ export default function AttendanceAdmin() {
                                )}
                            </td>
 
-                           <td className={`p-2 border-r align-top pt-2 ${hasOverlap ? "bg-red-50/50" : ""}`}>
-                              {combinedRecords.length > 0 ? (
+                           <td className={`p-2 border-r align-top pt-2 px-1 ${hasOverlap ? "bg-red-50/50" : ""}`}>
+                              {mergedCombinedRecords.length > 0 ? (
                                 <div className="flex flex-col gap-1 w-full text-xs">
                                    {hasOverlap && (
                                       <div className="h-[20px] bg-red-50 text-transparent rounded border border-transparent"></div>
                                    )}
-                                  {combinedRecords.map((cr, idx) => {
+                                  {mergedCombinedRecords.map((cr, idx) => {
+                                      const isDraftedRole = draft?.sites?.find(s => s.siteIndex === idx)?.declRole !== undefined;
                                       return (
-                                        <div key={idx} onClick={() => { if (!dateStr) return; setEditingTime({ dateStr, reportId: cr.reportId, projectId: cr.projectId, projectName: cr.projectName, recordId: record?.id, siteDecls: record?.site_declarations || [], reportStart: cr.reportStart, reportEnd: cr.reportEnd, declStart: cr.declStart, declEnd: cr.declEnd, role: cr.declRole }); }} className="min-h-[44px] flex items-center justify-center px-1 py-1 box-border cursor-pointer hover:bg-slate-100 transition-colors mb-1">
-                                          <span className={`text-[11px] whitespace-nowrap px-1 py-0.5 rounded border ${cr.declRole === '職長' ? 'bg-blue-100 text-blue-800 border-blue-200 font-bold' : cr.declRole === '現場代理人' ? 'bg-amber-100 text-amber-800 border-amber-200 font-bold' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
-                                            {cr.declRole}
-                                          </span>
+                                        <div key={idx} className="h-[44px] flex items-center justify-center box-border mb-1">
+                                          <select 
+                                             value={cr.currentRole} 
+                                             onChange={e => updateSiteField(idx, 'declRole', e.target.value)}
+                                             className={`w-full text-center border rounded px-0.5 py-1 text-[11px] font-medium leading-[1] outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                                                isDraftedRole ? 'border-amber-400 bg-amber-50 text-amber-800 font-bold' :
+                                                cr.currentRole === '職長' ? 'bg-blue-50/50 text-blue-800 border-blue-200 font-bold' : 
+                                                cr.currentRole === '現場代理人' ? 'bg-orange-50/50 text-orange-800 border-orange-200 font-bold' : 
+                                                'bg-slate-50 border-slate-200 text-slate-700'
+                                             }`}
+                                          >
+                                             <option value="一般">一般</option>
+                                             <option value="職長">職長</option>
+                                             <option value="現場代理人">現代</option>
+                                          </select>
                                         </div>
                                       );
                                   })}
@@ -777,23 +970,34 @@ export default function AttendanceAdmin() {
                               )}
                            </td>
 
-                           <td onClick={openAttendanceModal} className="p-2 border-r font-medium text-blue-700 cursor-pointer hover:bg-slate-100 transition-colors">
+                           <td className="p-2 border-r font-medium text-blue-700">
                               {record && record.travel_time_minutes > 0 ? `${record.travel_time_minutes} 分` : <span className="text-slate-300">-</span>}
                            </td>
-                           <td onClick={openAttendanceModal} className="p-2 border-r font-medium text-emerald-700 cursor-pointer hover:bg-slate-100 transition-colors">
+                           <td className="p-2 border-r font-medium text-emerald-700">
                               {record && record.prep_time_minutes > 0 ? `${record.prep_time_minutes} 分` : <span className="text-slate-300">-</span>}
                            </td>
+                           <td className="p-2 border-r font-medium text-purple-700">
+                              {record && (record.misc_time_minutes || 0) > 0 ? `${record.misc_time_minutes} 分` : <span className="text-slate-300">-</span>}
+                           </td>
                            <td 
-                               onClick={openAttendanceModal} 
-                               className="p-2 border-r font-medium text-amber-700 cursor-pointer hover:bg-slate-100 transition-colors"
+                               onClick={openExtraModal} 
+                               className="p-2 border-r font-medium text-amber-700 cursor-pointer hover:bg-amber-50 transition-colors group relative"
                                title={record?.personal_outs && record.personal_outs.length > 0 ? record.personal_outs.map(o => `${o.start_time || '?'}〜${o.end_time || '?'}`).join(' / ') : undefined}
                            >
-                              {record && record.personal_out_minutes > 0 ? `${record.personal_out_minutes} 分` : <span className="text-slate-300">-</span>}
+                              {record && record.personal_out_minutes > 0 ? `${record.personal_out_minutes} 分` : <span className="text-slate-300 group-hover:text-amber-400">追加</span>}
                            </td>
-                           <td onClick={openAttendanceModal} className="p-2 border-r text-left cursor-pointer hover:bg-slate-100 transition-colors">
-                              {record?.memo ? (
-                                <span className="text-xs text-slate-600 truncate max-w-[150px] inline-block align-bottom" title={record.memo}>{record.memo}</span>
-                              ) : <span className="text-slate-300">-</span>}
+                           <td onClick={openExtraModal} className="p-2 border-r text-left cursor-pointer hover:bg-slate-50 transition-colors align-top pt-2 group relative">
+                              <div className="flex flex-col gap-1 min-h-[36px]">
+                                {record?.memo ? (
+                                  <span className="text-xs text-slate-600 truncate max-w-[150px] inline-block align-bottom" title={record.memo}>{record.memo}</span>
+                                ) : <span className="text-slate-300 group-hover:text-slate-400">記載なし...</span>}
+                                
+                                {record?.admin_memo && (
+                                  <div className="bg-yellow-50 text-yellow-800 text-[10px] p-1 rounded border border-yellow-200 truncate max-w-[150px]" title={record.admin_memo}>
+                                    事務: {record.admin_memo}
+                                  </div>
+                                )}
+                              </div>
                            </td>
                          </tr>
                        );
@@ -801,12 +1005,15 @@ export default function AttendanceAdmin() {
                  </tbody>
                  <tfoot className="sticky bottom-0 bg-slate-100 shadow-[0_-1px_3px_rgba(0,0,0,0.1)] font-bold">
                    <tr>
-                      <td colSpan={7} className="p-3 text-right border-r text-slate-700">月間合計 :</td>
+                      <td colSpan={8} className="p-3 text-right border-r text-slate-700">月間合計 :</td>
                       <td className="p-3 border-r text-center text-blue-700 text-sm">
                          {records.reduce((acc, r) => acc + (r.travel_time_minutes || 0), 0)} 分
                       </td>
                       <td className="p-3 border-r text-center text-emerald-700 text-sm">
                          {records.reduce((acc, r) => acc + (r.prep_time_minutes || 0), 0)} 分
+                      </td>
+                      <td className="p-3 border-r text-center text-purple-700 text-sm">
+                         {records.reduce((acc, r) => acc + (r.misc_time_minutes || 0), 0)} 分
                       </td>
                       <td className="p-3 border-r text-center text-amber-700 text-sm">
                          {records.reduce((acc, r) => acc + (r.personal_out_minutes || 0), 0)} 分
@@ -819,6 +1026,7 @@ export default function AttendanceAdmin() {
                    </tr>
                  </tfoot>
                </table>
+            </div>
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground p-8">
@@ -835,139 +1043,53 @@ export default function AttendanceAdmin() {
         onSuccess={() => selectedWorkerId && fetchWorkerData(selectedWorkerId)}
       />
 
-      {editingTime && (
-        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-5 relative">
-            <h3 className="font-bold text-gray-800 mb-1">勤怠時間の直接修正</h3>
-            <p className="text-sm text-gray-500 mb-4">{editingTime.dateStr} - {editingTime.projectName}</p>
-            
-            <div className="space-y-4">
-              <div className="p-3 bg-blue-50/50 border border-blue-100 rounded">
-                <p className="text-xs font-bold text-blue-800 mb-2">日報 (職長報告)</p>
-                <div className="flex items-center gap-2">
-                  <input type="text" placeholder="HH:mm" value={editingTime.reportStart || ""} onChange={e => setEditingTime({...editingTime, reportStart: e.target.value})} className="border p-1.5 rounded text-sm w-full" />
-                  <span>〜</span>
-                  <input type="text" placeholder="HH:mm" value={editingTime.reportEnd || ""} onChange={e => setEditingTime({...editingTime, reportEnd: e.target.value})} className="border p-1.5 rounded text-sm w-full" />
-                </div>
-              </div>
 
-              <div className="p-3 bg-orange-50/50 border border-orange-100 rounded">
-                <p className="text-xs font-bold text-orange-800 mb-2">本人 (出勤簿申告)</p>
-                <div className="flex items-center gap-2 mb-3">
-                  <input type="text" placeholder="HH:mm" value={editingTime.declStart || ""} onChange={e => setEditingTime({...editingTime, declStart: e.target.value})} className="border p-1.5 rounded text-sm w-full" />
-                  <span>〜</span>
-                  <input type="text" placeholder="HH:mm" value={editingTime.declEnd || ""} onChange={e => setEditingTime({...editingTime, declEnd: e.target.value})} className="border p-1.5 rounded text-sm w-full" />
-                </div>
-                <div>
-                   <label className="text-xs font-bold text-orange-800 mb-1 block">現場での役割</label>
-                   <select 
-                      value={editingTime.role || "一般"} 
-                      onChange={(e) => setEditingTime({...editingTime, role: e.target.value as any})}
-                      className="w-full border p-1.5 rounded text-sm bg-white"
-                   >
-                      <option value="一般">一般作業員</option>
-                      <option value="職長">職長</option>
-                      <option value="現場代理人">現場代理人</option>
-                   </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 mt-6">
-              <button 
-                onClick={() => setEditingTime(null)}
-                className="px-4 py-2 border rounded text-slate-600 hover:bg-slate-50 text-sm font-medium"
-                disabled={savingTime}
-              >
-                キャンセル
-              </button>
-              <button 
-                onClick={handleSaveTime}
-                className="px-4 py-2 bg-blue-600 rounded text-white hover:bg-blue-700 text-sm font-medium"
-                disabled={savingTime}
-              >
-                {savingTime ? "保存中..." : "保存する"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editingAttendance && (
+      {editingExtra && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center p-4 border-b bg-slate-50">
-              <h3 className="font-bold text-lg text-slate-800">勤怠データの修正</h3>
+              <h3 className="font-bold text-lg text-slate-800">備考・私用外出の編集</h3>
             </div>
             
             <div className="p-4 flex-1 overflow-y-auto w-full">
-              <p className="text-sm font-bold text-slate-500 mb-6 bg-slate-100 p-2 rounded text-center">{editingAttendance.dateStr}</p>
+              <p className="text-sm font-bold text-slate-500 mb-6 bg-slate-100 p-2 rounded text-center">{editingExtra.dateStr}</p>
               
               <div className="space-y-4">
-                 <div>
-                    <label className="text-xs font-bold text-slate-500 mb-1 block">出勤・退勤 (アプリ通常)</label>
-                    <div className="flex gap-2">
-                       <input type="time" value={editingAttendance.clockIn || ""} onChange={e => setEditingAttendance({...editingAttendance, clockIn: e.target.value})} className="border p-2 rounded w-full" />
-                       <span className="self-center">〜</span>
-                       <input type="time" value={editingAttendance.clockOut || ""} onChange={e => setEditingAttendance({...editingAttendance, clockOut: e.target.value})} className="border p-2 rounded w-full" />
-                    </div>
-                 </div>
-
-                 <div className="bg-red-50 p-3 rounded-lg border border-red-100">
-                    <label className="text-xs font-bold text-red-800 mb-1 block">TOT出勤・TOT退勤</label>
-                    <div className="flex gap-2">
-                       <input type="time" value={editingAttendance.totClockIn || ""} onChange={e => setEditingAttendance({...editingAttendance, totClockIn: e.target.value})} className="border border-red-200 p-2 rounded w-full bg-white" />
-                       <span className="self-center text-red-400">〜</span>
-                       <input type="time" value={editingAttendance.totClockOut || ""} onChange={e => setEditingAttendance({...editingAttendance, totClockOut: e.target.value})} className="border border-red-200 p-2 rounded w-full bg-white" />
-                    </div>
-                 </div>
-
-                 <div className="grid grid-cols-2 gap-4">
-                    <div>
-                       <label className="text-xs font-bold text-slate-500 mb-1 block">移動時間 (分)</label>
-                       <input type="number" min="0" step="15" value={editingAttendance.travel} onChange={e => setEditingAttendance({...editingAttendance, travel: parseInt(e.target.value) || 0})} className="border p-2 rounded w-full" />
-                    </div>
-                    <div>
-                       <label className="text-xs font-bold text-slate-500 mb-1 block">準備時間 (分)</label>
-                       <input type="number" min="0" step="15" value={editingAttendance.prep} onChange={e => setEditingAttendance({...editingAttendance, prep: parseInt(e.target.value) || 0})} className="border p-2 rounded w-full" />
-                    </div>
-                 </div>
-
                  <div className="bg-blue-50/20 border border-blue-100 rounded-lg p-3 space-y-3">
                     <div className="flex justify-between items-center border-b border-blue-100 pb-2">
                        <h4 className="font-bold text-xs text-blue-800">私用外出 (中抜け)</h4>
                        <button 
                           type="button" 
-                          onClick={() => setEditingAttendance({...editingAttendance, personal_outs: [...(editingAttendance.personal_outs || []), { start_time: '', end_time: '' }]})}
+                          onClick={() => setEditingExtra({...editingExtra, personal_outs: [...(editingExtra.personal_outs || []), { start_time: '', end_time: '' }]})}
                           className="text-[10px] bg-white border border-blue-200 text-blue-600 px-2 py-1 rounded shadow-sm hover:bg-blue-50 flex items-center gap-1"
                        >
                           <Plus className="w-3 h-3"/> 追加
                        </button>
                     </div>
                     
-                    {(editingAttendance.personal_outs || []).length > 0 ? (
+                    {(editingExtra.personal_outs || []).length > 0 ? (
                        <div className="space-y-2 max-h-[120px] overflow-y-auto pr-1">
-                          {editingAttendance.personal_outs?.map((out, idx) => (
+                          {editingExtra.personal_outs?.map((out, idx) => (
                              <div key={idx} className="flex items-center gap-2">
                                 <div className="flex-1">
                                    <input type="time" value={out.start_time || ''} onChange={(e) => {
-                                      const newArr = [...(editingAttendance.personal_outs || [])];
+                                      const newArr = [...(editingExtra.personal_outs || [])];
                                       newArr[idx].start_time = e.target.value;
-                                      setEditingAttendance({...editingAttendance, personal_outs: newArr});
+                                      setEditingExtra({...editingExtra, personal_outs: newArr});
                                    }} className="flex h-8 w-full rounded border border-blue-200 bg-white px-2 py-1 text-xs shadow-sm focus-visible:ring-1 focus-visible:ring-blue-500" />
                                 </div>
                                 <span className="text-slate-400">〜</span>
                                 <div className="flex-1">
                                    <input type="time" value={out.end_time || ''} onChange={(e) => {
-                                      const newArr = [...(editingAttendance.personal_outs || [])];
+                                      const newArr = [...(editingExtra.personal_outs || [])];
                                       newArr[idx].end_time = e.target.value;
-                                      setEditingAttendance({...editingAttendance, personal_outs: newArr});
+                                      setEditingExtra({...editingExtra, personal_outs: newArr});
                                    }} className="flex h-8 w-full rounded border border-blue-200 bg-white px-2 py-1 text-xs shadow-sm focus-visible:ring-1 focus-visible:ring-blue-500" />
                                 </div>
                                 <button type="button" onClick={() => {
-                                   const newArr = [...(editingAttendance.personal_outs || [])];
+                                   const newArr = [...(editingExtra.personal_outs || [])];
                                    newArr.splice(idx, 1);
-                                   setEditingAttendance({...editingAttendance, personal_outs: newArr});
+                                   setEditingExtra({...editingExtra, personal_outs: newArr});
                                 }} className="p-1.5 text-slate-400 hover:text-red-500 rounded hover:bg-red-50">
                                    <Trash2 className="w-4 h-4" />
                                 </button>
@@ -979,25 +1101,36 @@ export default function AttendanceAdmin() {
                     )}
                  </div>
 
-                  
-                 
                  <div>
-                    <label className="text-xs font-bold text-slate-500 mb-1 block">備考 (連絡事項など)</label>
+                    <label className="text-xs font-bold text-slate-500 mb-1 block">備考 (作業員からの連絡事項)</label>
                     <textarea 
-                        value={editingAttendance.memo || ''} 
-                        onChange={e => setEditingAttendance({...editingAttendance, memo: e.target.value})} 
+                        value={editingExtra.memo || ''} 
+                        onChange={e => setEditingExtra({...editingExtra, memo: e.target.value})} 
                         className="border p-2 rounded w-full min-h-[60px] resize-none"
+                    />
+                 </div>
+
+                 <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-lg">
+                    <label className="text-xs font-bold text-emerald-800 mb-1 flex items-center gap-1">
+                       <ShieldCheck className="w-4 h-4" />
+                       事務局用メモ <span className="text-[10px] font-normal text-emerald-600">(作業員には非公開)</span>
+                    </label>
+                    <textarea 
+                        value={editingExtra.admin_memo || ''} 
+                        onChange={e => setEditingExtra({...editingExtra, admin_memo: e.target.value})} 
+                        placeholder="管理者用の引き継ぎや特記事項..."
+                        className="border p-2 rounded w-full min-h-[60px] resize-none bg-white focus:ring-1 focus:ring-emerald-500 outline-none"
                     />
                  </div>
               </div>
             </div>
             
             <div className="p-4 border-t flex justify-end gap-3 bg-slate-50">
-              <button onClick={() => setEditingAttendance(null)} className="px-4 py-2 border rounded-md text-sm font-medium hover:bg-slate-100 bg-white">
+              <button onClick={() => setEditingExtra(null)} className="px-4 py-2 border rounded-md text-sm font-medium hover:bg-slate-100 bg-white">
                 キャンセル
               </button>
-              <button onClick={handleSaveAttendance} disabled={savingTime} className="px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 min-w-[100px]">
-                {savingTime ? '保存中...' : '強制保存'}
+              <button onClick={handleSaveExtra} disabled={savingTime} className="px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 min-w-[100px]">
+                {savingTime ? '保存中...' : '保存する'}
               </button>
             </div>
           </div>
