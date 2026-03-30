@@ -192,7 +192,7 @@ export default function CompletionReportForm() {
           }
 
           if (uploadData) {
-              const driveImgUrl = uploadData.thumbnailLink ? uploadData.thumbnailLink.replace('=s220', '=s800') : uploadData.webViewLink;
+              const driveImgUrl = uploadData.directLink ? uploadData.directLink : uploadData.webViewLink;
               uploadedUrls.push(driveImgUrl);
           }
         }

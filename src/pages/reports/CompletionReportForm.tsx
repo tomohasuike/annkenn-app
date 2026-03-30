@@ -284,7 +284,7 @@ export function CompletionReportForm() {
     }
 
     // Google Drive URL
-    const publicUrl = uploadData.thumbnailLink ? uploadData.thumbnailLink.replace('=s220', '=s800') : uploadData.webViewLink;
+    const publicUrl = uploadData.directLink ? uploadData.directLink : uploadData.webViewLink;
 
     return publicUrl;
   };

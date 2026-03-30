@@ -101,7 +101,7 @@ serve(async (req: Request) => {
       fileId: finalDetails.id,
       webViewLink: finalDetails.webViewLink,
       webContentLink: finalDetails.webContentLink,
-      thumbnailLink: finalDetails.thumbnailLink
+      directLink: `https://lh3.googleusercontent.com/d/${finalDetails.id}` // Permanent image link
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

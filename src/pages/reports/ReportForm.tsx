@@ -511,7 +511,7 @@ export default function ReportForm() {
                         console.error('Photo Upload error:', uploadError || uploadData?.error);
                         // We tolerate single image failures rather than breaking the whole form
                     } else if (uploadData) {
-                        const driveImgUrl = uploadData.thumbnailLink ? uploadData.thumbnailLink.replace('=s220', '=s800') : uploadData.webViewLink;
+                        const driveImgUrl = uploadData.directLink ? uploadData.directLink : uploadData.webViewLink;
                         uploadedUrls.push(driveImgUrl);
                     }
                 } catch (err) {
@@ -613,7 +613,7 @@ export default function ReportForm() {
                                 });
 
                                 if (!error && uploadData?.success) {
-                                    const driveImgUrl = uploadData.thumbnailLink ? uploadData.thumbnailLink.replace('=s220', '=s800') : uploadData.webViewLink;
+                                    const driveImgUrl = uploadData.directLink ? uploadData.directLink : uploadData.webViewLink;
                                     uploadedPhotos.push(driveImgUrl);
                                 }
                             } catch (err) { console.error('Material photo upload failed:', err); }

@@ -190,7 +190,7 @@ export default function VehicleInspection() {
               throw new Error("画像のアップロードに失敗しました");
           }
 
-          return uploadData.thumbnailLink ? uploadData.thumbnailLink.replace('=s220', '=s800') : uploadData.webViewLink;
+          return uploadData.directLink ? uploadData.directLink : uploadData.webViewLink;
       } catch (e) {
           console.error("Upload error", e)
           return null
