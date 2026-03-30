@@ -563,97 +563,282 @@ export default function WorkerAttendance() {
              <div className="flex justify-center p-12">読み込み中...</div>
         ) : (
           <div className="overflow-auto flex-1">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-100 text-slate-700 sticky top-0 z-10">
+            <table className="w-full text-sm text-left whitespace-nowrap">
+              <thead className="bg-slate-100 text-slate-700 sticky top-0 z-10 border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3 border-b w-36">日付</th>
-                  <th className="px-4 py-3 border-b">出退勤</th>
-                  <th className="px-4 py-3 border-b min-w-[200px]">申告現場</th>
-                  <th className="px-4 py-3 border-b w-28">役割</th>
-                  <th className="px-4 py-3 border-b w-24">移動</th>
-                  <th className="px-4 py-3 border-b w-24">準備</th>
-                  <th className="px-4 py-3 border-b w-24 text-center">操作</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-12 text-center">月/日</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-10 text-center">曜日</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-24">出勤時間</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-24">退勤時間</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-24 text-center">現場入</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-24 text-center">現場出</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 min-w-[200px]">作業現場名 (日報連携)</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-12 text-center">役割</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-16 text-center">移動</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-16 text-center">準備</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-20 text-center">私用外出</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 min-w-[150px]">備考</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-24 bg-blue-50/50 text-blue-800 text-center">操作</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody>
                 {days.map(day => {
                   const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
                   const record = attendanceRecords[dateStr];
                   const dateObj = new Date(year, month - 1, day);
-                  const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-                  
+                  const dow = dateObj.getDay();
+                  const isWeekend = dow === 0 || dow === 6;
+                  const dowStr = ['日', '月', '火', '水', '木', '金', '土'][dow];
+                  const projs = assignedProjects[dateStr] || [];
+                  const siteDecls = record?.site_declarations || [];
+
+                  const getDeclaredTime = (projectId: string | undefined, field: 'start_time' | 'end_time') => {
+                     if (!projectId) return null;
+                     const specific = siteDecls.find(s => s.project_id === projectId);
+                     const imported = siteDecls.find(s => s.project_id === 'imported' || s.project_id === 'unassigned');
+                     return specific && specific[field] ? specific[field] : (imported && imported[field] ? imported[field] : null);
+                  };
+
+                  const getDeclaredRole = (projectId: string | undefined) => {
+                     if (!projectId) return record?.role || '一般';
+                     const specific = siteDecls.find(s => s.project_id === projectId);
+                     const imported = siteDecls.find(s => s.project_id === 'imported' || s.project_id === 'unassigned');
+                     return specific && specific.role ? specific.role : (imported && imported.role ? imported.role : (record?.role || '一般'));
+                  };
+
+                  const formatTime = (tString?: string | null) => {
+                    if (!tString) return '-';
+                    return new Date(tString).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                  };
+
+                  const hasOverlap = (() => {
+                     if (projs.length < 2) return false;
+                     const toMins = (hhmm: string | null) => {
+                        if (!hhmm) return null;
+                        const [h, m] = hhmm.split(':').map(Number);
+                        return (h * 60) + (m || 0);
+                     };
+                     
+                     const validProjs = projs.map((p: any) => ({
+                         s: toMins(p.foreman_start),
+                         e: toMins(p.foreman_end)
+                     })).filter((p: any) => p.s !== null && p.e !== null);
+                     
+                     for (let i = 0; i < validProjs.length; i++) {
+                         for (let j = i + 1; j < validProjs.length; j++) {
+                             const a = validProjs[i];
+                             const b = validProjs[j];
+                             if (a.s! < b.e! && a.e! > b.s!) {
+                                 return true;
+                             }
+                         }
+                     }
+                     return false;
+                  })();
+
+                  const combinedRecords: any[] = [];
+                  projs.forEach((p: any) => {
+                      combinedRecords.push({
+                          type: 'assigned',
+                          reportId: p.report_id,
+                          projectId: p.project_id,
+                          projectName: p.project_name,
+                          reportStart: p.foreman_start,
+                          reportEnd: p.foreman_end,
+                          declStart: getDeclaredTime(p.project_id, 'start_time'),
+                          declEnd: getDeclaredTime(p.project_id, 'end_time'),
+                          declRole: getDeclaredRole(p.project_id)
+                      });
+                  });
+                  siteDecls.forEach((sd: any) => {
+                      if ((sd.project_id === 'imported' || sd.project_id === 'unassigned') && projs.length > 0) {
+                          return;
+                      }
+                      if (!combinedRecords.some(cr => cr.projectId === sd.project_id)) {
+                          combinedRecords.push({
+                              type: sd.project_id === 'imported' ? 'imported' : 'unassigned',
+                              reportId: undefined,
+                              projectId: sd.project_id,
+                              projectName: sd.project_name || (sd.project_id === 'imported' ? '過去インポートデータ' : '割当外の現場'),
+                              reportStart: null,
+                              reportEnd: null,
+                              declStart: sd.start_time,
+                              declEnd: sd.end_time,
+                              declRole: sd.role || '一般'
+                          });
+                      }
+                  });
+
                   return (
-                    <tr key={day} className={`hover:bg-slate-50 transition-colors ${isWeekend ? 'bg-red-50/20' : ''}`}>
-                      <td className="px-4 py-3 font-medium">{month}/{day} ({['日', '月', '火', '水', '木', '金', '土'][dateObj.getDay()]})</td>
-                      <td className="px-4 py-3">
-                        {record?.clock_in_time ? (
-                           <div className="font-medium">
-                               {new Date(record.clock_in_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} 
-                               <span className="text-muted-foreground mx-1">〜</span> 
-                               {record.clock_out_time ? new Date(record.clock_out_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : ' 未打刻'}
+                    <tr key={day} className={`border-b hover:bg-slate-50 transition-colors ${isWeekend ? (dow===0?'bg-red-50/20':'bg-blue-50/20') : ''}`}>
+                       <td className={`p-2 border-r text-center ${dow===0 ? 'text-red-500 font-bold' : dow===6 ? 'text-blue-500 font-bold' : 'text-slate-700'}`}>
+                          {month}/{day}
+                       </td>
+                       <td className={`p-2 border-r text-center ${dow===0 ? 'text-red-500 font-bold' : dow===6 ? 'text-blue-500 font-bold' : 'text-slate-700'}`}>
+                          {dowStr}
+                       </td>
+                       <td className="p-2 border-r font-medium text-slate-700 text-center">
+                          {formatTime(record?.clock_in_time)}
+                       </td>
+                       <td className="p-2 border-r font-medium text-slate-700 text-center">
+                          {formatTime(record?.clock_out_time)}
+                       </td>
+                       
+                       {/* 現場入 Column */}
+                       <td className={`p-2 border-r font-medium align-top pt-2 px-1 text-left min-w-[80px] ${hasOverlap ? "bg-red-50/50 text-slate-700" : "bg-blue-50/10 text-slate-700"}`}>
+                          {combinedRecords.length > 0 ? (
+                            <div className="flex flex-col gap-1 w-full">
+                               {hasOverlap && (
+                                  <div className="h-[20px] bg-red-600 text-white rounded text-[10px] font-bold flex items-center justify-center shadow-md w-full border border-red-700 animate-pulse">
+                                     🚨 重複エラー
+                                  </div>
+                               )}
+                              {combinedRecords.map((cr, idx) => {
+                                 const isMismatch = cr.type === 'assigned' && cr.declStart && cr.declStart !== (cr.reportStart || '');
+                                 
+                                 return (
+                                   <div key={idx} className={`h-[44px] flex flex-col justify-center text-[11px] rounded px-1.5 box-border border ${
+                                      isMismatch ? 'border-red-400 bg-red-50 text-red-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700'
+                                   }`}>
+                                     {cr.type === 'assigned' ? (
+                                         <>
+                                             <div className="flex justify-between items-center w-full">
+                                                <span className="text-[9px] text-slate-500 mr-1">日報</span>
+                                                <span className={isMismatch ? "font-bold" : ""}>{cr.reportStart || '-'}</span>
+                                             </div>
+                                             <div className={`flex justify-between items-center w-full mt-0.5 pt-0.5 border-t ${isMismatch ? 'border-red-200' : 'border-slate-100 text-blue-700'}`}>
+                                                <span className={`text-[9px] mr-1 ${isMismatch ? 'text-red-500' : 'text-blue-400'}`}>本人</span>
+                                                <span className={isMismatch ? "font-bold" : "font-medium"}>{cr.declStart || '-'}</span>
+                                             </div>
+                                         </>
+                                     ) : (
+                                         <div className="flex justify-between items-center w-full mt-0.5 pt-0.5">
+                                            <span className="text-[9px] mr-1 text-blue-400">本人</span>
+                                            <span className="font-medium text-blue-700">{cr.declStart || '-'}</span>
+                                         </div>
+                                     )}
+                                   </div>
+                                 );
+                              })}
+                            </div>
+                          ) : (
+                             <span className="text-slate-300 flex items-center justify-center h-[34px]">-</span>
+                          )}
+                       </td>
+
+                       {/* 現場出 Column */}
+                       <td className={`p-2 border-r font-medium align-top pt-2 px-1 text-left min-w-[80px] ${hasOverlap ? "bg-red-50/50 text-slate-700" : "bg-blue-50/10 text-slate-700"}`}>
+                          {combinedRecords.length > 0 ? (
+                            <div className="flex flex-col gap-1 w-full">
+                               {hasOverlap && (
+                                  <div className="h-[20px] bg-red-50 text-red-600 rounded text-[10px] font-bold flex items-center justify-center shadow-sm w-full border border-red-200">
+                                     要確認
+                                  </div>
+                               )}
+                              {combinedRecords.map((cr, idx) => {
+                                 const isMismatch = cr.type === 'assigned' && cr.declEnd && cr.declEnd !== (cr.reportEnd || '');
+                                 
+                                 return (
+                                   <div key={idx} className={`h-[44px] flex flex-col justify-center text-[11px] rounded px-1.5 box-border border ${
+                                      isMismatch ? 'border-red-400 bg-red-50 text-red-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700'
+                                   }`}>
+                                     {cr.type === 'assigned' ? (
+                                         <>
+                                             <div className="flex justify-between items-center w-full">
+                                                <span className="text-[9px] text-slate-500 mr-1">日報</span>
+                                                <span className={isMismatch ? "font-bold" : ""}>{cr.reportEnd || '-'}</span>
+                                             </div>
+                                             <div className={`flex justify-between items-center w-full mt-0.5 pt-0.5 border-t ${isMismatch ? 'border-red-200' : 'border-slate-100 text-blue-700'}`}>
+                                                <span className={`text-[9px] mr-1 ${isMismatch ? 'text-red-500' : 'text-blue-400'}`}>本人</span>
+                                                <span className={isMismatch ? "font-bold" : "font-medium"}>{cr.declEnd || '-'}</span>
+                                             </div>
+                                         </>
+                                     ) : (
+                                         <div className="flex justify-between items-center w-full mt-0.5 pt-0.5">
+                                            <span className="text-[9px] mr-1 text-blue-400">本人</span>
+                                            <span className="font-medium text-blue-700">{cr.declEnd || '-'}</span>
+                                         </div>
+                                     )}
+                                   </div>
+                                 );
+                              })}
+                            </div>
+                          ) : (
+                             <span className="text-slate-300 flex items-center justify-center h-[34px]">-</span>
+                          )}
+                       </td>
+
+                       {/* 作業現場名 Column */}
+                       <td className={`p-2 border-r text-left max-w-[250px] font-medium align-top pt-2 ${hasOverlap ? "bg-red-50/50 text-red-700" : "text-slate-600"}`}>
+                          {combinedRecords.length > 0 ? (
+                             <div className="flex flex-col gap-1 w-full">
+                                {hasOverlap && (
+                                   <div className="h-[20px] bg-red-50 text-red-600 rounded text-[10px] font-bold flex items-center justify-center shadow-sm w-full border border-red-200">
+                                      日報重複
+                                   </div>
+                                )}
+                               {combinedRecords.map((cr, idx) => (
+                                  <div key={idx} className="min-h-[44px] flex flex-col justify-center w-full px-1 py-1 box-border mb-1">
+                                     {cr.type === 'assigned' ? (
+                                        <div className="flex flex-col items-start w-full whitespace-normal break-all">
+                                          {cr.projectName && <span className="text-[12px] text-blue-700 font-bold leading-tight block">{cr.projectName}</span>}
+                                        </div>
+                                     ) : (
+                                        <span className={`text-[11px] leading-tight block whitespace-normal ${cr.type === 'imported' ? 'text-slate-400 italic' : 'text-slate-700'}`}>
+                                          {cr.projectName}
+                                        </span>
+                                     )}
+                                  </div>
+                               ))}
+                             </div>
+                          ) : (
+                             <span className="text-slate-300 flex items-center h-[34px]">-</span>
+                          )}
+                       </td>
+
+                       {/* 役割 Column */}
+                       <td className="p-2 border-r text-center align-top pt-2">
+                          <div className="flex flex-col gap-1 items-center h-full">
+                             {hasOverlap && <div className="h-[20px] w-full" />}
+                             {combinedRecords.length > 0 ? combinedRecords.map((cr, idx) => (
+                                <div key={idx} className="h-[44px] flex items-center justify-center text-[10px] w-full mb-1">
+                                  <span className={`border px-1.5 py-0.5 rounded leading-none ${cr.declRole === '職長' ? 'bg-blue-100 text-blue-700 border-blue-200 font-bold' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                    {cr.declRole || '一般'}
+                                  </span>
+                                </div>
+                             )) : <div className="h-[44px] flex items-center justify-center text-slate-300">-</div>}
+                          </div>
+                       </td>
+
+                       {/* 移動、準備、私用外出、備考 Column */}
+                       <td className="p-2 border-r text-center align-top pt-2">
+                           <div className="h-full flex items-center justify-center text-blue-600 font-medium text-xs">
+                              {record?.travel_time_minutes ? `${record.travel_time_minutes} 分` : <span className="text-slate-300 font-normal">-</span>}
                            </div>
-                        ) : <span className="text-slate-400">-</span>}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                         {(() => {
-                            const decls = record?.site_declarations || [];
-                            const assigned = assignedProjects[dateStr] || [];
-                            const isAllImported = decls.length > 0 && decls.every(p => p.project_id === 'imported' || p.project_id === 'unassigned');
-                            const realDecls = isAllImported ? [] : decls;
-                            const formatTm = (t: string | null | undefined) => t ? t.slice(0,5) : '';
-                            
-                            return (
-                               <div className="flex flex-col gap-1 text-xs">
-                                   {realDecls.map((p:any, i:number) => (
-                                     <span key={`real-${i}`} className={`font-medium truncate w-full block px-1.5 py-0.5 rounded border bg-slate-100 text-slate-700 shadow-sm`}>
-                                       <span className="text-[10px] text-slate-500 mr-1">[申告]</span>
-                                       {p.project_name} {p.start_time ? `(${formatTm(p.start_time)}〜${formatTm(p.end_time) || '?'})` : ''}
-                                     </span>
-                                   ))}
-                                   {assigned.map((ap:any, i:number) => (
-                                     <span key={`asg-${i}`} className={`text-blue-600 font-medium truncate w-full block bg-blue-50/50 border-blue-200 px-1.5 py-0.5 rounded border border-dashed ${realDecls.length > 0 ? 'opacity-70 mt-0.5' : ''}`}>
-                                       <span className="text-[10px] text-blue-500 mr-1">[予定]</span>
-                                       {ap.project_name} {ap.foreman_start ? `(${formatTm(ap.foreman_start)}〜${formatTm(ap.foreman_end) || '?'})` : ''}
-                                       {isAllImported && realDecls.length === 0 && <span className="ml-1 text-[10px] text-slate-400 font-normal">(インポート済)</span>}
-                                     </span>
-                                   ))}
-                                   {realDecls.length === 0 && assigned.length === 0 && isAllImported && (
-                                       <span className="text-xs text-slate-400 italic bg-slate-50 px-1.5 py-0.5 rounded border w-fit">データインポート</span>
-                                   )}
-                                   {realDecls.length === 0 && assigned.length === 0 && !isAllImported && (
-                                       <span className="text-xs text-slate-400 italic">日報なし</span>
-                                   )}
-                               </div>
-                            );
-                         })()}
-                      </td>
-                      <td className="px-4 py-3">
-                         {(() => {
-                           const decls = record?.site_declarations || [];
-                           const assigned = assignedProjects[dateStr] || [];
-                           const isAllImported = decls.length > 0 && decls.every(p => p.project_id === 'imported' || p.project_id === 'unassigned');
-                           const realDecls = isAllImported ? [] : decls;
-                           
-                           if (realDecls.length > 0) {
-                             return (
-                               <div className="flex flex-col gap-1 text-xs">{realDecls.map((sd:any, i:number) => (
-                                 <span key={i} className={`truncate w-fit block px-1.5 py-0.5 rounded border ${sd.role === '職長' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100'}`}>{sd.role || '一般'}</span>
-                               ))}</div>
-                             );
-                           } else if (assigned.length > 0) {
-                             return <span className="text-xs text-slate-400 italic">-</span>;
-                           }
-                           return <span className="text-slate-400">-</span>;
-                         })()}
-                      </td>
-                      <td className="px-4 py-3">{record?.travel_time_minutes ? `${record.travel_time_minutes}分` : '-'}</td>
-                      <td className="px-4 py-3">{record?.prep_time_minutes ? `${record.prep_time_minutes}分` : '-'}</td>
-                      <td className="px-4 py-3 text-center">
-                        <button 
-                           className="inline-flex items-center justify-center rounded text-xs font-medium transition-colors border bg-white shadow-sm hover:bg-slate-100 h-8 px-3"
-                           onClick={() => openModal(dateStr)}
-                        >{record ? '編集' : '入力'}</button>
-                      </td>
+                       </td>
+                       <td className="p-2 border-r text-center align-top pt-2">
+                           <div className="h-full flex items-center justify-center text-emerald-600 font-medium text-xs">
+                              {record?.prep_time_minutes ? `${record.prep_time_minutes} 分` : <span className="text-slate-300 font-normal">-</span>}
+                           </div>
+                       </td>
+                       <td className="p-2 border-r text-center align-top pt-2">
+                           <div className="h-full flex items-center justify-center text-amber-600 font-medium text-xs">
+                              {record?.personal_out_minutes ? `${record.personal_out_minutes} 分` : <span className="text-slate-300 font-normal">-</span>}
+                           </div>
+                       </td>
+                       <td className="p-2 border-r text-left align-top pt-2 max-w-[200px] overflow-hidden">
+                           <div className="h-full flex items-center text-slate-600 text-[11px] whitespace-normal">
+                              {record?.memo || <span className="text-slate-300 font-normal">-</span>}
+                           </div>
+                       </td>
+                       
+                       {/* 操作 (入力・編集ボタン) */}
+                       <td className="p-2 text-center align-middle bg-blue-50/20 sticky right-0 z-10 border-l border-slate-200 shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.1)]">
+                           <button 
+                              className="inline-flex items-center justify-center rounded text-xs font-bold transition-all border border-blue-200 bg-white text-blue-600 shadow-sm hover:bg-blue-100 hover:border-blue-400 h-9 px-4 w-full"
+                              onClick={() => openModal(dateStr)}
+                           >{record ? '編集' : '+ 入力'}</button>
+                       </td>
                     </tr>
                   )
                 })}
