@@ -581,6 +581,10 @@ export default function AttendanceAdmin() {
                            });
                        });
                        siteDecls.forEach((sd: any) => {
+                           // If it's imported or unassigned, and we already assigned it as fallback to projs, don't create an orphaned row
+                           if ((sd.project_id === 'imported' || sd.project_id === 'unassigned') && projs.length > 0) {
+                               return;
+                           }
                            if (!combinedRecords.some(cr => cr.projectId === sd.project_id)) {
                                combinedRecords.push({
                                    type: sd.project_id === 'imported' ? 'imported' : 'unassigned',
