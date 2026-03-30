@@ -203,6 +203,8 @@ export default function WorkerAttendance() {
         id,
         report_date,
         project_id,
+        start_time,
+        end_time,
         projects ( project_name ),
         report_personnel!inner ( worker_id, start_time, end_time )
       `)
@@ -237,6 +239,21 @@ export default function WorkerAttendance() {
     }
 
     if (reportsData) {
+      const formatTimeSafe = (timeString: string | null) => {
+         if (!timeString) return null;
+         try {
+            const match = timeString.toString().match(/([0-9]{1,2}):([0-9]{2})/);
+            if (match) {
+               const hour = match[1].padStart(2, '0');
+               const min = match[2];
+               return `${hour}:${min}`;
+            }
+            return null;
+         } catch(e) {
+           return null;
+         }
+      };
+
       reportsData.forEach((report: any) => {
         const date = report.report_date;
         const pName = Array.isArray(report.projects) 
@@ -248,17 +265,20 @@ export default function WorkerAttendance() {
         if (pName) {
            if (!projectsByDate[date]) projectsByDate[date] = [];
            
+           const rStart = formatTimeSafe(personnelRow?.start_time || report.start_time);
+           const rEnd = formatTimeSafe(personnelRow?.end_time || report.end_time);
+
            const existingIdx = projectsByDate[date].findIndex(p => p.project_id === report.project_id);
            if (existingIdx >= 0) {
-              projectsByDate[date][existingIdx].foreman_start = personnelRow?.start_time || null;
-              projectsByDate[date][existingIdx].foreman_end = personnelRow?.end_time || null;
+              projectsByDate[date][existingIdx].foreman_start = rStart;
+              projectsByDate[date][existingIdx].foreman_end = rEnd;
               projectsByDate[date][existingIdx].report_id = report.id;
            } else {
               projectsByDate[date].push({
                 project_id: report.project_id,
                 project_name: pName,
-                foreman_start: personnelRow?.start_time || null,
-                foreman_end: personnelRow?.end_time || null,
+                foreman_start: rStart,
+                foreman_end: rEnd,
                 report_id: report.id
               });
            }
