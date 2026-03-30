@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Clock, X, Plus, Trash2 } from 'lucide-react';
+import { Clock, X, Plus, Trash2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 interface DailyAttendance {
   id: string;
@@ -856,7 +857,19 @@ export default function WorkerAttendance() {
                                   <div key={idx} className="min-h-[44px] flex flex-col justify-center w-full px-1 py-1 box-border mb-1">
                                      {cr.type === 'assigned' ? (
                                         <div className="flex flex-col items-start w-full whitespace-normal break-all">
-                                          {cr.projectName && <span className="text-[12px] text-blue-700 font-bold leading-tight block">{cr.projectName}</span>}
+                                          {cr.projectName && (
+                                              cr.reportId ? (
+                                                <Link
+                                                  to={`/reports/${cr.reportId}`}
+                                                  className="text-[12px] text-blue-700 font-bold leading-tight block hover:text-blue-500 hover:underline flex items-start gap-1"
+                                                >
+                                                  <FileText className="w-3 h-3 min-w-[12px] mt-[1px] text-blue-500" />
+                                                  {cr.projectName}
+                                                </Link>
+                                              ) : (
+                                                <span className="text-[12px] text-blue-700 font-bold leading-tight block">{cr.projectName}</span>
+                                              )
+                                          )}
                                         </div>
                                      ) : (
                                         <span className={`text-[11px] leading-tight block whitespace-normal ${cr.type === 'imported' ? 'text-slate-400 italic' : 'text-slate-700'}`}>
