@@ -134,13 +134,25 @@ export default function WorkerAttendance() {
         .select('id, name')
         .eq('email', user.email)
         .single();
-
-      if (!worker) {
-        // 社長（非作業員）のテスト用：一番最初の作業員データを借りる
+        
+      if (user.email === 'tomo.hasuike@hitec-inc.co.jp') {
+          // 社長アカウントの場合、強制的に「鈴木　好幸」さんのデータを表示する
+          const { data: suzukiWorker } = await supabase
+            .from('worker_master')
+            .select('id, name')
+            .eq('name', '鈴木　好幸')
+            .single();
+            
+          if (suzukiWorker) {
+              worker = suzukiWorker;
+              setTestModeName(suzukiWorker.name);
+          }
+      } else if (!worker) {
+        // その他の非作業員テスト用
         const { data: fallbackWorker } = await supabase
           .from('worker_master')
           .select('id, name')
-          .eq('name', '鈴木　好幸')
+          .limit(1)
           .single();
         
         if (fallbackWorker) {
