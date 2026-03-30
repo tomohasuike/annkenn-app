@@ -40,8 +40,28 @@ export default function Projects() {
         const { data, error } = await query
         if (error) throw error
         
-        // 休暇（VACATION）案件は工程管理用のシステム案件のため管理画面から除外
-        const visibleProjects = (data || []).filter(p => p.project_number !== 'VACATION' && p.project_name !== '■ 休暇')
+        // 休暇（VACATION）案件は除外し、KD/BS始まり、または数字6桁始まりのもの（及びその子案件）のみ表示
+        const visibleProjects = (data || []).filter(p => {
+          if (p.project_number === 'VACATION' || p.project_name === '■ 休暇') return false;
+          
+          const num = p.project_number || '';
+          if (num.startsWith('KD') || num.startsWith('BS')) return true;
+          
+          const base = num.split('-')[0];
+          if (/^[0-9]{6}$/.test(base)) return true;
+          
+          // 親案件が条件を満たしている場合は子案件（枝番）も表示
+          if (p.parent_project_id) {
+            const parent = data.find(parent => parent.id === p.parent_project_id);
+            if (parent) {
+              const pNum = parent.project_number || '';
+              if (pNum.startsWith('KD') || pNum.startsWith('BS')) return true;
+              if (/^[0-9]{6}$/.test(pNum.split('-')[0])) return true;
+            }
+          }
+          
+          return false;
+        })
         
         setProjects(visibleProjects)
       } catch (err) {

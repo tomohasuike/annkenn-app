@@ -5,7 +5,7 @@ import { format, addDays, subDays, startOfWeek } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Search, ChevronLeft, ChevronRight, Plus, RefreshCw, Users, MessageSquare, Info, X, CalendarDays, List, ListTodo, History, PanelLeft, ChevronDown, ChevronRight as ChevronRightIcon, Truck, Trash2, Clock, FolderGit2, User } from 'lucide-react'
 
-type ProjectData = { id: string; name: string; category: string; status: string; no: string | null; site: string | null; legacy_id?: string; client_name?: string | null; client_company_name?: string | null; folder_url?: string | null }
+type ProjectData = { id: string; name: string; category: string; status: string; no: string | null; site: string | null; legacy_id?: string; client_name?: string | null; client_company_name?: string | null; folder_url?: string | null; parent_project_id?: string | null }
 type ResourceData = { id: string; name: string; type: 'worker' | 'vehicle'; categoryId?: 'president' | 'employee' | 'partner' | 'vehicle' | 'machine' }
 type ProjectDailyData = { id?: string; project_id: string; target_date: string; planned_count?: number | null; comment?: string | null }
 type AssignmentData = {
@@ -183,12 +183,33 @@ export default function ScheduleManagement() {
     setSyncStatus('更新中...')
     try {
       const [projRes, workerRes, vehicleRes] = await Promise.all([
-        supabase.from('projects').select('id, project_name, category, status_flag, project_number, site_name, legacy_id, client_name, client_company_name, folder_url').order('created_at', { ascending: false }),
+        supabase.from('projects').select('id, project_name, category, status_flag, project_number, site_name, legacy_id, client_name, client_company_name, folder_url, parent_project_id').order('created_at', { ascending: false }),
         supabase.from('worker_master').select('id, name, type').eq('is_active', true).neq('type', '事務員').order('display_order', { ascending: true, nullsFirst: false }).order('id', { ascending: true }),
         supabase.from('vehicle_master').select('id, vehicle_name, category').eq('is_active', true).or('is_inspection_only.is.null,is_inspection_only.eq.false').order('created_at', { ascending: true })
       ])
 
-      const pl = (projRes.data || []).map(p => ({ 
+      const rawData = projRes.data || [];
+      const visibleProjects = rawData.filter(p => {
+          if (p.project_number === 'VACATION' || p.project_name === '■ 休暇') return true; // 休暇案件は表示
+          
+          const num = p.project_number || '';
+          if (num.startsWith('KD') || num.startsWith('BS')) return true;
+          
+          const base = num.split('-')[0];
+          if (/^[0-9]{6}$/.test(base)) return true;
+          
+          if (p.parent_project_id) {
+              const parent = rawData.find(parent => parent.id === p.parent_project_id);
+              if (parent) {
+                  const pNum = parent.project_number || '';
+                  if (pNum.startsWith('KD') || pNum.startsWith('BS')) return true;
+                  if (/^[0-9]{6}$/.test(pNum.split('-')[0])) return true;
+              }
+          }
+          return false;
+      });
+
+      const pl = visibleProjects.map(p => ({ 
           id: p.id, 
           name: p.project_name, 
           category: p.category, 
@@ -198,7 +219,8 @@ export default function ScheduleManagement() {
           legacy_id: p.legacy_id,
           client_name: p.client_name,
           client_company_name: p.client_company_name,
-          folder_url: p.folder_url
+          folder_url: p.folder_url,
+          parent_project_id: p.parent_project_id
       }))
       
       setProjectsList(pl)
