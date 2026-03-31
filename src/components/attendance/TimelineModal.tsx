@@ -213,7 +213,7 @@ export default function TimelineModal({
     setTimelineEvents(newEvents);
   };
 
-  const updateEventInfo = (index: number, updates: Partial<TimelineEvent>) => {
+  const updateEventInfo = async (index: number, updates: Partial<TimelineEvent>) => {
     if (readOnly) return;
     let finalUpdates = { ...updates };
     
@@ -223,6 +223,33 @@ export default function TimelineModal({
            finalUpdates.role = assignedRole.role;
        } else if (timelineEvents[index].role && ['現場代理人', '現場代理人（主任技術者）', '監理技術者'].includes(timelineEvents[index].role || '')) {
            finalUpdates.role = '一般';
+       }
+    }
+
+    const targetRole = finalUpdates.role !== undefined ? finalUpdates.role : timelineEvents[index].role;
+    const targetProject = finalUpdates.project_id !== undefined ? finalUpdates.project_id : timelineEvents[index].project_id;
+    
+    if (targetRole === '職長' && targetProject && ('role' in updates || 'project_id' in updates)) {
+       try {
+           const { data: others, error } = await supabase
+               .from('daily_attendance')
+               .select('worker_id, site_declarations')
+               .eq('date', selectedDate)
+               .neq('worker_id', workerId);
+               
+           if (!error && others) {
+               const alreadyHasForeman = others.some(row => {
+                   const decs = Array.isArray(row.site_declarations) ? row.site_declarations : [];
+                   return decs.some((dec: any) => dec.id === targetProject && dec.role === '職長');
+               });
+               if (alreadyHasForeman) {
+                   toast.error('この案件にはすでに別の職長がいます。１案件につき職長は１人までです。');
+                   // Revert role to general so it's not stuck
+                   finalUpdates.role = '一般';
+               }
+           }
+       } catch (err) {
+           console.error(err);
        }
     }
 

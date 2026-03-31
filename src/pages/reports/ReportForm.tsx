@@ -490,6 +490,8 @@ export default function ReportForm() {
     setSaving(true)
     try {
         const { data: { user } } = await supabase.auth.getUser()
+        const sessionData = await supabase.auth.getSession();
+        const token = sessionData.data.session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY;
         
         // --- Photo Upload Logic ---
         const uploadedUrls = [...existingPhotos];
@@ -503,19 +505,33 @@ export default function ReportForm() {
                     const formData = new FormData();
                     formData.append('file', finalFile);
 
-                    const { data: uploadData, error: uploadError } = await supabase.functions.invoke('upload-drive-file', {
-                        body: formData,
+                    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-drive-file`, {
+                        method: 'POST',
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        },
+                        body: formData
                     });
                     
-                    if (uploadError || !uploadData?.success) {
-                        console.error('Photo Upload error:', uploadError || uploadData?.error);
-                        // We tolerate single image failures rather than breaking the whole form
+                    if (!res.ok) {
+                        const errText = await res.text();
+                        console.error('Photo Upload error:', res.status, errText);
+                        alert(`写真アップロードに失敗しました (Error ${res.status}): ${errText}`);
+                        continue;
+                    }
+
+                    const uploadData = await res.json();
+                    
+                    if (!uploadData?.success) {
+                        console.error('Photo Upload error:', uploadData?.error);
+                        alert(`写真アップロードに失敗しました: ${uploadData?.error}`);
                     } else if (uploadData) {
                         const driveImgUrl = uploadData.directLink ? uploadData.directLink : uploadData.webViewLink;
                         uploadedUrls.push(driveImgUrl);
                     }
-                } catch (err) {
+                } catch (err: any) {
                     console.error('Compression or upload failed:', err);
+                    alert(`写真のアップロード中に予期せぬエラーが発生しました: ${err.message}`);
                 }
             }
         }
@@ -608,11 +624,21 @@ export default function ReportForm() {
                                 const formData = new FormData();
                                 formData.append('file', finalFile);
 
-                                const { data: uploadData, error } = await supabase.functions.invoke('upload-drive-file', {
-                                    body: formData,
+                                const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-drive-file`, {
+                                    method: 'POST',
+                                    headers: { Authorization: `Bearer ${token}` },
+                                    body: formData
                                 });
 
-                                if (!error && uploadData?.success) {
+                                if (!res.ok) {
+                                    const errText = await res.text();
+                                    console.error('Material photo upload error:', res.status, errText);
+                                    continue;
+                                }
+
+                                const uploadData = await res.json();
+
+                                if (uploadData?.success) {
                                     const driveImgUrl = uploadData.directLink ? uploadData.directLink : uploadData.webViewLink;
                                     uploadedPhotos.push(driveImgUrl);
                                 }
@@ -630,11 +656,21 @@ export default function ReportForm() {
                                 const formData = new FormData();
                                 formData.append('file', finalFile);
 
-                                const { data: uploadData, error } = await supabase.functions.invoke('upload-drive-file', {
-                                    body: formData,
+                                const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-drive-file`, {
+                                    method: 'POST',
+                                    headers: { Authorization: `Bearer ${token}` },
+                                    body: formData
                                 });
 
-                                if (!error && uploadData?.success) {
+                                if (!res.ok) {
+                                    const errText = await res.text();
+                                    console.error('Material doc upload error:', res.status, errText);
+                                    continue;
+                                }
+                                
+                                const uploadData = await res.json();
+
+                                if (uploadData?.success) {
                                     const driveDocUrl = uploadData.webViewLink;
                                     uploadedDocs.push(driveDocUrl);
                                 }
