@@ -508,8 +508,16 @@ export default function ReportForm() {
                     });
                     
                     if (uploadError) {
-                        console.error('Photo Upload Edge Function Error:', uploadError);
-                        alert(`写真アップロードに失敗しました (Error): ${uploadError.message}`);
+                        let detailedMsg = uploadError.message;
+                        try {
+                            if (uploadError.context) {
+                                const ctxText = await uploadError.context.text();
+                                detailedMsg += "\nDetails: " + ctxText;
+                            }
+                        } catch(e) {}
+                        
+                        console.error('Photo Upload Edge Function Error:', uploadError, detailedMsg);
+                        alert(`写真アップロードに失敗しました:\n${detailedMsg}`);
                         continue;
                     }
 
@@ -623,7 +631,14 @@ export default function ReportForm() {
                                 });
 
                                 if (uploadError) {
-                                    console.error('Material photo upload Edge Function error:', uploadError);
+                                    let detailedMsg = uploadError.message;
+                                    try {
+                                        if (uploadError.context) {
+                                            const ctxText = await uploadError.context.text();
+                                            detailedMsg += "\\nDetails: " + ctxText;
+                                        }
+                                    } catch(e) {}
+                                    console.error('Material photo upload Edge Function error:', uploadError, detailedMsg);
                                     continue;
                                 }
 
@@ -650,7 +665,14 @@ export default function ReportForm() {
                                 });
 
                                 if (uploadError) {
-                                    console.error('Material doc upload Edge Function error:', uploadError);
+                                    let detailedMsg = uploadError.message;
+                                    try {
+                                        if (uploadError.context) {
+                                            const ctxText = await uploadError.context.text();
+                                            detailedMsg += "\\nDetails: " + ctxText;
+                                        }
+                                    } catch(e) {}
+                                    console.error('Material doc upload Edge Function error:', uploadError, detailedMsg);
                                     continue;
                                 }
 
