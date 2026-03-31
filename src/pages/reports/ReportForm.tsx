@@ -527,7 +527,7 @@ export default function ReportForm() {
             }
         }
         
-        const reportPayload = {
+        const basePayload = {
             project_id: report.project_id,
             report_date: new Date(report.보고日時).toISOString(),
             work_category: report.作業区分,
@@ -536,16 +536,14 @@ export default function ReportForm() {
             progress: report.工事進捗,
             work_content: report.工事内容,
             notes: report.備考,
-            reporter_id: user?.id || null,
-            reporter_name: reporterName || user?.email?.split('@')[0] || '未設定',
             site_photos: JSON.stringify(uploadedUrls)
         }
 
         let currentReportId = id;
 
         if (id) {
-            // Update existing
-            const { error: updateErr } = await supabase.from('daily_reports').update(reportPayload).eq('id', id)
+            // Update existing (omit reporter_id to preserve the original creator & avoid FK errors)
+            const { error: updateErr } = await supabase.from('daily_reports').update(basePayload).eq('id', id)
             if (updateErr) throw updateErr
 
             // Delete old relations
@@ -556,7 +554,12 @@ export default function ReportForm() {
             await supabase.from('report_subcontractors').delete().eq('report_id', id)
         } else {
             // Insert new
-            const { data: newReport, error: insertErr } = await supabase.from('daily_reports').insert([reportPayload]).select().single()
+            const insertPayload = {
+                ...basePayload,
+                reporter_id: user?.id || null,
+                reporter_name: reporterName || user?.email?.split('@')[0] || '未設定',
+            };
+            const { data: newReport, error: insertErr } = await supabase.from('daily_reports').insert([insertPayload]).select().single()
             if (insertErr) throw insertErr
             currentReportId = newReport.id
         }
