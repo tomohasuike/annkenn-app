@@ -411,6 +411,10 @@ export default function AttendanceAdmin() {
            const reportId = _r?.id;
            const projectId = _r?.project_id;
            
+           if (sStr && eStr && sStr === eStr) {
+               return; // 現場入と現場出が同じ場合は「完了報告用」なので表示しない
+           }
+           
            if (d && p) {
              if (!projMap[d]) projMap[d] = [];
              // Check for duplicate by name

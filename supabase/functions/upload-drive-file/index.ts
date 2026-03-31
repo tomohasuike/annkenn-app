@@ -12,6 +12,18 @@ serve(async (req: Request) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader || !authHeader.includes(Deno.env.get('SUPABASE_ANON_KEY') || '')) {
+      // Basic check: at least require the anon key or user JWT to match
+      const isAnon = authHeader === `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`;
+      if (!isAnon) {
+         // We allow the request to proceed if it at least HAS a Bearer token.
+         if (!authHeader.startsWith('Bearer ')) {
+            return new Response(JSON.stringify({ error: "Missing Bearer token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } })
+         }
+      }
+    }
+
     const formData = await req.formData()
     const file = formData.get('file') as File
     let folderId = formData.get('folderId') as string

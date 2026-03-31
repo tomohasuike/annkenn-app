@@ -328,6 +328,10 @@ export default function WorkerAttendance() {
            const rStart = formatTimeSafe(r.start_time || _r.start_time);
            const rEnd = formatTimeSafe(r.end_time || _r.end_time);
 
+           if (rStart && rEnd && rStart === rEnd) {
+               return; // 現場入と現場出が同じ場合は「完了報告用」なので表示しない
+           }
+
            const existingIdx = projectsByDate[date].findIndex(p => p.project_id === _r.project_id);
            if (existingIdx >= 0) {
               projectsByDate[date][existingIdx].foreman_start = rStart;
@@ -363,6 +367,10 @@ export default function WorkerAttendance() {
            
            const rStart = formatTimeSafe(_r.start_time);
            const rEnd = formatTimeSafe(_r.end_time);
+
+           if (rStart && rEnd && rStart === rEnd) {
+               return; // 現場入と現場出が同じ場合は「完了報告用」なので表示しない
+           }
 
            const existingIdx = projectsByDate[date].findIndex(p => p.project_id === _r.project_id);
            if (existingIdx >= 0) {
@@ -420,10 +428,27 @@ export default function WorkerAttendance() {
         }
 
         let lastEnd = ci;
+        let remainingPrep = existingRecord.prep_time_minutes || 0;
+        let remainingMisc = existingRecord.misc_time_minutes || 0;
+
+        const toMins = (hhmm: string | null | undefined) => {
+            if (!hhmm) return 0;
+            const [h, m] = hhmm.split(':').map(Number);
+            return (h * 60) + (m || 0);
+        };
+
         for (const d of decls) {
              if (d.start_time) {
                  if (lastEnd && lastEnd !== d.start_time) {
-                     initialEvents.push({ id: crypto.randomUUID(), time: lastEnd, type: 'travel' });
+                     const diffMins = toMins(d.start_time) - toMins(lastEnd);
+                     let gapType: 'travel' | 'prep' | 'misc' = 'travel';
+                     if (diffMins > 0) {
+                         if (remainingPrep === diffMins) { gapType = 'prep'; remainingPrep -= diffMins; }
+                         else if (remainingMisc === diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
+                         else if (remainingPrep > 0 && remainingPrep >= diffMins) { gapType = 'prep'; remainingPrep -= diffMins; }
+                         else if (remainingMisc > 0 && remainingMisc >= diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
+                     }
+                     initialEvents.push({ id: crypto.randomUUID(), time: lastEnd, type: gapType });
                  }
                  initialEvents.push({
                      id: crypto.randomUUID(), time: d.start_time, type: 'site_work',
@@ -436,7 +461,15 @@ export default function WorkerAttendance() {
         const co = formatTime(existingRecord.clock_out_time);
         if (co) {
              if (lastEnd && lastEnd !== co) {
-                initialEvents.push({ id: crypto.randomUUID(), time: lastEnd, type: 'travel' });
+                 const diffMins = toMins(co) - toMins(lastEnd);
+                 let gapType: 'travel' | 'prep' | 'misc' = 'travel';
+                 if (diffMins > 0) {
+                     if (remainingPrep === diffMins) { gapType = 'prep'; remainingPrep -= diffMins; }
+                     else if (remainingMisc === diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
+                     else if (remainingPrep > 0 && remainingPrep >= diffMins) { gapType = 'prep'; remainingPrep -= diffMins; }
+                     else if (remainingMisc > 0 && remainingMisc >= diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
+                 }
+                 initialEvents.push({ id: crypto.randomUUID(), time: lastEnd, type: gapType });
              }
              initialEvents.push({ id: crypto.randomUUID(), time: co, type: 'clock_out' });
         }
@@ -578,7 +611,15 @@ export default function WorkerAttendance() {
     let misc_time_minutes = 0;
     const site_declarations: any[] = [];
     
-    const validEvents = processedEvents.filter(e => e.time).sort((a,b) => a.time.localeCompare(b.time));
+    const validEvents = processedEvents.filter(e => e.time).sort((a,b) => {
+        const diff = a.time.localeCompare(b.time);
+        if (diff !== 0) return diff;
+        if (a.type === 'clock_in') return -1;
+        if (b.type === 'clock_in') return 1;
+        if (a.type === 'clock_out') return 1;
+        if (b.type === 'clock_out') return -1;
+        return 0;
+    });
 
     const toMins = (hhmm: string) => {
       const [h, m] = hhmm.split(':').map(Number);
