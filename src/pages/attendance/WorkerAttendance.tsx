@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Clock, X, Plus, Trash2, FileText } from 'lucide-react';
+import { Clock, X, Plus, Trash2, FileText, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 
@@ -41,6 +41,7 @@ export default function WorkerAttendance() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [allProjects, setAllProjects] = useState<{ id: string; project_name: string; status_flag: string; project_number?: string; client_name?: string; parent_project_id?: string | null }[]>([]);
+  const [activeRoles, setActiveRoles] = useState<any[]>([]);
   
   // Branch Selection State
   const [branchSelection, setBranchSelection] = useState<{
@@ -199,6 +200,17 @@ export default function WorkerAttendance() {
       }, {} as Record<string, DailyAttendance>);
       setAttendanceRecords(recordsByDate);
     }
+
+    // Role Assignments fetching
+    const { data: roleData } = await supabase
+      .from('project_role_assignments')
+      .select('project_id, role, start_date, end_date')
+      .eq('worker_id', wId)
+      .lte('start_date', endDate)
+      .gte('end_date', startDate);
+    
+    if (roleData) setActiveRoles(roleData);
+    else setActiveRoles([]);
 
     const { data: assignmentsData } = await supabase
       .from('assignments')
@@ -467,12 +479,51 @@ export default function WorkerAttendance() {
   const removeEvent = (index: number) => {
     const newEvents = [...timelineEvents];
     newEvents.splice(index, 1);
+    
+    // Auto-merge adjacent identical site_work blocks if they end up next to each other
+    if (index > 0 && index < newEvents.length) {
+        const prev = newEvents[index - 1];
+        const next = newEvents[index];
+        if (prev.type === 'site_work' && next.type === 'site_work' && 
+            prev.project_id === next.project_id && prev.project_id !== undefined) {
+            newEvents.splice(index, 1);
+        }
+    }
+    
+    setTimelineEvents(newEvents);
+  };
+
+  const addNakanuke = (index: number) => {
+    const currentEvent = timelineEvents[index];
+    if (currentEvent.type !== 'site_work') return;
+    
+    // Add a 'misc' (雑務/中抜け) block, then a duplicate of the current site block
+    const newEvents = [...timelineEvents];
+    newEvents.splice(index + 1, 0, 
+       { id: crypto.randomUUID(), time: '', type: 'misc' }, // Step out
+       { id: crypto.randomUUID(), time: '', type: 'site_work', project_id: currentEvent.project_id, project_name: currentEvent.project_name, role: currentEvent.role } // Return
+    );
     setTimelineEvents(newEvents);
   };
 
   const updateEventInfo = (index: number, updates: Partial<TimelineEvent>) => {
+    let finalUpdates = { ...updates };
+    
+    if ('project_id' in finalUpdates && finalUpdates.project_id) {
+       const assignedRole = activeRoles.find(r => 
+           r.project_id === finalUpdates.project_id && 
+           r.start_date <= (selectedDate || '') && 
+           r.end_date >= (selectedDate || '')
+       );
+       if (assignedRole) {
+           finalUpdates.role = assignedRole.role;
+       } else if (timelineEvents[index].role && ['現場代理人', '現場代理人（主任技術者）', '監理技術者'].includes(timelineEvents[index].role || '')) {
+           finalUpdates.role = '一般';
+       }
+    }
+
     const newEvents = [...timelineEvents];
-    newEvents[index] = { ...newEvents[index], ...updates };
+    newEvents[index] = { ...newEvents[index], ...finalUpdates };
     setTimelineEvents(newEvents);
     
     // 分岐工事のピックアップ
@@ -553,12 +604,13 @@ export default function WorkerAttendance() {
             } else if (prev.type === 'misc') {
                 misc_time_minutes += diffMins;
             } else if (prev.type === 'site_work' && prev.project_id) {
+                const assignedRole = activeRoles.find(r => r.project_id === prev.project_id && r.start_date <= (selectedDate || '') && r.end_date >= (selectedDate || ''));
                 site_declarations.push({
                     project_id: prev.project_id,
                     project_name: prev.project_name,
                     start_time: prev.time,
                     end_time: ev.time,
-                    role: prev.role || '一般'
+                    role: assignedRole ? assignedRole.role : (prev.role || '一般')
                 });
             }
         }
@@ -1087,7 +1139,14 @@ export default function WorkerAttendance() {
                                     )}
 
                                     {ev.type !== 'clock_in' && ev.type !== 'clock_out' && (
-                                        <button onClick={() => removeEvent(idx)} className="p-2 text-slate-300 hover:text-red-500 rounded bg-white/50 border shadow-sm ml-auto sm:ml-0"><Trash2 className="w-4 h-4"/></button>
+                                        <div className="ml-auto sm:ml-0 flex items-center gap-1">
+                                          {ev.type === 'site_work' && (
+                                             <button onClick={() => addNakanuke(idx)} className="px-2 py-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-100/50 rounded bg-blue-50 border border-blue-100 shadow-sm text-[11px] font-bold flex items-center whitespace-nowrap transition-colors" title="この現場作業を一度中断し、中抜け後に同じ現場を再開します">
+                                                + 中抜けを挟む
+                                             </button>
+                                          )}
+                                          <button onClick={() => removeEvent(idx)} className="p-2 text-slate-300 hover:text-red-500 rounded bg-white/50 border shadow-sm"><Trash2 className="w-4 h-4"/></button>
+                                        </div>
                                     )}
                                 </div>
 
@@ -1117,15 +1176,27 @@ export default function WorkerAttendance() {
                                             </div>
                                         </div>
                                         <div className="w-full sm:w-32 shrink-0">
-                                            <select 
-                                                className="w-full h-10 px-3 text-sm border-0 ring-1 ring-slate-300 bg-white rounded-md shadow-inner text-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                                value={ev.role || '一般'}
-                                                onChange={(e) => updateEventInfo(idx, { role: e.target.value })}
-                                            >
-                                                <option value="一般">一般</option>
-                                                <option value="職長">職長</option>
-                                                <option value="現場代理人">代理人</option>
-                                            </select>
+                                            {(() => {
+                                                const assignedRole = activeRoles.find(r => r.project_id === ev.project_id && r.start_date <= (selectedDate || '') && r.end_date >= (selectedDate || ''));
+                                                if (assignedRole) {
+                                                    return (
+                                                        <div className="w-full h-10 px-3 text-sm border-0 ring-1 ring-amber-300 bg-amber-50 rounded-md shadow-inner text-amber-900 flex items-center justify-between font-bold cursor-not-allowed" title="管理者によって割り当てられています">
+                                                            {assignedRole.role}
+                                                            <Lock className="w-3.5 h-3.5 text-amber-600"/>
+                                                        </div>
+                                                    );
+                                                }
+                                                return (
+                                                    <select 
+                                                        className="w-full h-10 px-3 text-sm border-0 ring-1 ring-slate-300 bg-white rounded-md shadow-inner text-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                                        value={ev.role || '一般'}
+                                                        onChange={(e) => updateEventInfo(idx, { role: e.target.value })}
+                                                    >
+                                                        <option value="一般">一般</option>
+                                                        <option value="職長">職長</option>
+                                                    </select>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                 )}

@@ -6,6 +6,8 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { AttendanceImportModal } from '../../components/attendance/AttendanceImportModal';
 import TotImportModal from '../../components/attendance/TotImportModal';
+import TimelineModal from '../../components/attendance/TimelineModal';
+import RoleAssignmentAdmin from '../../components/attendance/RoleAssignmentAdmin';
 
 
 
@@ -59,6 +61,7 @@ interface DraftRecord {
 
 export default function AttendanceAdmin() {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [activeRoles, setActiveRoles] = useState<any[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [records, setRecords] = useState<DailyAttendance[]>([]);
   const [projects, setProjects] = useState<Record<string, string[]>>({}); // date -> project names
@@ -72,6 +75,8 @@ export default function AttendanceAdmin() {
   const [drafts, setDrafts] = useState<Record<string, DraftRecord>>({});
   const hasUnsavedChanges = Object.keys(drafts).length > 0;
 
+  const [activeTab, setActiveTab] = useState<'attendance' | 'roles'>('attendance');
+  
   const [editingExtra, setEditingExtra] = useState<{
     dateStr: string;
     recordId?: string;
@@ -80,6 +85,31 @@ export default function AttendanceAdmin() {
     memo: string | null;
     admin_memo: string | null;
   } | null>(null);
+
+  const [timelineModal, setTimelineModal] = useState<{
+    isOpen: boolean;
+    dateStr: string;
+    workerId: string;
+    existingRecord: any;
+    assignedProjectsForDate: any[];
+  }>({
+    isOpen: false,
+    dateStr: '',
+    workerId: '',
+    existingRecord: null,
+    assignedProjectsForDate: []
+  });
+
+  const openTimelineModal = (dateStr: string, workerId: string) => {
+      const existingRecord = records.find(r => r.worker_id === workerId && r.target_date === dateStr);
+      setTimelineModal({
+          isOpen: true,
+          dateStr,
+          workerId,
+          existingRecord: existingRecord || null,
+          assignedProjectsForDate: []
+      });
+  };
 
   const [savingTime, setSavingTime] = useState(false);
 
@@ -305,6 +335,20 @@ export default function AttendanceAdmin() {
 
       if (recordData) setRecords(recordData);
 
+      // Fetch active roles for this worker
+      const { data: roleData } = await supabase
+        .from('project_role_assignments')
+        .select(`project_id, role, start_date, end_date, project:projects(project_name)`)
+        .eq('worker_id', workerId)
+        .lte('start_date', endDateStr)
+        .gte('end_date', startDateStr);
+      
+      if (roleData) {
+         setActiveRoles(roleData);
+      } else {
+         setActiveRoles([]);
+      }
+
       // 2. Fetch Projects mapping for this worker
       const { data: reportData } = await supabase
         .from('report_personnel')
@@ -440,7 +484,23 @@ export default function AttendanceAdmin() {
               社員の申告状況を通月で確認し、月次締めやTOTチェックを行います
             </p>
           </div>
+
           <div className="flex gap-2 shrink-0">
+             <button
+                onClick={() => setActiveTab('attendance')}
+                className={`px-3 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-colors shadow-sm ${activeTab === 'attendance' ? 'bg-primary text-primary-foreground border-primary' : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50'}`}
+             >
+                📅 勤怠明細
+             </button>
+             <button
+                onClick={() => setActiveTab('roles')}
+                className={`px-3 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-colors shadow-sm ${activeTab === 'roles' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50'}`}
+             >
+                💼 現場代理人・指定
+             </button>
+          </div>
+
+          <div className="flex gap-2 shrink-0 ml-auto">
              <button
                 onClick={async () => {
                    if (window.confirm('1月24日以前の勤怠データを完全に一括消去します。よろしいですか？\n※操作を元に戻すことはできません。')) {
@@ -476,13 +536,20 @@ export default function AttendanceAdmin() {
           </div>
         </div>
 
+        {activeTab === 'attendance' && (
         <div className="flex bg-slate-50 border p-1.5 rounded-md justify-between items-center shadow-sm">
             <button onClick={handlePrevMonth} className="px-3 py-1 border bg-white rounded hover:bg-slate-50 text-xs font-medium shadow-sm active:scale-95">&lt; 前月26日</button>
             <h3 className="text-base sm:text-lg font-bold whitespace-nowrap px-4 tracking-tight">{targetYear}年 {targetMonth}月度 <span className="text-muted-foreground text-xs sm:text-sm font-normal ml-2 hidden sm:inline-block">({startDateStr.replace(/-/g, '/')} 〜 {endDateStr.replace(/-/g, '/')})</span></h3>
             <button onClick={handleNextMonth} className="px-3 py-1 border bg-white rounded hover:bg-slate-50 text-xs font-medium shadow-sm active:scale-95">次月25日 &gt;</button>
         </div>
+        )}
       </div>
 
+      {activeTab === 'roles' ? (
+         <RoleAssignmentAdmin 
+            workers={workers} 
+         />
+      ) : (
       <div className="flex flex-1 min-h-0 gap-3">
         {/* Left Sidebar: Worker List */}
         <div className="w-36 sm:w-48 shrink-0 flex flex-col bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
@@ -515,11 +582,20 @@ export default function AttendanceAdmin() {
         {/* Right Content: Spreadsheet View */}
         <div className="flex-1 flex flex-col min-h-0 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden relative">
           <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <h3 className="text-xl font-bold flex items-center gap-2 text-slate-800">
                 {workers.find(w => w.id === selectedWorkerId)?.name || '未選択'}
                 <span className="text-sm font-normal text-muted-foreground ml-2">さんの勤怠表</span>
               </h3>
+              {activeRoles.length > 0 && (
+                 <div className="flex gap-2 flex-wrap items-center">
+                    {activeRoles.map(r => (
+                       <span key={`${r.project_id}-${r.role}`} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shadow-sm" title={`${r.start_date.replace(/-/g,'/')}〜${r.end_date.replace(/-/g,'/')}`}>
+                          💼 {r.role} ({r.project?.project_name})
+                       </span>
+                    ))}
+                 </div>
+              )}
             </div>
             
             <div className="flex items-center gap-3">
@@ -590,6 +666,7 @@ export default function AttendanceAdmin() {
                      <th className="p-3 border-r w-16 font-bold text-slate-700">雑務</th>
                      <th className="p-3 border-r w-16 font-bold text-slate-700">私用外出</th>
                      <th className="p-3 border-r min-w-[150px] font-bold text-slate-700 text-left">備考</th>
+                     <th className="p-3 font-bold text-slate-700 w-24 text-center">申告詳細</th>
                    </tr>
                  </thead>
                  <tbody>
@@ -947,20 +1024,41 @@ export default function AttendanceAdmin() {
                                       const isDraftedRole = draft?.sites?.find(s => s.siteIndex === idx)?.declRole !== undefined;
                                       return (
                                         <div key={idx} className="h-[44px] flex items-center justify-center box-border mb-1">
-                                          <select 
-                                             value={cr.currentRole} 
-                                             onChange={e => updateSiteField(idx, 'declRole', e.target.value)}
-                                             className={`w-full text-center border rounded px-0.5 py-1 text-[11px] font-medium leading-[1] outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
-                                                isDraftedRole ? 'border-amber-400 bg-amber-50 text-amber-800 font-bold' :
-                                                cr.currentRole === '職長' ? 'bg-blue-50/50 text-blue-800 border-blue-200 font-bold' : 
-                                                cr.currentRole === '現場代理人' ? 'bg-orange-50/50 text-orange-800 border-orange-200 font-bold' : 
-                                                'bg-slate-50 border-slate-200 text-slate-700'
-                                             }`}
-                                          >
-                                             <option value="一般">一般</option>
-                                             <option value="職長">職長</option>
-                                             <option value="現場代理人">現代</option>
-                                          </select>
+                                          {(() => {
+                                             const assignedRole = activeRoles.find(r => r.project_id === cr.projectId && r.start_date <= dateStr && r.end_date >= dateStr);
+                                             if (assignedRole) {
+                                                const shortRole = assignedRole.role === '現場代理人' ? '現代' : 
+                                                                  assignedRole.role === '現場代理人（主任技術者）' ? '現主' : 
+                                                                  assignedRole.role === '監理技術者' ? '監技' : assignedRole.role;
+                                                return (
+                                                  <div className="w-full text-center border rounded px-0.5 py-1 text-[11px] border-orange-300 bg-orange-50 text-orange-800 font-bold flex items-center justify-center cursor-not-allowed" title="期間指定で固定されています">
+                                                     {shortRole}
+                                                  </div>
+                                                );
+                                             }
+                                             return (
+                                              <select 
+                                                 value={cr.currentRole} 
+                                                 onChange={e => updateSiteField(idx, 'declRole', e.target.value)}
+                                                 className={`w-full h-full text-center border rounded px-0.5 py-1 text-[11px] font-medium leading-[1] outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                                                    isDraftedRole ? 'border-amber-400 bg-amber-50 text-amber-800 font-bold' :
+                                                    cr.currentRole === '職長' ? 'bg-blue-50/50 text-blue-800 border-blue-200 font-bold' : 
+                                                    cr.currentRole === '現場代理人' || cr.currentRole === '現場代理人（主任技術者）' || cr.currentRole === '監理技術者' ? 'bg-orange-50/50 text-orange-800 border-orange-200 font-bold' :
+                                                    'bg-slate-50 border-slate-200 text-slate-700'
+                                                 }`}
+                                              >
+                                                 <option value="一般">一般</option>
+                                                 <option value="職長">職長</option>
+                                                 {(cr.currentRole === '現場代理人' || cr.currentRole === '現場代理人（主任技術者）' || cr.currentRole === '監理技術者') && (
+                                                    <option value={cr.currentRole}>
+                                                       {cr.currentRole === '現場代理人' ? '現代' : 
+                                                        cr.currentRole === '現場代理人（主任技術者）' ? '現主' : 
+                                                        cr.currentRole === '監理技術者' ? '監技' : cr.currentRole}
+                                                    </option>
+                                                 )}
+                                              </select>
+                                             );
+                                          })()}
                                         </div>
                                       );
                                   })}
@@ -997,7 +1095,16 @@ export default function AttendanceAdmin() {
                                     事務: {record.admin_memo}
                                   </div>
                                 )}
-                              </div>
+                               </div>
+                           </td>
+                           <td className="p-2 border-r text-center align-middle hover:bg-slate-50 transition-colors">
+                              <button
+                                 onClick={() => openTimelineModal(dateStr, selectedWorkerId!)}
+                                 className="text-xs font-bold text-blue-600 border border-blue-200 bg-white hover:bg-blue-50 hover:border-blue-400 px-3 py-1.5 rounded transition-all shadow-sm w-full whitespace-nowrap flex items-center justify-center gap-1"
+                                 title="従業員が入力した詳細な勤怠タイムラインを確認・編集します"
+                              >
+                                 📝 詳細
+                              </button>
                            </td>
                          </tr>
                        );
@@ -1035,6 +1142,7 @@ export default function AttendanceAdmin() {
           )}
         </div>
       </div>
+      )}
 
       <AttendanceImportModal
         isOpen={showImportModal}
@@ -1144,6 +1252,19 @@ export default function AttendanceAdmin() {
         onComplete={() => {
            setShowTotModal(false);
            if (selectedWorkerId) fetchWorkerData(selectedWorkerId);
+        }}
+      />
+
+      <TimelineModal
+        isOpen={timelineModal.isOpen}
+        onClose={() => setTimelineModal({ ...timelineModal, isOpen: false })}
+        selectedDate={timelineModal.dateStr}
+        workerId={timelineModal.workerId}
+        recordId={timelineModal.existingRecord?.id || null}
+        existingRecord={timelineModal.existingRecord}
+        assignedProjectsForDate={timelineModal.assignedProjectsForDate}
+        onSaveSuccess={() => {
+            if (selectedWorkerId) fetchWorkerData(selectedWorkerId);
         }}
       />
     </div>

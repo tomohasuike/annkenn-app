@@ -336,7 +336,7 @@ export default function BillingForm() {
         if (insError) throw insError
       }
 
-      navigate("/billing")
+      navigate("/billing", { state: { returnToInvoiceId: currentInvoiceId } })
     } catch (e: any) {
       console.error("Error saving invoice:", e)
       alert("保存中にエラーが発生しました: " + e.message)
@@ -360,7 +360,7 @@ export default function BillingForm() {
           
           <div className="flex items-center gap-4 sticky top-0 bg-slate-50/80 backdrop-blur-md py-4 z-10 border-b">
             <button
-              onClick={() => navigate("/billing")}
+              onClick={() => navigate("/billing", { state: { returnToInvoiceId: id } })}
               className="p-2 hover:bg-slate-200 rounded-full transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -373,7 +373,7 @@ export default function BillingForm() {
             </div>
             
             <button
-              onClick={() => navigate("/billing")}
+              onClick={() => navigate("/billing", { state: { returnToInvoiceId: id } })}
               disabled={saving}
               className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none bg-white border border-slate-300 text-slate-700 shadow-sm hover:bg-slate-50 h-10 px-6 py-2"
             >

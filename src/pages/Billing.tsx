@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { supabase } from "../lib/supabase"
 import { Plus, Search, FileText, Building2, Loader2, Edit, Trash2, ChevronDown, ChevronRight, MapPin, RefreshCw } from "lucide-react"
 
@@ -53,6 +53,7 @@ type InvoiceData = {
 
 export default function Billing() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [invoices, setInvoices] = useState<InvoiceData[]>([])
   const [projects, setProjects] = useState<ProjectData[]>([]) // For Projects tab
   const [loading, setLoading] = useState(true)
@@ -98,6 +99,27 @@ export default function Billing() {
   useEffect(() => {
     checkAccessAndFetchData()
   }, [])
+
+  useEffect(() => {
+    if (!loading && location.state?.returnToInvoiceId) {
+      const invId = location.state.returnToInvoiceId;
+      setExpandedInvoiceId(invId);
+      
+      setTimeout(() => {
+        const el = document.getElementById(`invoice-card-${invId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-4', 'ring-blue-400', 'transition-all', 'duration-1000');
+          setTimeout(() => el.classList.remove('ring-4', 'ring-blue-400'), 1500);
+        }
+      }, 300);
+
+      // Clear the state so it doesn't run again on normal reload
+      const stateCopy = { ...location.state };
+      delete stateCopy.returnToInvoiceId;
+      window.history.replaceState(stateCopy, document.title);
+    }
+  }, [loading, location.state])
 
   async function checkAccessAndFetchData() {
     setLoading(true)
@@ -1144,7 +1166,7 @@ export default function Billing() {
 
                 return (
                   // Conditional Wrapper (Dark vs Light Card)
-                  <div key={inv.id} className={activeTab === "pending" 
+                  <div key={inv.id} id={`invoice-card-${inv.id}`} className={activeTab === "pending" 
                     ? "bg-[#242b38] rounded-xl shadow-md border-t-4 border-slate-800 overflow-hidden transition-all duration-200 hover:shadow-lg mb-4"
                     : "bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-200 hover:shadow-md mb-4"
                   }>
