@@ -23,6 +23,13 @@ const getDisplayClientName = (proj: Partial<ProjectData> | null | undefined): st
   return "";
 }
 
+const isValidBillingProject = (projectNumber: string | null | undefined): boolean => {
+  if (!projectNumber) return false;
+  const num = projectNumber.toUpperCase();
+  if (num === 'VACATION' || num.startsWith('999999')) return false; // Hide Vacation and Internal
+  return num.startsWith('KD') || num.startsWith('BS') || /^\d{6}/.test(num);
+};
+
 type InvoiceDetailData = {
   id: string
   invoice_id: string
@@ -348,7 +355,7 @@ export default function Billing() {
 
   // Projects View (案件一覧)
   let filteredProjects = projects.filter(p => {
-    if (p.project_number === 'VACATION' || (p.project_name && p.project_name.includes('休暇'))) return false
+    if (!isValidBillingProject(p.project_number) || (p.project_name && p.project_name.includes('休暇'))) return false;
     return (p.project_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
            (p.project_number || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
            getDisplayClientName(p).toLowerCase().includes(searchTerm.toLowerCase())
@@ -451,7 +458,7 @@ export default function Billing() {
 
   const isNotVacation = (inv: any) => {
     const proj = inv.primaryProj as Partial<ProjectData>
-    return proj?.project_number !== 'VACATION' && (!proj?.project_name || !proj.project_name.includes('休暇'))
+    return isValidBillingProject(proj?.project_number) && (!proj?.project_name || !proj.project_name.includes('休暇'))
   }
 
   const displayPending = pendingInvoices.filter(applySearchToGroup).filter(isNotVacation)

@@ -42,6 +42,13 @@ const parseFormattedString = (val: string): number | '' => {
   return isNaN(num) ? '' : num;
 };
 
+const isValidBillingProject = (projectNumber: string | null | undefined): boolean => {
+  if (!projectNumber) return false;
+  const num = projectNumber.toUpperCase();
+  if (num === 'VACATION' || num.startsWith('999999')) return false;
+  return num.startsWith('KD') || num.startsWith('BS') || /^\d{6}/.test(num);
+};
+
 export default function BillingForm() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -451,7 +458,7 @@ export default function BillingForm() {
                           className="w-full h-11 rounded-lg border border-slate-200 bg-white px-3 text-base text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none"
                         >
                           <option value="">選択してください</option>
-                          {projectsList.map((p) => (
+                          {projectsList.filter(p => isValidBillingProject(p.number)).map((p) => (
                             <option key={p.id} value={p.id}>{p.name}</option>
                           ))}
                         </select>
@@ -543,6 +550,7 @@ export default function BillingForm() {
                           p.id !== projectId && 
                           p.clientName === primaryClient && 
                           primaryClient && 
+                          isValidBillingProject(p.number) &&
                           (p.statusFlag === '着工中' || p.statusFlag === '完工' || p.statusFlag === '完了')
                         );
                         
