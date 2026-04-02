@@ -150,14 +150,18 @@ export default function ReportsList() {
     fetchReports()
   }, [])
 
-  const filteredReports = reports.filter(r => 
-    (r.project.project_number?.includes(search) || '') || 
-    (r.project.project_name?.includes(search) || '') || 
-    (r.project.site_name?.includes(search) || '') || 
-    (r.project.client_name?.includes(search) || '') || 
-    (r.work_content?.includes(search) || '') ||
-    (r.reporter_name?.includes(search) || '')
-  )
+  const searchLower = search.toLowerCase();
+  const filteredReports = reports.filter(r => {
+    if (!searchLower) return true;
+    return (
+      (r.project?.project_number || '').toLowerCase().includes(searchLower) || 
+      (r.project?.project_name || '').toLowerCase().includes(searchLower) || 
+      (r.project?.site_name || '').toLowerCase().includes(searchLower) || 
+      (r.project?.client_name || '').toLowerCase().includes(searchLower) || 
+      (r.work_content || '').toLowerCase().includes(searchLower) ||
+      (r.reporter_name || '').toLowerCase().includes(searchLower)
+    );
+  })
 
   const formatDate = (dateString: string) => {
     if (!dateString) return ''
