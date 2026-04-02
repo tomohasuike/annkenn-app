@@ -22,6 +22,8 @@ type DailyReport = {
   project: {
     project_number: string
     project_name: string
+    site_name: string
+    client_name: string
   }
   site_photos: string[]
 }
@@ -52,7 +54,9 @@ export default function ReportsList() {
             site_photos,
             projects (
               project_number,
-              project_name
+              project_name,
+              site_name,
+              client_name
             ),
             report_personnel ( worker_master(name), worker_name, start_time, end_time ),
             report_vehicles ( vehicle_master(vehicle_name), vehicle_name ),
@@ -114,7 +118,9 @@ export default function ReportsList() {
           }).filter(Boolean) || [],
           project: {
             project_number: item.projects?.project_number || '',
-            project_name: item.projects?.project_name || '案件未設定'
+            project_name: item.projects?.project_name || '案件未設定',
+            site_name: item.projects?.site_name || '',
+            client_name: item.projects?.client_name || ''
           },
           site_photos: (() => {
             if (!item.site_photos) return [];
@@ -147,6 +153,8 @@ export default function ReportsList() {
   const filteredReports = reports.filter(r => 
     (r.project.project_number?.includes(search) || '') || 
     (r.project.project_name?.includes(search) || '') || 
+    (r.project.site_name?.includes(search) || '') || 
+    (r.project.client_name?.includes(search) || '') || 
     (r.work_content?.includes(search) || '') ||
     (r.reporter_name?.includes(search) || '')
   )
@@ -219,7 +227,7 @@ export default function ReportsList() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <input
               type="search"
-              placeholder="工事番号、案件名、作業内容、報告者で検索..."
+              placeholder="工事番号、案件名、現場名、発注者、作業内容、報告者で検索..."
               className="flex h-10 w-full rounded-md border border-input bg-background/50 backdrop-blur-sm px-3 py-2 pl-9 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:bg-background"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
