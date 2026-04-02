@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronRight, Plus, Trash2, Settings, Network, Save, ChevronDown, Zap, Search, Eye, Download, ShieldCheck, Activity, AlertTriangle, ExternalLink, Link as LinkIcon, Printer } from 'lucide-react';
+import { ChevronRight, Trash2, Network, ChevronDown, ShieldCheck, Activity, AlertTriangle, ExternalLink, Link as LinkIcon, Printer, Zap } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { NumpadModal } from '../../components/ui/NumpadModal';
 
