@@ -176,3 +176,44 @@
   user-select: text !important;
   -webkit-user-select: text !important;
 }
+
+/* Hide number input spinners globally */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Print Styles */
+@media print {
+  .print-hidden {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .print-break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-break-before {
+    break-before: page;
+    page-break-before: always;
+  }
+  
+  /* Reset background and colors for clean PDF */
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  
+  /* Remove shadows and borders */
+  * {
+    box-shadow: none !important;
+  }
+}

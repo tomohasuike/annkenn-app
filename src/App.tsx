@@ -25,6 +25,11 @@ import WorkerAttendance from "./pages/attendance/WorkerAttendance"
 import Login from "./pages/Login"
 import ProtectedRoute from "./components/auth/ProtectedRoute"
 
+import ToolsDashboard from "./pages/tools/ToolsDashboard"
+import SiteDesignDashboard from "./pages/tools/SiteDesignDashboard"
+import PowerCalc from "./pages/tools/PowerCalc"
+import LightingCalc from "./pages/tools/LightingCalc"
+
 function WorkersPlaceholder() {
   return <div className="p-8"><h2 className="text-xl font-bold">作業員マスター</h2></div>
 }
@@ -69,6 +74,14 @@ function App() {
               <Route path="safety-dashboard" element={<SafetyDashboard />} />
               <Route path="vehicle-inspection" element={<VehicleInspection />} />
               <Route path="settings" element={<Settings />} />
+
+              {/* 現場用ツール群 */}
+              <Route path="tools">
+                <Route index element={<ToolsDashboard />} />
+                <Route path=":projectId/site-design" element={<SiteDesignDashboard />} />
+                <Route path=":projectId/power-calc" element={<PowerCalc />} />
+                <Route path=":projectId/lighting-calc" element={<LightingCalc />} />
+              </Route>
             </Route>
           </Route>
         </Routes>

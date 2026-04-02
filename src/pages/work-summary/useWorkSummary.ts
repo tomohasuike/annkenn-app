@@ -150,7 +150,7 @@ export function useWorkSummary() {
           report_personnel (worker_name, worker_master(name), start_time, end_time),
           report_vehicles (vehicle_name),
           report_machinery (machinery_name),
-          report_materials (material_name, photo, documentation),
+          report_materials (material_name, quantity, photo, documentation),
           report_subcontractors (subcontractor_name, worker_count, start_time, end_time)
         `);
 
@@ -313,7 +313,10 @@ export function useWorkSummary() {
 
         // Materials & Photos
         materials.forEach((m: any) => {
-          if (m.material_name) pObj.materials.push(m.material_name);
+          if (m.material_name) {
+            const qtyStr = m.quantity ? ` ${m.quantity}` : '';
+            pObj.materials.push(m.material_name + qtyStr);
+          }
           
           if (m.photo) {
             try {

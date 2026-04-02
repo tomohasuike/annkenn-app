@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Outlet, NavLink } from "react-router-dom"
-import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature } from "lucide-react"
+import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature, Zap, Wrench, Lightbulb } from "lucide-react"
 import { ThemeSwitcher } from "../ui/ThemeSwitcher"
 import logoImg from "../../assets/logo.png"
 import { supabase } from "../../lib/supabase"
@@ -10,6 +10,7 @@ export default function AppLayout() {
   const [userInitial, setUserInitial] = useState("U");
   const [allowedApps, setAllowedApps] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [appMode, setAppMode] = useState<'core' | 'tools'>('core');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -94,9 +95,43 @@ export default function AppLayout() {
             ? 'w-64 fixed inset-y-0 left-0 top-16 md:relative md:top-0 md:translate-x-0 translate-x-0' 
             : 'w-0 overflow-hidden md:w-0 md:border-r-0 fixed inset-y-0 left-0 top-16 md:relative md:top-0 -translate-x-full md:translate-x-0'
         }`}>
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            {hasAccess('dashboard') && (
-            <NavLink to="/" className={getNavClass}>
+          
+          <div className="p-3 border-b border-border/50">
+            <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-1 flex items-center justify-between text-xs font-medium">
+              <button 
+                className={`flex-1 py-1.5 px-2 rounded-md transition-colors ${appMode === 'core' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                onClick={() => setAppMode('core')}
+              >
+                管理システム
+              </button>
+              <button 
+                className={`flex-1 py-1.5 px-2 rounded-md transition-colors ${appMode === 'tools' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                onClick={() => setAppMode('tools')}
+              >
+                現場ツール
+              </button>
+            </div>
+          </div>
+
+          <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+            {appMode === 'tools' && (
+              <>
+                <NavLink to="/tools" className={getNavClass}>
+                  {({ isActive }) => (
+                    <>
+                      <Wrench className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
+                      ツールポータル (案件選択)
+                      {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
+                    </>
+                  )}
+                </NavLink>
+              </>
+            )}
+
+            {appMode === 'core' && (
+              <>
+                {hasAccess('dashboard') && (
+                <NavLink to="/" className={getNavClass}>
               {({ isActive }) => (
                 <>
                   <LayoutDashboard className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
@@ -251,6 +286,8 @@ export default function AppLayout() {
               <FileSignature className="w-5 h-5 text-slate-500 group-hover:text-slate-700" />
               PDFエディタ
             </a>
+              </>
+            )}
           </nav>
         </aside>
 
