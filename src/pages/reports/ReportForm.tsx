@@ -418,15 +418,18 @@ export default function ReportForm() {
       const { data: matData } = await supabase.from('report_materials').select('material_name, quantity, photo, documentation').eq('report_id', reportId)
       if (matData) setMaterials(matData.map((m: any) => {
           let existingPhotos: string[] = [];
-          if (m.photo) {
+          if (m.photo && m.photo.trim() !== '') {
               try { existingPhotos = JSON.parse(m.photo); if (!Array.isArray(existingPhotos)) existingPhotos = [m.photo]; }
               catch(e) { existingPhotos = [m.photo]; }
           }
+          existingPhotos = existingPhotos.filter((url: string) => url && url.trim() !== '');
+
           let existingDocs: string[] = [];
-          if (m.documentation) {
+          if (m.documentation && m.documentation.trim() !== '') {
               try { existingDocs = JSON.parse(m.documentation); if (!Array.isArray(existingDocs)) existingDocs = [m.documentation]; }
               catch(e) { existingDocs = [m.documentation]; }
           }
+          existingDocs = existingDocs.filter((url: string) => url && url.trim() !== '');
           return {
               material_name: m.material_name || '', 
               quantity: m.quantity || '',
@@ -614,7 +617,8 @@ export default function ReportForm() {
             if (materials.length > 0) {
                 const matPayload = [];
                 for (const m of materials) {
-                    if (m.material_name.trim() === '') continue;
+                    const hasFiles = m.pending_photos.length > 0 || m.pending_docs.length > 0 || m.existing_photos.length > 0 || m.existing_docs.length > 0;
+                    if (m.material_name.trim() === '' && !hasFiles && m.quantity.trim() === '') continue;
                     
                     const uploadedPhotos = [...m.existing_photos];
                     if (m.pending_photos.length > 0) {
@@ -1339,7 +1343,7 @@ export default function ReportForm() {
                                                     const isPdf = url.toLowerCase().includes('.pdf');
                                                     return (
                                                         <div key={`ex-dc-${i}`} className="relative border border-border/50 rounded-md bg-background h-16 w-16 flex items-center justify-center group/img">
-                                                            {isPdf ? <ClipboardList className="w-6 h-6 text-red-500/70" /> : <img src={url} className="object-cover w-full h-full" alt="doc" />}
+                                                            {isPdf ? <ClipboardList className="w-6 h-6 text-red-500/70" /> : (url ? <img src={url} className="object-cover w-full h-full" alt="doc" /> : <div className="text-[8px]">No Image</div>)}
                                                             <button type="button" onClick={() => removeMaterialFile(index, 'doc', true, i)} className="absolute top-0 right-0 p-0.5 bg-black/60 text-white rounded-bl-md opacity-0 group-hover/img:opacity-100 hover:bg-red-500 transition-all"><X className="w-3 h-3" /></button>
                                                             {isPdf && <a href={url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-10" title="PDFを開く" />}
                                                         </div>
