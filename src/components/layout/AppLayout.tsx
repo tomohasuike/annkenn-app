@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Outlet, NavLink } from "react-router-dom"
-import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature, Wrench } from "lucide-react"
+import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature, Wrench, Bot } from "lucide-react"
 import { ThemeSwitcher } from "../ui/ThemeSwitcher"
 import logoImg from "../../assets/logo.png"
 import { supabase } from "../../lib/supabase"
@@ -122,6 +122,16 @@ export default function AppLayout() {
                       <Wrench className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
                       ツールポータル (案件選択)
                       {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
+                    </>
+                  )}
+                </NavLink>
+
+                <NavLink to="/material-assistant" className={getNavClass}>
+                  {({ isActive }) => (
+                    <>
+                      <Bot className={`w-5 h-5 ${isActive ? 'text-green-600' : 'text-green-500 group-hover:text-green-600'}`} />
+                      AI 材料提案
+                      {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-green-600 rounded-r-md"></span>}
                     </>
                   )}
                 </NavLink>

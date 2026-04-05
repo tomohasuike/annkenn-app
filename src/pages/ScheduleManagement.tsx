@@ -77,8 +77,14 @@ export default function ScheduleManagement() {
   const [newTodoText, setNewTodoText] = useState("")
   
   // Modals state
-  const [commentModalState, setCommentModalState] = useState<{ isOpen: boolean, projectId: string, dateStr: string, initialValue: string }>({ isOpen: false, projectId: '', dateStr: '', initialValue: '' })
-  const [plannedCountModalState, setPlannedCountModalState] = useState<{ isOpen: boolean, projectId: string, dateStr: string, initialValue: string }>({ isOpen: false, projectId: '', dateStr: '', initialValue: '' })
+  const [dailyDataModalState, setDailyDataModalState] = useState<{
+    isOpen: boolean,
+    projectId: string,
+    dateStr: string,
+    comment: string,
+    plannedCount: string,
+    isVacation: boolean
+  }>({ isOpen: false, projectId: '', dateStr: '', comment: '', plannedCount: '', isVacation: false })
   const [partnerCountModalState, setPartnerCountModalState] = useState<{ isOpen: boolean, assignmentId: string, initialValue: number }>({ isOpen: false, assignmentId: '', initialValue: 1 })
   const [mobileCellModalState, setMobileCellModalState] = useState<{ isOpen: boolean, projectId: string, dateStr: string, dailyDataId?: string }>({ isOpen: false, projectId: '', dateStr: '' })
   
@@ -686,20 +692,22 @@ export default function ScheduleManagement() {
     }
   }
 
-  const handlePlannedCountClick = (projectId: string, dateStr: string, currentVal: number | null | undefined, e: React.MouseEvent) => {
+  const handleDailyDataClick = (projectId: string, dateStr: string, currentComment: string | null | undefined, currentCount: number | null | undefined, e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
-    setPlannedCountModalState({ isOpen: true, projectId, dateStr, initialValue: currentVal?.toString() || "" })
+    setDailyDataModalState({
+      isOpen: true,
+      projectId,
+      dateStr,
+      comment: currentComment || "",
+      plannedCount: currentCount?.toString() || "",
+      isVacation: projectId === vacationProjId
+    });
   }
 
   const handlePartnerCountClick = (assignmentId: string, currentVal: number, e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
     if (!isAdmin) return
     setPartnerCountModalState({ isOpen: true, assignmentId, initialValue: currentVal })
-  }
-
-  const handleCommentClick = (projectId: string, dateStr: string, currentVal: string | null | undefined, e: React.MouseEvent) => {
-    e.preventDefault(); e.stopPropagation();
-    setCommentModalState({ isOpen: true, projectId, dateStr, initialValue: currentVal || "" })
   }
 
   // --- Right Panel Actions ---
@@ -812,72 +820,51 @@ export default function ScheduleManagement() {
   const renderCellModals = () => (
     <>
       {/* Modals for Cell Actions */}
-      {commentModalState.isOpen && createPortal(
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onPointerDown={() => setCommentModalState({ ...commentModalState, isOpen: false })}>
+      {dailyDataModalState.isOpen && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onPointerDown={() => setDailyDataModalState({ ...dailyDataModalState, isOpen: false })}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in duration-200" onPointerDown={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-slate-700 flex items-center gap-0.5"><MessageSquare className="w-4 h-4 text-amber-500" /> コメント入力</h3>
-              <button type="button" onClick={() => setCommentModalState({ ...commentModalState, isOpen: false })} className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200">
+              <h3 className="font-bold text-slate-700 flex items-center gap-1.5"><MessageSquare className="w-4 h-4 text-amber-500" /> {dailyDataModalState.isVacation ? 'コメント入力' : '予定人員・コメント入力'}</h3>
+              <button type="button" onClick={() => setDailyDataModalState({ ...dailyDataModalState, isOpen: false })} className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-5 flex flex-col gap-4">
-              <textarea 
-                className="w-full p-1 text-[0.95em] border border-slate-300 rounded outline-none focus:border-blue-500 min-h-[100px] resize-none focus:ring-1 focus:ring-blue-500"
-                placeholder="コメントを入力してください"
-                value={commentModalState.initialValue}
-                onChange={(e) => setCommentModalState({ ...commentModalState, initialValue: e.target.value })}
-                autoFocus
-              />
-              <div className="flex justify-end gap-0.5 pt-2">
-                <button type="button" onClick={() => setCommentModalState({ ...commentModalState, isOpen: false })} className="px-4 py-2 font-bold text-[0.95em] text-slate-600 border border-slate-300 rounded hover:bg-slate-50 transition-colors">キャンセル</button>
-                <button type="button" onClick={() => {
-                  updateDailyData(commentModalState.projectId, commentModalState.dateStr, { comment: commentModalState.initialValue.trim() || null });
-                  setCommentModalState({ ...commentModalState, isOpen: false });
-                }} className="px-5 py-2 font-bold text-[0.95em] text-white bg-blue-600 rounded hover:bg-blue-700 shadow flex items-center gap-0.5 transition-colors">
-                  保存
-                </button>
+              {!dailyDataModalState.isVacation && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">予定人員</label>
+                  <input 
+                    type="number"
+                    min="0"
+                    className="w-full p-1.5 text-[0.95em] border border-slate-300 rounded outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="半角数字"
+                    value={dailyDataModalState.plannedCount}
+                    onChange={(e) => setDailyDataModalState({ ...dailyDataModalState, plannedCount: e.target.value })}
+                    autoFocus
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">コメント</label>
+                <textarea 
+                  className="w-full p-2 text-[0.95em] border border-slate-300 rounded outline-none focus:border-blue-500 min-h-[100px] resize-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="コメントを入力してください"
+                  value={dailyDataModalState.comment}
+                  onChange={(e) => setDailyDataModalState({ ...dailyDataModalState, comment: e.target.value })}
+                  autoFocus={dailyDataModalState.isVacation}
+                />
               </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {plannedCountModalState.isOpen && createPortal(
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onPointerDown={() => setPlannedCountModalState({ ...plannedCountModalState, isOpen: false })}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in duration-200" onPointerDown={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-slate-700">予定人員の入力</h3>
-              <button type="button" onClick={() => setPlannedCountModalState({ ...plannedCountModalState, isOpen: false })} className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-5 flex flex-col gap-4">
-              <input 
-                type="number"
-                min="0"
-                className="w-full p-0.5 text-[0.95em] border border-slate-300 rounded outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                placeholder="半角数字"
-                value={plannedCountModalState.initialValue}
-                onChange={(e) => setPlannedCountModalState({ ...plannedCountModalState, initialValue: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    let parsed: number | null = parseInt(plannedCountModalState.initialValue, 10);
-                    if (isNaN(parsed) || plannedCountModalState.initialValue.trim() === "") parsed = null;
-                    updateDailyData(plannedCountModalState.projectId, plannedCountModalState.dateStr, { planned_count: parsed });
-                    setPlannedCountModalState({ ...plannedCountModalState, isOpen: false });
-                  }
-                }}
-                autoFocus
-              />
-              <div className="flex justify-end gap-0.5 pt-2">
-                <button type="button" onClick={() => setPlannedCountModalState({ ...plannedCountModalState, isOpen: false })} className="px-4 py-2 font-bold text-[0.95em] text-slate-600 border border-slate-300 rounded hover:bg-slate-50 transition-colors">キャンセル</button>
+              <div className="flex justify-end gap-1.5 pt-2">
+                <button type="button" onClick={() => setDailyDataModalState({ ...dailyDataModalState, isOpen: false })} className="px-4 py-2 font-bold text-[0.95em] text-slate-600 border border-slate-300 rounded hover:bg-slate-50 transition-colors">キャンセル</button>
                 <button type="button" onClick={() => {
-                  let parsed: number | null = parseInt(plannedCountModalState.initialValue, 10);
-                  if (isNaN(parsed) || plannedCountModalState.initialValue.trim() === "") parsed = null;
-                  updateDailyData(plannedCountModalState.projectId, plannedCountModalState.dateStr, { planned_count: parsed });
-                  setPlannedCountModalState({ ...plannedCountModalState, isOpen: false });
+                  const updates: any = { comment: dailyDataModalState.comment.trim() || null };
+                  if (!dailyDataModalState.isVacation) {
+                    let parsed: number | null = parseInt(dailyDataModalState.plannedCount, 10);
+                    if (isNaN(parsed) || dailyDataModalState.plannedCount.trim() === "") parsed = null;
+                    updates.planned_count = parsed;
+                  }
+                  updateDailyData(dailyDataModalState.projectId, dailyDataModalState.dateStr, updates);
+                  setDailyDataModalState({ ...dailyDataModalState, isOpen: false });
                 }} className="px-5 py-2 font-bold text-[0.95em] text-white bg-blue-600 rounded hover:bg-blue-700 shadow flex items-center gap-0.5 transition-colors">
                   保存
                 </button>
@@ -1305,7 +1292,7 @@ export default function ScheduleManagement() {
                                      {/* 予定人数 */}
                                      <div 
                                        className="flex-shrink-0 cursor-pointer"
-                                       onClick={(e) => handlePlannedCountClick(p.id, dStr, daily?.planned_count, e)}
+                                       onClick={(e) => handleDailyDataClick(p.id, dStr, daily?.comment, daily?.planned_count, e)}
                                        title="予定人員を入力"
                                      >
                                        {(sumWorkers > 0 || !!daily?.planned_count) ? (
@@ -1322,7 +1309,7 @@ export default function ScheduleManagement() {
                                      {/* コメント */}
                                      <div 
                                        className="flex-1 cursor-pointer min-w-0 flex justify-end"
-                                       onClick={(e) => handleCommentClick(p.id, dStr, daily?.comment, e)}
+                                       onClick={(e) => handleDailyDataClick(p.id, dStr, daily?.comment, daily?.planned_count, e)}
                                        title={daily?.comment ? "コメントを編集" : "コメントを追加"}
                                      >
                                        {daily?.comment ? (
@@ -1654,7 +1641,7 @@ export default function ScheduleManagement() {
                                {!daily?.comment && (
                                  <div 
                                     className="p-0.5 rounded transition-colors flex items-center justify-center cursor-pointer text-slate-300 hover:bg-slate-200"
-                                    onClick={(e) => handleCommentClick(vacationProjId, dateStr, daily?.comment, e)}
+                                    onClick={(e) => handleDailyDataClick(vacationProjId, dateStr, daily?.comment, daily?.planned_count, e)}
                                     title="コメントを追加"
                                  >
                                     <MessageSquare className="w-3.5 h-3.5" />
@@ -1664,7 +1651,7 @@ export default function ScheduleManagement() {
                              {daily?.comment && (
                                <div 
                                  className="text-[0.75em] px-1 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 cursor-pointer hover:bg-amber-100 break-words whitespace-pre-wrap leading-tight"
-                                 onClick={(e) => handleCommentClick(vacationProjId, dateStr, daily?.comment, e)}
+                                 onClick={(e) => handleDailyDataClick(vacationProjId, dateStr, daily?.comment, daily?.planned_count, e)}
                                  title="コメントを編集"
                                >
                                  {daily.comment}
@@ -1825,7 +1812,7 @@ export default function ScheduleManagement() {
                                   <div className="flex justify-between items-center">
                                     <div 
                                       className={`text-[0.75em] font-bold px-1 rounded transition-colors cursor-pointer hover:border-slate-300 ${plannedCountClasses}`}
-                                      onClick={(e) => handlePlannedCountClick(p.id, dateStr, daily?.planned_count, e)}
+                                      onClick={(e) => handleDailyDataClick(p.id, dateStr, daily?.comment, daily?.planned_count, e)}
                                       title={`予定: ${daily?.planned_count || '-'}人 / 現在: ${assignedWorkerCount}人`}
                                     >
                                       予:{daily?.planned_count || '-'}名
@@ -1833,7 +1820,7 @@ export default function ScheduleManagement() {
                                     {!daily?.comment && (
                                       <div 
                                          className="p-0.5 rounded transition-colors flex items-center justify-center cursor-pointer text-slate-300 hover:bg-slate-200"
-                                         onClick={(e) => handleCommentClick(p.id, dateStr, daily?.comment, e)}
+                                         onClick={(e) => handleDailyDataClick(p.id, dateStr, daily?.comment, daily?.planned_count, e)}
                                          title="コメントを追加"
                                       >
                                          <MessageSquare className="w-3.5 h-3.5" />
@@ -1843,7 +1830,7 @@ export default function ScheduleManagement() {
                                   {daily?.comment && (
                                     <div 
                                       className="text-[0.75em] px-1 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 cursor-pointer hover:bg-amber-100 break-words whitespace-pre-wrap leading-tight"
-                                      onClick={(e) => handleCommentClick(p.id, dateStr, daily?.comment, e)}
+                                      onClick={(e) => handleDailyDataClick(p.id, dateStr, daily?.comment, daily?.planned_count, e)}
                                       title="コメントを編集"
                                     >
                                       {daily.comment}
