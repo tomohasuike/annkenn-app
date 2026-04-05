@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Upload, Camera, Bot, User, ImageIcon, Loader2 } from "lucide-react";
+import { Send, Camera, Bot, User, Loader2 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
 type MessageNode = {
