@@ -116,6 +116,7 @@ export default function AppLayout() {
           <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
             {appMode === 'tools' && (
               <>
+                {hasAccess('tools-dashboard') && (
                 <NavLink to="/tools" className={getNavClass}>
                   {({ isActive }) => (
                     <>
@@ -125,7 +126,9 @@ export default function AppLayout() {
                     </>
                   )}
                 </NavLink>
+                )}
 
+                {hasAccess('material-assistant') && (
                 <NavLink to="/material-assistant" className={getNavClass}>
                   {({ isActive }) => (
                     <>
@@ -135,6 +138,7 @@ export default function AppLayout() {
                     </>
                   )}
                 </NavLink>
+                )}
               </>
             )}
 

@@ -37,26 +37,36 @@ export interface AppSettings {
   earthquake_target_region?: string;
 }
 
-const APPS = [
+const MANAGEMENT_APPS = [
   { id: 'dashboard', name: 'ダッシュボード' },
   { id: 'projects', name: '案件管理' },
   { id: 'reports', name: '日報管理' },
+  { id: 'schedule-admin', name: '工程管理(フル)' },
+  { id: 'work-summary', name: '作業集計管理' },
+  { id: 'attendance-admin', name: '勤怠管理' },
+  { id: 'billing', name: '請求管理' },
+  { id: 'safety-dashboard', name: '安否確認管理' },
   { id: 'completion-reports', name: '完了報告' },
   { id: 'tomorrow-schedules', name: '翌日予定' },
   { id: 'schedule-management', name: '工程管理' },
-  { id: 'schedule-admin', name: '工程管理(フル)' },
-  { id: 'work-summary', name: '作業集計管理' },
   { id: 'attendance', name: '勤怠申告' },
-  { id: 'attendance-admin', name: '勤怠管理' },
-  { id: 'billing', name: '請求管理' },
-  { id: 'vehicle-inspection', name: '車両点検' },
-  { id: 'safety-dashboard', name: '安否確認管理' }
+  { id: 'vehicle-inspection', name: '車両点検' }
 ]
+
+const FIELD_APPS = [
+  { id: 'tools-dashboard', name: '現場ツール(計算等)' },
+  { id: 'material-assistant', name: '材料検索(AI)' }
+]
+
+const APPS = [...MANAGEMENT_APPS, ...FIELD_APPS]
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<'users' | 'workers' | 'vehicles' | 'app-settings'>('users')
+  const [permissionTab, setPermissionTab] = useState<'management' | 'field'>('management')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  
+  const appsToRender = permissionTab === 'management' ? MANAGEMENT_APPS : FIELD_APPS;
   
   // Data State
   const [workers, setWorkers] = useState<WorkerMaster[]>([])
@@ -466,16 +476,31 @@ export default function Settings() {
                     </button>
                 </div>
 
+                <div className="flex gap-2 border-b border-border/50 pb-2 mt-2">
+                   <button
+                     className={`px-4 py-2 text-sm font-bold rounded-t-md transition-colors ${permissionTab === 'management' ? 'bg-primary/5 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-slate-50'}`}
+                     onClick={() => setPermissionTab('management')}
+                   >
+                     管理システム権限
+                   </button>
+                   <button
+                     className={`px-4 py-2 text-sm font-bold rounded-t-md transition-colors ${permissionTab === 'field' ? 'bg-primary/5 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-slate-50'}`}
+                     onClick={() => setPermissionTab('field')}
+                   >
+                     現場ツール権限
+                   </button>
+                </div>
+
                 <div className="overflow-auto border rounded-lg max-h-[70vh]">
                     <table className="w-full text-sm text-left relative">
                         <thead className="text-xs text-muted-foreground bg-slate-50 border-b sticky top-0 z-30 shadow-sm">
                             <tr>
                                 <th className="px-4 py-3 font-medium sticky left-0 bg-slate-50 z-40 shadow-[1px_0_0_0_theme(colors.border)] min-w-[140px]">作業員名</th>
-                                <th className="px-4 py-3 font-medium text-center sticky left-[140px] bg-slate-50 z-40 shadow-[1px_0_0_0_theme(colors.border)]">管理者</th>
-                                {APPS.map(app => (
+                                <th className="px-4 py-3 font-medium text-center sticky left-[140px] bg-slate-50 z-40 shadow-[1px_0_0_0_theme(colors.border)] whitespace-nowrap">管理者</th>
+                                {appsToRender.map(app => (
                                     <th key={app.id} className="px-4 py-3 font-medium text-center writing-mode-vertical sm:writing-mode-horizontal whitespace-nowrap bg-slate-50 z-30">
                                         <div className="flex items-center justify-center gap-1">
-                                            <span className="truncate max-w-[80px]" title={app.name}>{app.name}</span>
+                                            <span className="truncate max-w-[140px] lg:max-w-none" title={app.name}>{app.name}</span>
                                         </div>
                                     </th>
                                 ))}
@@ -513,7 +538,7 @@ export default function Settings() {
                                             <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                                         </label>
                                     </td>
-                                    {APPS.map(app => {
+                                    {appsToRender.map(app => {
                                         const hasAccess = (worker.allowed_apps || []).includes(app.id);
                                         return (
                                             <td key={app.id} className="px-4 py-3 text-center">
