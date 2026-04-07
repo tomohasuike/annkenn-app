@@ -1131,7 +1131,7 @@ export default function ReportForm() {
                                           }}
                                       >
                                           <option value="" disabled>＋ 作業員を追加する</option>
-                                          {workersList.filter(w => !personnel.some(p => p.worker_id === w.id)).map(w => (
+                                          {workersList.filter(w => !personnel.some(p => p.worker_id === w.id && (p.group_id || 'default') === g.id)).map(w => (
                                               <option key={w.id} value={w.id}>{w.name}</option>
                                           ))}
                                       </select>

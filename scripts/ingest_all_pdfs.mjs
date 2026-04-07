@@ -17,33 +17,38 @@ if (!apiKey) {
 // --- 処理対象のPDFファイルリスト ---
 const targetPdfs = [
   { 
-    path: '/Users/hasuiketomoo/Downloads/catalog_densetsu-kai.pdf', 
-    manufacturer: 'ネグロス電工',
-    catalogUrl: 'https://drive.google.com/file/d/1beHW2kqNS-zzFjJOU1MWKsSvJWfSiYHB/view?usp=drive_link'
+    path: '/Users/hasuiketomoo/Downloads/nitto-SK-25A.pdf', 
+    manufacturer: '日東工業',
+    catalogUrl: 'https://drive.google.com/drive/folders/'
   },
   { 
-    path: '/Users/hasuiketomoo/Downloads/catalog_taflock-kai.pdf', 
-    manufacturer: 'ネグロス電工',
-    catalogUrl: 'https://drive.google.com/file/d/1nTR7o4ksXloTWf9nwGWoQUErB6X7LDjS/view?usp=drive_link'
+    path: '/Users/hasuiketomoo/Downloads/idec-SJPJA01B.pdf', 
+    manufacturer: 'IDEC',
+    catalogUrl: 'https://drive.google.com/drive/folders/'
   },
   { 
-    path: '/Users/hasuiketomoo/Downloads/kanro_zenbun-rurukawa.pdf', 
-    manufacturer: '古河電気工業',
-    catalogUrl: 'https://drive.google.com/file/d/1EqkIP7b6198yXJ4SNwZptwN3ooNMoebZ/view?usp=drive_link'
+    path: '/Users/hasuiketomoo/Downloads/fujidenki62D2-J-0030f_web_1952nq3img.pdf', 
+    manufacturer: '富士電機',
+    catalogUrl: 'https://drive.google.com/drive/folders/'
   },
   { 
-    path: '/Users/hasuiketomoo/Downloads/2025_1mirai.pdf', 
-    manufacturer: '未来工業',
-    catalogUrl: 'https://drive.google.com/file/d/1_I6GkKufTjty5moo9Ba7kWrUsCgFy7i5/view?usp=drive_link'
+    path: '/Users/hasuiketomoo/Downloads/mitsubisi-catalog.pdf', 
+    manufacturer: '三菱電機',
+    catalogUrl: 'https://drive.google.com/drive/folders/'
   },
   { 
-    path: '/Users/hasuiketomoo/Downloads/ZFCT1A316.pdf', 
-    manufacturer: 'パナソニック',
-    catalogUrl: 'https://drive.google.com/file/d/1ScOmTKi-iTYsCucGvjF_i0nLws9cqVhz/view?usp=drive_link'
+    path: '/Users/hasuiketomoo/Downloads/naigai0447_20240701.pdf', 
+    manufacturer: '内外電機',
+    catalogUrl: 'https://drive.google.com/drive/folders/'
+  },
+  { 
+    path: '/Users/hasuiketomoo/Downloads/KasugaProductsGuide_catalog_20230410.pdf', 
+    manufacturer: '春日電機',
+    catalogUrl: 'https://drive.google.com/drive/folders/'
   }
 ];
 
-const chunkSize = 5; 
+const chunkSize = 1; // 節約・精密モード（1ページずつ単独で送信し、コンテキスト肥大化による高額トークン消費を完全に防ぐ）
 const progressFile = resolve(__dirname, 'ingestion_progress.json');
 const sqlOutputFile = resolve(__dirname, 'catalogs_insert.sql');
 
@@ -118,11 +123,15 @@ async function runIngestion() {
             const name = String(item.name).trim().replace(/'/g, "''") || '製品名なし';
             const desc = item.description ? `'${String(item.description).replace(/'/g, "''")}'` : 'NULL';
             const price = item.standard_price || 'NULL';
-            const img = `'https://dummyimage.com/200x200/cccccc/000.png&text=${encodeURIComponent(num)}'`;
+            const img = 'NULL'; // 後から別スクリプトで自動補完するため初期値はNULL
             const docUrl = `'${catalogUrl}'`;
+            const w = item.width_mm || 'NULL';
+            const h = item.height_mm || 'NULL';
+            const d = item.depth_mm || 'NULL';
+            const p = item.page_number || currentStart; // フォールバックは現在ページ番号
             
-            sqlChunk += `INSERT INTO materials (manufacturer_id, model_number, name, description, standard_price, image_url, catalog_url) ` +
-                        `VALUES ((SELECT id FROM manufacturers WHERE name = '${mfgName}' LIMIT 1), '${num}', '${name}', ${desc}, ${price}, ${img}, ${docUrl});\n`;
+            sqlChunk += `INSERT INTO materials (manufacturer_id, model_number, name, description, standard_price, image_url, catalog_url, width_mm, height_mm, depth_mm, page_number) ` +
+                        `VALUES ((SELECT id FROM manufacturers WHERE name = '${mfgName}' LIMIT 1), '${num}', '${name}', ${desc}, ${price}, ${img}, ${docUrl}, ${w}, ${h}, ${d}, ${p});\n`;
           }
 
           fs.appendFileSync(sqlOutputFile, sqlChunk);
@@ -151,7 +160,7 @@ async function runIngestion() {
         }
       }
 
-      await new Promise(res => setTimeout(res, 10000)); 
+      await new Promise(res => setTimeout(res, 500)); // 制限解除のため待機時間を0.5秒（Turboモード）に短縮
     }
   }
 
@@ -159,17 +168,19 @@ async function runIngestion() {
   console.log("👉 生成された `scripts/catalogs_insert.sql` をSupabaseで実行してください！");
 }
 
-async function extractDataFromGemini(base64Data, mfgName) {
+async function extractDataFromGemini(base64Data, mfgName, pageNumber) {
   const prompt = `
-あなたはプロの電気工事士・電材卸業者のアシスタントです。
-添付された ${mfgName} の製品カタログPDF（数ページ分）から、掲載されているすべての電気製品情報を読み取り、必ず以下の形式のJSONの配列（Array）のみを出力してください。
+あなたはこの電気工事会社の右腕AIです。
+添付された【カタログの ${pageNumber} ページ目】の ${mfgName} の製品カタログPDFから、掲載されているすべての電気製品情報を読み取り、必ず以下の形式のJSONの配列（Array）のみを出力してください。
 余計な解説文やマークダウンのバッククオート（\`\`\`json など）は一切出力しないでください。最初の文字は [ で始まり、最後の文字は ] となるようにパース可能な生文字列を返してください。
 
 【抽出ルール】
 - ページ内に製品がない場合や、ただの説明文・目次ページ・施工方法ページの場合は空の配列 [] を返してください。
+- 出力するJSONの \`page_number\` には、必ず \`${pageNumber}\` （数値）をセットしてください。
 - 複数の製品がある場合は、すべて配列の要素として含めてください。
 - 「希望小売価格」や「定価」の記載があれば、カンマ等を抜いた数値として \`standard_price\` にいれてください（「円<税抜>」などは除外）。価格がない場合は null にしてください。
 - 小さな部品（カバーやジョイント）も型番があれば製品とみなします。
+- 【重要】カタログに外寸（タテ、ヨコ、フカサ等の寸法）が記載されていれば、数値を抽出して \`width_mm\`, \`height_mm\`, \`depth_mm\` に入れてください（単位はすべてmmで統一すること）。縦・横・高さなどの記載がある部分だけ取り出し、記載がない項目については null を設定してください。
 
 【JSONフォーマット例】
 [
@@ -177,7 +188,11 @@ async function extractDataFromGemini(base64Data, mfgName) {
     "model_number": "型番テキスト",
     "name": "製品名テキスト",
     "description": "仕様や色、特徴の説明",
-    "standard_price": 500
+    "standard_price": 500,
+    "width_mm": 500,
+    "height_mm": 300,
+    "depth_mm": null,
+    "page_number": 42
   }
 ]
 `;

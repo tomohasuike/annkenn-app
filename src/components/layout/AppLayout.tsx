@@ -129,12 +129,12 @@ export default function AppLayout() {
                 )}
 
                 {hasAccess('material-assistant') && (
-                <NavLink to="/material-assistant" className={getNavClass}>
+                <NavLink to="/kensack-engine" className={getNavClass}>
                   {({ isActive }) => (
                     <>
-                      <Bot className={`w-5 h-5 ${isActive ? 'text-green-600' : 'text-green-500 group-hover:text-green-600'}`} />
-                      AI 材料提案
-                      {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-green-600 rounded-r-md"></span>}
+                      <Bot className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-blue-500 group-hover:text-blue-600'}`} />
+                      材料・自動提案
+                      {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
                     </>
                   )}
                 </NavLink>

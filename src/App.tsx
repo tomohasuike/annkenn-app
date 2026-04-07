@@ -29,7 +29,7 @@ import ToolsDashboard from "./pages/tools/ToolsDashboard"
 import SiteDesignDashboard from "./pages/tools/SiteDesignDashboard"
 import PowerCalc from "./pages/tools/PowerCalc"
 import LightingCalc from "./pages/tools/LightingCalc"
-import MaterialAssistant from "./pages/tools/MaterialAssistant"
+import { KensackEngine } from "./pages/KensackEngine"
 
 function WorkersPlaceholder() {
   return <div className="p-8"><h2 className="text-xl font-bold">作業員マスター</h2></div>
@@ -77,7 +77,7 @@ function App() {
               <Route path="settings" element={<Settings />} />
               
               {/* AI材料提案（独立したグローバルツール） */}
-              <Route path="material-assistant" element={<MaterialAssistant />} />
+              <Route path="kensack-engine" element={<KensackEngine />} />
 
               {/* 現場用ツール群 */}
               <Route path="tools">

@@ -218,6 +218,7 @@ export default function PdfEditor() {
   const [driveFileId, setDriveFileId] = useState<string | null>(null);
   const [isGoogleApiLoaded, setIsGoogleApiLoaded] = useState(false);
   const [tokenClient, setTokenClient] = useState<any>(null);
+  const [jumpTarget, setJumpTarget] = useState<string | null>(null);
 
   useEffect(() => {
       const loadGoogleApi = () => {
@@ -293,7 +294,7 @@ export default function PdfEditor() {
       }
   };
 
-  const performDriveOpenById = (fileIdToLoad: string) => {
+  const performDriveOpenById = (fileIdToLoad: string, jumpToPage?: string | null) => {
       if (!tokenClient || !isGoogleApiLoaded) return;
       
       tokenClient.callback = async (response: any) => {
@@ -304,6 +305,7 @@ export default function PdfEditor() {
           }
           
           try {
+              // 「ファイルを結合中...」というローディング（元々はダウンロード処理）を発生させるが、実際は一瞬で終わる
               setIsMerging(true);
               const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileIdToLoad}?fields=id,name,parents&supportsAllDrives=true`, {
                   headers: { Authorization: `Bearer ${response.access_token}` }
@@ -312,24 +314,59 @@ export default function PdfEditor() {
               const metadata = await res.json();
               const parentId = metadata.parents && metadata.parents.length > 0 ? metadata.parents[0] : null;
               
-              const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileIdToLoad}?alt=media&supportsAllDrives=true`, {
-                  headers: { Authorization: `Bearer ${response.access_token}` }
-              });
-              if (!fileRes.ok) throw new Error('Failed to download file data');
-              const blob = await fileRes.blob();
-              const downloadedFile = new File([blob], metadata.name, { type: 'application/pdf' });
-              (downloadedFile as any).fileId = fileIdToLoad;
-              (downloadedFile as any).parentId = parentId;
+              // プロキシオブジェクト：保存・エクスポート時にのみ実体（全データ）をフェッチさせる
+              const remoteFile: any = {
+                  url: `https://www.googleapis.com/drive/v3/files/${fileIdToLoad}?alt=media&supportsAllDrives=true`,
+                  httpHeaders: { Authorization: `Bearer ${response.access_token}` },
+                  name: metadata.name,
+                  fileId: fileIdToLoad,
+                  parentId: parentId,
+                  type: 'application/pdf',
+                  arrayBuffer: async () => {
+                      // エクスポートなど実体が必要な時に初めてストリームではなく一括ダウンロードする
+                      const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileIdToLoad}?alt=media&supportsAllDrives=true`, {
+                          headers: { Authorization: `Bearer ${response.access_token}` }
+                      });
+                      if (!fileRes.ok) throw new Error('Failed to download file data');
+                      return await fileRes.arrayBuffer();
+                  }
+              };
               
-              setFiles([downloadedFile]);
+              setFiles([remoteFile]);
               setDriveFileId(fileIdToLoad);
               setPageAnnotations({});
               setFilePageCounts([]);
               setPageOrder([]);
               setPast([]);
               setFuture([]);
-              await loadProjectDataFromDrive(fileIdToLoad, response.access_token);
               
+              if (!jumpToPage) {
+                  await loadProjectDataFromDrive(fileIdToLoad, response.access_token);
+              }
+              
+              if (jumpToPage) {
+                const targetId = `0-${jumpToPage}`;
+                
+                // カタログから飛んできた場合はサイドバーは重いので明示的に閉じる
+                setShowSidebar(false);
+                
+                // 今すぐ対象ページ状態に書き換えておかないと単一ページモードのレンダリングから除外されてしまう
+                setPageNumber(targetId);
+                setSelectedPages([targetId]);
+
+                // 少し待ってからページ指定とスクロールを行う（Reactレンダリング完了を確実にするため）
+                let attempts = 0;
+                const scrollInterval = setInterval(() => {
+                  if (mainPageRefs.current && mainPageRefs.current[targetId]) {
+                    mainPageRefs.current[targetId]?.scrollIntoView({ behavior: 'auto', block: 'start' });
+                    clearInterval(scrollInterval);
+                  } else if (attempts > 50) {
+                    clearInterval(scrollInterval);
+                  }
+                  attempts++;
+                }, 400);
+              }
+
               toast.success('ドライブからファイルを読み込みました');
           } catch (e) {
               console.error(e);
@@ -347,6 +384,7 @@ export default function PdfEditor() {
 
       const urlParams = new URLSearchParams(window.location.search);
       const stateParam = urlParams.get('state');
+      const jumpToPage = urlParams.get('jumpToPage');
       
       if (stateParam && !isMerging && files.length === 0) {
           try {
@@ -354,11 +392,15 @@ export default function PdfEditor() {
               if (state.action === 'open' && state.ids && state.ids.length > 0) {
                   const targetFileId = state.ids[0];
                   
+                  if (jumpToPage) {
+                      setJumpTarget(jumpToPage);
+                  }
+                  
                   // URLからパラメータを消去し、リロード時の無限ループ（再発火）を防ぐ
                   window.history.replaceState({}, document.title, window.location.pathname);
                   
                   // ★ ここで既存のドライブ読み込み関数（対象のファイルIDを渡す）を呼び出す
-                  performDriveOpenById(targetFileId);
+                  performDriveOpenById(targetFileId, jumpToPage);
               }
           } catch (e) {
               console.error('Drive state parameterの解析に失敗しました:', e);
@@ -1678,7 +1720,9 @@ export default function PdfEditor() {
           </div>
       )}
 
-      <header ref={headerRef} className="flex-shrink-0 h-[52px] bg-gray-100 shadow-inner border-b border-gray-300 flex items-center justify-between px-4 relative z-[9999]">
+      {/* Header and top tools are completely hidden during Kensack Single Page mode to provide a clean preview */}
+      {!jumpTarget && (
+        <header ref={headerRef} className="flex-shrink-0 h-[52px] bg-gray-100 shadow-inner border-b border-gray-300 flex items-center justify-between px-4 relative z-[9999]">
         
         <div className="flex items-center gap-2">
           <button 
@@ -1952,9 +1996,10 @@ export default function PdfEditor() {
            )}
         </div>
       </header>
+      )}
 
       {/* Markup Toolbar */}
-      {isMarkupToolbarVisible && (
+      {!jumpTarget && isMarkupToolbarVisible && (
           <div className="flex-shrink-0 h-[44px] bg-[#f5f5f7] border-b border-gray-300 flex items-center justify-center px-4 relative z-[60] shadow-sm animate-in slide-in-from-top-2 duration-200">
              <div className="flex items-center gap-1">
                 <button onClick={() => { console.log('TEXT BUTTON CLICKED! Inserting text shape'); handleInsertShape('text'); }} className={`flex items-center justify-center w-[28px] h-[28px] rounded-md transition-colors hover:bg-gray-200/50 text-gray-700`} title="テキスト"><Type strokeWidth={1.5} className="w-[16px] h-[16px]"/></button>
@@ -2179,40 +2224,105 @@ export default function PdfEditor() {
                             options={PDF_OPTIONS}
                             loading={fileIndex === 0 ? <div className="p-12 text-gray-500">Loading PDF...</div> : null}
                         >
-                            {filePageCounts[fileIndex] && Array.from({ length: filePageCounts[fileIndex] }, (_, i) => {
-                                const pageId = `${fileIndex}-${i + 1}`;
-                                const rank = pageOrder.indexOf(pageId);
-                                if (rank === -1) return null;
-                                const order = rank;
-                                return (
-                                    <div key={pageId} style={{ order }} ref={el => { if (mainPageRefs.current) mainPageRefs.current[pageId] = el; }} className="mb-4">
-                                        <MainPage 
-                                            pageId={pageId}
-                                            rotation={pageRotations[pageId]}
-                                            onInitRotation={handleInitRotation}
-                                            annotations={pageAnnotations[pageId] || EMPTY_ARRAY}
-                                            setAnnotations={(newAnns: any) => setCurrentAnnotationsForPage(pageId, newAnns)}
-                                            activeTool={activeTool}
-                                            activeShapeType={activeShapeType}
-                                            activeColor={activeColor}
-                                            activeFillColor={activeFillColor}
-                                            activeStrokeWidth={activeStrokeWidth}
-                                            onVisible={handlePageVisible}
-                                            onHistorySave={saveHistory}
-                                            selectedAnnotationIds={selectedAnnotationIds}
-                                            setSelectedAnnotationIds={setSelectedAnnotationIds}
-                                            setActiveTool={setActiveTool}
-                                            stageRef={(node: Konva.Stage | null) => {
-                                                if (node) {
-                                                    stageRefs.current[pageId] = node;
-                                                }
-                                            }}
-                                        />
-                                    </div>
-                                );
-                            })}
+                            {filePageCounts[fileIndex] && (
+                                (() => {
+                                    // If we arrived from Kensack (jumpTarget is present), we force single-page mode
+                                    // to prevent rendering 1900+ pages of a catalog.
+                                    const isSinglePageMode = !!jumpTarget;
+                                    
+                                    // Make sure pageNumber overrides jumpParam if user navigated
+                                    // But wait, pageNumber state is better.
+                                    const activeTargetPage = isSinglePageMode ? pageNumber : null;
+
+                                    return Array.from({ length: filePageCounts[fileIndex] }, (_, i) => {
+                                        const pageId = `${fileIndex}-${i + 1}`;
+                                        const rank = pageOrder.indexOf(pageId);
+                                        if (rank === -1) return null;
+                                        
+                                        if (isSinglePageMode && pageId !== activeTargetPage) return null;
+
+                                        const order = rank;
+                                        return (
+                                            <div key={pageId} style={{ order }} ref={el => { if (mainPageRefs.current) mainPageRefs.current[pageId] = el; }} className="mb-4">
+                                                <MainPage 
+                                                    pageId={pageId}
+                                                    rotation={pageRotations[pageId]}
+                                                    onInitRotation={handleInitRotation}
+                                                    annotations={pageAnnotations[pageId] || EMPTY_ARRAY}
+                                                    setAnnotations={(newAnns: any) => setCurrentAnnotationsForPage(pageId, newAnns)}
+                                                    activeTool={activeTool}
+                                                    activeShapeType={activeShapeType}
+                                                    activeColor={activeColor}
+                                                    activeFillColor={activeFillColor}
+                                                    activeStrokeWidth={activeStrokeWidth}
+                                                    onVisible={handlePageVisible}
+                                                    onHistorySave={saveHistory}
+                                                    selectedAnnotationIds={selectedAnnotationIds}
+                                                    setSelectedAnnotationIds={setSelectedAnnotationIds}
+                                                    setActiveTool={setActiveTool}
+                                                    stageRef={(node: Konva.Stage | null) => {
+                                                        if (node) {
+                                                            stageRefs.current[pageId] = node;
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        );
+                                    });
+                                })()
+                            )}
                         </Document>
                     ))}
+                </div>
+            )}
+            
+            {/* Single Page Navigation Control (for Kensack Mode) */}
+            {jumpTarget && files.length > 0 && pageOrder.length > 1 && (
+                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white rounded-full px-6 py-3 flex items-center gap-6 shadow-2xl z-50 animate-in slide-in-from-bottom-5">
+                    <button 
+                        onClick={() => {
+                            // Ensure jumpTarget is kept if we want to stay in single page mode, but we just change state
+                            const currentIdx = pageOrder.indexOf(pageNumber);
+                            if (currentIdx > 0) {
+                                setPageNumber(pageOrder[currentIdx - 1]);
+                                setSelectedPages([pageOrder[currentIdx - 1]]);
+                            }
+                        }}
+                        disabled={pageOrder.indexOf(pageNumber) <= 0}
+                        className="p-1 hover:bg-slate-700 rounded-full disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+                    
+                    <span className="text-sm font-medium tabular-nums min-w-[80px] text-center">
+                        {pageOrder.indexOf(pageNumber) + 1} / {pageOrder.length}
+                    </span>
+                    
+                    <button 
+                        onClick={() => {
+                            const currentIdx = pageOrder.indexOf(pageNumber);
+                            if (currentIdx < pageOrder.length - 1 && currentIdx !== -1) {
+                                setPageNumber(pageOrder[currentIdx + 1]);
+                                setSelectedPages([pageOrder[currentIdx + 1]]);
+                            }
+                        }}
+                        disabled={pageOrder.indexOf(pageNumber) === -1 || pageOrder.indexOf(pageNumber) >= pageOrder.length - 1}
+                        className="p-1 hover:bg-slate-700 rounded-full disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                    </button>
+                    
+                    <div className="w-[1px] h-6 bg-slate-600 mx-1"></div>
+                    
+                    <button 
+                        onClick={() => {
+                            // 終了してKensackに戻るかタブを閉じる
+                            window.close();
+                        }}
+                        className="text-xs font-semibold hover:text-blue-300 transition-colors"
+                    >
+                        閉じる
+                    </button>
                 </div>
             )}
         </main>
