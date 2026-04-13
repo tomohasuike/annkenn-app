@@ -88,7 +88,7 @@ export default function TimelineModal({
         
         if (isAllImported && assignedForDate.length > 0) {
              const originalTimes = { 
-                 start: decls[0]?.start_time || '08:30', 
+                 start: decls[0]?.start_time || '08:00',
                  end: decls[decls.length - 1]?.end_time || '17:00' 
              };
              decls = assignedForDate.map(ap => ({
@@ -160,7 +160,7 @@ export default function TimelineModal({
             initialEvents.push({ id: crypto.randomUUID(), time: '08:00', type: 'travel' });
             assignedForDate.forEach(ap => {
                 initialEvents.push({
-                     id: crypto.randomUUID(), time: '08:30', type: 'site_work',
+                     id: crypto.randomUUID(), time: '08:00', type: 'site_work',
                      project_id: ap.project_id, project_name: ap.project_name, role: '一般'
                 });
             });

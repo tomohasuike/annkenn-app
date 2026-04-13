@@ -1,0 +1,88 @@
+{
+  "cable_ampacity": {
+    "temperature_celsius": 40,
+    "cable_types": {
+      "CV_3C_1T": {
+        "2sq": 23, "3.5sq": 33, "5.5sq": 44, "8sq": 54, "14sq": 76,
+        "22sq": 100, "38sq": 140, "60sq": 190, "100sq": 260, "150sq": 340,
+        "200sq": 410, "250sq": 470, "325sq": 555
+      },
+      "CVT_1T": {
+        "14sq": 86, "22sq": 110, "38sq": 155, "60sq": 210, "100sq": 290,
+        "150sq": 380, "200sq": 465, "250sq": 535, "325sq": 635
+      },
+      "CET_conduit_1T": {
+        "14sq": 81, "22sq": 105, "38sq": 145, "60sq": 185, "100sq": 250,
+        "150sq": 320, "200sq": 380, "250sq": 430
+      },
+      "IV_conduit_3W": {
+        "1.6mm": 19, "2.0mm": 24, "5.5sq": 34, "8sq": 42, "14sq": 61,
+        "22sq": 80, "38sq": 113, "60sq": 150
+      },
+      "HIV_multiplier": 1.22
+    }
+  },
+  "reduction_factors": {
+    "description": "同一管内多条布設時の電流減少係数 (内線規程 1340-2表)",
+    "rules": [
+      { "max_wires": 3, "factor": 0.70 },
+      { "max_wires": 4, "factor": 0.63 },
+      { "max_wires": 6, "factor": 0.56 },
+      { "max_wires": 15, "factor": 0.49 },
+      { "max_wires": 40, "factor": 0.43 },
+      { "max_wires": 60, "factor": 0.39 },
+      { "max_wires": 999, "factor": 0.34 }
+    ]
+  },
+  "unbalance_rate": {
+    "description": "単相3線式の設備不平衡率 (内線規程 1305-1条)",
+    "max_percent": 40,
+    "formula": "((中性線と各電圧側電線間に接続される負荷設備容量の最大差) / (総負荷設備容量の1/2)) * 100",
+    "exemptions": [
+      "契約電力5kW程度以下の場合",
+      "特定の分岐回路に限定された負荷の場合"
+    ]
+  },
+  "voltage_drop": {
+    "description": "低圧配線の電圧降下限度 (内線規程 1310-1条)",
+    "rules": [
+      { "max_distance_m": 60, "source_utility_percent": 4, "source_transformer_percent": 5 },
+      { "max_distance_m": 120, "source_utility_percent": 4, "source_transformer_percent": 5 },
+      { "max_distance_m": 200, "source_utility_percent": 5, "source_transformer_percent": 6 },
+      { "max_distance_m": 9999, "source_utility_percent": 6, "source_transformer_percent": 7 }
+    ]
+  },
+  "motor_trunk_capacity": {
+    "description": "電動機負荷を含む電線（幹線・分岐）の太さ計算ルール",
+    "rules": {
+      "Im_le_50A": "Iw >= (Im * 1.25) + Ih",
+      "Im_gt_50A": "Iw >= (Im * 1.10) + Ih"
+    }
+  },
+  "motor_full_load_current": {
+    "description": "三相かご形誘導電動機（200V）の規約電流値 (資料 3-7-3)",
+    "mapping_kw_to_amp": {
+      "0.4": 3.2,
+      "0.75": 4.6,
+      "1.5": 8.0,
+      "2.2": 11.1,
+      "3.7": 16.8,
+      "5.5": 24.6,
+      "7.5": 34.0,
+      "11": 48.0,
+      "15": 64.0,
+      "22": 92.0,
+      "30": 124.0,
+      "37": 152.0,
+      "45": 190.0,
+      "55": 228.0
+    }
+  },
+  "motor_breaker_selection": {
+    "description": "電動機の分岐回路における過電流遮断器（ブレーカ）定格電流の上限 (内線規程 1360-9条等)",
+    "rules": [
+      "原則: ブレーカ定格電流(IB) <= 該当電線の許容電流(Iw) * 2.5",
+      "安全目安: ブレーカ定格電流(IB) <= 電動機定格電流(Im) * 3"
+    ]
+  }
+}

@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Plus, Trash2, Activity, Settings2, FileText, List, PlusCircle, Save, ChevronLeft } from 'lucide-react';
+import { Plus, Trash2, Activity, Settings2, FileText, List, PlusCircle, Save, ChevronLeft, ShieldAlert, CheckCircle2, FileSpreadsheet, X, Calculator, Bot, Check } from 'lucide-react';
+import Den81ReportPreview from '../../components/Den81ReportPreview';
 
 interface LightingLoad {
   id: string;
@@ -10,118 +11,166 @@ interface LightingLoad {
   voltage: '100V' | '200V';
   phase: 'U' | 'W' | 'UW'; // U相(赤), W相(黒), U-W両相(赤黒200V用)
   va: number; // 容量(VA)
+  length_m: number; // こう長(m)
   breakerType: 'MCCB' | 'ELCB'; // 遮断器種別
+  is_verified?: boolean;
 }
 
-const generateId = () => Math.random().toString(36).substr(2, 9);
+const generateId = () => crypto.randomUUID();
 
 export default function LightingCalc() {
-  const { projectId } = useParams();
+  const { selectedProjectId } = useOutletContext<{ selectedProjectId: string }>();
+  const projectId = selectedProjectId || null;
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const targetTreeNodeId = searchParams.get('treeNodeId');
   const initialName = searchParams.get('name');
+  const loadId = searchParams.get('load_id');
 
   const [savedBoards, setSavedBoards] = useState<any[]>([]);
-  const [currentBoardId, setCurrentBoardId] = useState<string | null>(targetTreeNodeId && targetTreeNodeId !== 'undefined' ? targetTreeNodeId : null);
+  const [currentBoardId, setCurrentBoardId] = useState<string | null>(loadId || (targetTreeNodeId && targetTreeNodeId !== 'undefined' ? targetTreeNodeId : null));
   const [isSaving, setIsSaving] = useState(false);
   const [popupMessage, setPopupMessage] = useState<{title: string, message: string} | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<{ id: string, name: string } | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [showSimulation, setShowSimulation] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importJsonText, setImportJsonText] = useState('');
 
   const [title, setTitle] = useState('電灯盤-1');
   const [demandFactor, setDemandFactor] = useState(100);
 
   const [loads, setLoads] = useState<LightingLoad[]>([
-    { id: generateId(), circuitNo: 1, name: '照明 L1', voltage: '100V', phase: 'U', va: 600, breakerType: 'MCCB' },
-    { id: generateId(), circuitNo: 2, name: 'コンセント C1', voltage: '100V', phase: 'W', va: 1200, breakerType: 'ELCB' },
-    { id: generateId(), circuitNo: 3, name: '空調機', voltage: '200V', phase: 'UW', va: 2000, breakerType: 'ELCB' },
+    { id: generateId(), circuitNo: 1, name: '照明 L1', voltage: '100V', phase: 'U', va: 600, length_m: 10, breakerType: 'MCCB' },
+    { id: generateId(), circuitNo: 2, name: 'コンセント C1', voltage: '100V', phase: 'W', va: 1200, length_m: 15, breakerType: 'ELCB' },
+    { id: generateId(), circuitNo: 3, name: '空調機', voltage: '200V', phase: 'UW', va: 2000, length_m: 20, breakerType: 'ELCB' },
   ]);
 
   // 初回ロードで保存済みリストを取得
   useEffect(() => {
-    if (projectId) loadBoardsList();
+    loadBoardsList();
   }, [projectId]);
 
   const loadBoardsList = async () => {
-    const { data } = await supabase.from('site_tools_data')
-      .select('id, name, updated_at, data_payload')
-      .eq('project_id', projectId)
-      .eq('tool_type', 'LIGHTING_CALC')
-      .order('updated_at', { ascending: false });
+    let query = supabase.from('calc_panels')
+      .select('id, name, updated_at')
+      .eq('panel_type', 'LIGHTING')
+      .order('created_at', { ascending: false });
+
+    if (projectId) {
+      query = query.eq('project_id', projectId);
+    } else {
+      query = query.is('project_id', null);
+    }
+    const { data } = await query;
       
     if (data) {
       setSavedBoards(data);
 
       // URL引数があれば自動ロード/新規作成判定
-      if (targetTreeNodeId && !currentBoardId) {
-        const matchingBoard = data.find((b: any) => b.data_payload?.treeNodeId === targetTreeNodeId);
-        if (matchingBoard) {
-          loadBoard(matchingBoard);
-        } else {
-          // ツリーからの該当盤がない場合は、新規作成として名前だけセットする
-          createNewBoard();
-          if (initialName) setTitle(initialName);
-        }
+      if (loadId && !currentBoardId) {
+         await loadBoard(loadId, data.find((b: any) => b.id === loadId)?.name);
+      } else if (targetTreeNodeId && !currentBoardId) {
+         // ツリーと calc_panels の連携は一旦省略または id マッチで代用
+         createNewBoard();
+         if (initialName) setTitle(initialName);
       } else if (!currentBoardId && data.length > 0) {
         // 通常アクセスで何もない場合は最新をロード
-        loadBoard(data[0]);
+        await loadBoard(data[0].id, data[0].name);
       }
     }
   };
 
-  const loadBoard = (board: any) => {
-    setCurrentBoardId(board.id);
-    setTitle(board.name || '無題');
-    const p = board.data_payload;
-    if (p) {
-      if (p.demandFactor !== undefined) setDemandFactor(p.demandFactor);
-      if (p.loads) setLoads(p.loads);
+  const loadBoard = async (id: string, boardName?: string) => {
+    setCurrentBoardId(id);
+    if (boardName) setTitle(boardName);
+
+    // Fetch parent panel
+    const { data: panelData } = await supabase.from('calc_panels').select('*').eq('id', id).single();
+    if (panelData) {
+      // Set name and attributes
+      if (panelData.name) setTitle(panelData.name);
+      if (panelData.reduction_factor) setDemandFactor(panelData.reduction_factor * 100);
+
+      // Fetch loads
+      const { data: loadsData } = await supabase.from('calc_loads').select('*').eq('panel_id', id).order('circuit_no', { ascending: true });
+      if (loadsData && loadsData.length > 0) {
+         setLoads(loadsData.map((l: any) => ({
+           id: l.id,
+           circuitNo: l.circuit_no,
+           name: l.name,
+           voltage: l.phase === 'UW' ? '200V' : '100V',
+           phase: l.phase,
+           va: Math.round(l.capacity_kw * 1000),
+           length_m: l.cable_length_m || 20,
+           breakerType: 'MCCB' // DBにないので固定
+         })));
+      }
     }
   };
 
   const createNewBoard = () => {
     setCurrentBoardId(null);
     setTitle('新規電灯盤');
-    setLoads([{ id: generateId(), circuitNo: 1, name: '照明 L1', voltage: '100V', phase: 'U', va: 1000, breakerType: 'MCCB' }]);
+    setLoads([{ id: generateId(), circuitNo: 1, name: '照明 L1', voltage: '100V', phase: 'U', va: 1000, length_m: 10, breakerType: 'MCCB' }]);
     setDemandFactor(100);
+    // URLのload_idをクリア
+    if (loadId) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('load_id');
+      setSearchParams(newParams, { replace: true });
+    }
   };
 
   const saveBoard = async () => {
-    if (!projectId) {
-      setPopupMessage({ title: "エラー", message: "プロジェクトが選択されていません。ツールポータルから入り直してください。" });
-      return;
-    }
     setIsSaving(true);
-    
-    // ツリー側に返すための計算結果集計 (VA -> kW換算: 単純に1000で割る。需要率適用前の値)
-    const totalKw = summary.totalVA / 1000;
-
-    const payload = { 
-      demandFactor, 
-      loads,
-      treeNodeId: targetTreeNodeId || undefined, 
-      summaryKw: totalKw,
-      summaryDemandFactor: demandFactor, 
-    };
-
     try {
-      if (currentBoardId) {
-        const { error } = await supabase.from('site_tools_data')
-          .update({ name: title, data_payload: payload, updated_at: new Date().toISOString() })
-          .eq('id', currentBoardId);
-        if (error) throw error;
-        setPopupMessage({ title: "保存完了", message: "上書き保存しました。" });
+      let panelId = currentBoardId;
+      
+      const panelData = {
+         project_id: projectId,
+         name: title,
+         panel_type: 'LIGHTING',
+         voltage_system: '1Φ3W 100/200V',
+         reduction_factor: demandFactor / 100.0,
+      };
+
+      if (panelId) {
+         const { error } = await supabase.from('calc_panels').update(panelData).eq('id', panelId);
+         if (error) throw error;
       } else {
-        const { data, error } = await supabase.from('site_tools_data')
-          .insert([{ project_id: projectId, tool_type: 'LIGHTING_CALC', name: title, data_payload: payload }])
-          .select().single();
-        if (error) throw error;
-        if (data) setCurrentBoardId(data.id);
-        setPopupMessage({ title: "保存完了", message: "新しく保存しました。" });
+         const { data, error } = await supabase.from('calc_panels').insert([panelData]).select().single();
+         if (error) throw error;
+         if (data) {
+           panelId = data.id;
+           setCurrentBoardId(panelId);
+         }
       }
+
+      if (panelId) {
+         // Wipe existing loads
+         await supabase.from('calc_loads').delete().eq('panel_id', panelId);
+
+         // Insert new loads
+         const insertLoads = loads.map(l => ({
+            id: l.id,
+            panel_id: panelId,
+            circuit_no: l.circuitNo,
+            name: l.name,
+            is_spare: false,
+            capacity_kw: l.va / 1000.0,
+            phase: l.phase,
+            cable_length_m: l.length_m
+         }));
+
+         const { error: loadError } = await supabase.from('calc_loads').insert(insertLoads);
+         if (loadError) throw loadError;
+      }
+
+      setPopupMessage({ title: "保存完了", message: currentBoardId ? "上書き保存しました。" : "新しく保存しました。" });
       await loadBoardsList();
     } catch (e: any) {
-      console.error(e);
+      console.error('Save failed:', e);
       setPopupMessage({ title: "保存エラー", message: "保存に失敗しました: " + e.message });
     } finally {
       setIsSaving(false);
@@ -130,7 +179,7 @@ export default function LightingCalc() {
 
   const deleteBoard = async (id: string) => {
     try {
-      const { error } = await supabase.from('site_tools_data').delete().eq('id', id);
+      const { error } = await supabase.from('calc_panels').delete().eq('id', id);
       if (error) throw error;
       
       setPopupMessage({ title: "削除完了", message: "盤のデータを削除しました。" });
@@ -225,12 +274,23 @@ export default function LightingCalc() {
     setLoads([...loads, { 
       id: generateId(), 
       circuitNo: nextCircuit, 
-      name: `回路 ${nextCircuit}`, 
+      name: ``, 
       voltage: '100V', 
       phase: nextCircuit % 2 === 0 ? 'W' : 'U', 
-      va: 1000,
+      va: 0,
+      length_m: 10,
       breakerType: 'MCCB'
     }]);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, index: number, field: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (index === loads.length - 1 && field === 'last') {
+        addLoad();
+        // focus will be handled by auto-focusing on mount or a ref, but for rapid entry, just relying on Tab is fine.
+      }
+    }
   };
 
   const removeLoad = (id: string) => {
@@ -250,13 +310,50 @@ export default function LightingCalc() {
     }));
   };
 
+  const verifyLoad = (id: string) => {
+    setLoads(loads.map(l => l.id === id ? { ...l, is_verified: true } : l));
+  };
+
+  const handleImportJSON = () => {
+    try {
+      const parsed = JSON.parse(importJsonText);
+      const importedLoads = Array.isArray(parsed.loads) ? parsed.loads : parsed;
+      
+      const nextCircuit = loads.length > 0 ? Math.max(...loads.map(l => l.circuitNo)) + 1 : 1;
+
+      const newLoads: LightingLoad[] = importedLoads.map((l: any, index: number) => ({
+        id: generateId(),
+        circuitNo: l.circuit_no || (nextCircuit + index),
+        name: l.name || '名称不明',
+        voltage: '100V', // JSONから自動推測がない場合は100V
+        phase: (nextCircuit + index) % 2 === 0 ? 'W' : 'U',
+        va: (Number(l.capacity_kw) * 1000) || 0,
+        length_m: 10,
+        breakerType: 'MCCB',
+        is_verified: l.is_verified === undefined ? true : l.is_verified
+      }));
+
+      // JSONの盤名称が存在し、現在の盤名が初期値の場合は上書き
+      if (parsed.panel_name && (title === '電灯盤-1' || !title)) {
+        setTitle(parsed.panel_name);
+      }
+
+      setLoads([...loads, ...newLoads]);
+      setShowImport(false);
+      setImportJsonText('');
+      setPopupMessage({ title: 'インポート完了', message: `${newLoads.length}件の負荷を取り込みました。` });
+    } catch (e: any) {
+      setPopupMessage({ title: 'インポートエラー', message: 'JSONの解析に失敗しました。形式を確認してください。' });
+    }
+  };
+
   return (
     <div className="flex flex-col md:flex-row h-full min-h-[calc(100vh-100px)] -m-4 sm:-m-6 md:-m-8 border-t border-slate-200 dark:border-slate-800">
       
       {/* 画面左側の「版（計算書）一覧サイドバー」 */}
       <div className="w-full md:w-64 lg:w-72 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex justify-between items-center">
-          <h2 className="font-bold text-sm flex items-center gap-2"><List className="w-4 h-4"/> 案件内の電灯盤</h2>
+          <h2 className="font-bold text-sm flex items-center gap-2"><List className="w-4 h-4"/> {projectId ? '案件内の電灯盤' : 'フリー計算書(未紐付け)'}</h2>
           <button onClick={createNewBoard} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-blue-600 transition-colors" title="新しい電灯盤を追加">
             <PlusCircle className="w-5 h-5"/>
           </button>
@@ -268,7 +365,7 @@ export default function LightingCalc() {
           {savedBoards.map(board => (
             <div key={board.id} className="relative group">
               <button
-                onClick={() => loadBoard(board)}
+                onClick={() => loadBoard(board.id, board.name)}
                 className={`w-full text-left px-3 py-2.5 pr-8 rounded-md text-sm transition-colors ${currentBoardId === board.id ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-bold' : 'hover:bg-white dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'}`}
               >
                 <div className="flex flex-col gap-1">
@@ -303,13 +400,17 @@ export default function LightingCalc() {
         <div className="max-w-6xl mx-auto space-y-6 pb-12">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <button 
-                onClick={() => navigate(`/tools/${projectId}/site-design`)}
-                className="flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 font-bold mb-3 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 px-3 py-1.5 rounded-full shadow-sm transition-all"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                現場ツリー(親)へ戻る
-              </button>
+              {projectId ? (
+                 <button 
+                   onClick={() => navigate(`/tools/site-design`)}
+                   className="flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 font-bold mb-3 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 px-3 py-1.5 rounded-full shadow-sm transition-all"
+                 >
+                   <ChevronLeft className="w-3.5 h-3.5" />
+                   現場ツリー(親)へ戻る
+                 </button>
+              ) : (
+                 <span className="inline-block mb-3 px-3 py-1 bg-orange-100 text-orange-800 text-xs font-bold rounded-full border border-orange-200">フリー作成モード</span>
+              )}
               <h1 className="text-2xl font-bold tracking-tight text-slate-800 dark:text-slate-100 flex items-center gap-2">
                  {title || '電灯計算書'} <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 font-bold rounded-full ml-2">単相3線式 100/200V</span>
                  {targetTreeNodeId && <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 font-bold rounded-full border border-green-200 ml-1">ツリー連携中</span>}
@@ -325,18 +426,31 @@ export default function LightingCalc() {
                 <Save className="w-4 h-4" />
                 {isSaving ? '保存中...' : 'クラウド保存'}
               </button>
-              {/* AI読み込みボタン（将来構想） */}
               <button 
-                 className="px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm flex items-center gap-2 transition-all transform hover:scale-[1.02]"
-                 onClick={() => setPopupMessage({ title: "近日公開", message: "図面やPDFを読み込んで、AIが単線結線図から負荷リストを自動作成するAIビジョン機能がここに実装予定です！" })}
+                onClick={() => setShowImport(true)}
+                className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors"
               >
-                <FileText className="w-4 h-4" />
-                図面からAI入力
+                <Bot className="w-4 h-4" />
+                AIデータ取り込み
+              </button>
+              <button 
+                onClick={() => setShowPreview(true)}
+                className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                プレビュー/出力
+              </button>
+              <button 
+                onClick={() => setShowSimulation(true)}
+                className="flex-1 sm:flex-none px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors"
+              >
+                <Calculator className="w-4 h-4" />
+                契約電力シミュレーション
               </button>
             </div>
           </div>
 
-      {/* 設定パネル */}
+      {/* 設定パネル (シンプル化) */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-5 flex flex-wrap gap-6 items-end">
         <div className="space-y-1.5 flex-1 min-w-[200px]">
           <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">分電盤名称</label>
@@ -365,117 +479,133 @@ export default function LightingCalc() {
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-800/50 uppercase border-b border-slate-200 dark:border-slate-800">
+            <thead className="text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-800/50 uppercase border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="px-4 py-3 font-semibold w-16 text-center">回路</th>
-                <th className="px-4 py-3 font-semibold min-w-[150px] whitespace-nowrap">負荷名称</th>
-                <th className="px-4 py-3 font-semibold w-24">電圧</th>
-                <th className="px-4 py-3 font-semibold w-24 text-center">接続相</th>
-                <th className="px-4 py-3 font-semibold w-28 text-right">容量 (VA)</th>
-                <th className="px-4 py-3 font-semibold bg-red-50/50 dark:bg-red-900/10 text-red-700 w-20 text-right border-l border-r border-slate-100">U相(赤)</th>
-                <th className="px-4 py-3 font-semibold bg-slate-800/5 dark:bg-slate-100/10 text-slate-800 dark:text-slate-200 w-20 text-right">W相(黒)</th>
-                <th className="px-4 py-3 font-semibold bg-blue-50/40 text-blue-800 min-w-[90px] border-l border-white text-center">遮断器</th>
-                <th className="px-4 py-3 font-semibold bg-blue-50/40 text-blue-800 w-16 text-center">自動(A)</th>
-                <th className="px-2 py-3 w-10 text-center">
+                <th className="px-3 py-2 font-semibold w-12 text-center">回路</th>
+                <th className="px-3 py-2 font-semibold min-w-[200px] whitespace-nowrap">名称</th>
+                <th className="px-3 py-2 font-semibold w-24">電圧</th>
+                <th className="px-3 py-2 font-semibold w-24 text-center">接続相</th>
+                <th className="px-3 py-2 font-semibold w-28 text-right">容量 (VA)</th>
+                <th className="px-3 py-2 font-semibold w-24 text-right">こう長 (m)</th>
+                <th className="px-3 py-2 font-semibold text-red-600 w-16 text-right border-l border-slate-100">U(A)</th>
+                <th className="px-3 py-2 font-semibold text-slate-800 dark:text-slate-200 w-16 text-right">W(A)</th>
+                <th className="px-3 py-2 font-semibold w-16 text-center border-l border-white">遮断器</th>
+                <th className="px-2 py-2 w-8 text-center">
                   <Settings2 className="w-4 h-4 mx-auto text-slate-400" />
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {calculatedLoads.map((load) => (
-                <tr key={load.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/40 transition-colors group">
-                  <td className="px-4 py-2.5 text-center">
+              {calculatedLoads.map((load, index) => (
+                <tr key={load.id} className={`group hover:bg-blue-50/50 dark:hover:bg-slate-800/40 transition-colors ${load.is_verified === false ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-white dark:bg-slate-900'}`}>
+                  <td className="px-3 py-1.5 text-center">
                     <input 
                       type="number" 
                       value={load.circuitNo}
                       onChange={(e) => updateLoad(load.id, 'circuitNo', Number(e.target.value))}
-                      className="w-10 bg-transparent border-0 focus:ring-0 px-0 py-1 text-sm font-mono text-center mx-auto text-slate-500"
+                      className="w-full bg-transparent border border-transparent focus:border-blue-500 focus:bg-white px-1 py-1 text-sm font-mono text-center mx-auto text-slate-500 rounded outline-none"
                     />
                   </td>
-                  <td className="px-4 py-2.5 min-w-[150px]">
+                  <td className="px-3 py-1.5 min-w-[200px]">
                     <input 
                       type="text" 
                       value={load.name}
+                      onKeyDown={(e) => handleKeyDown(e, index, 'name')}
                       onChange={(e) => updateLoad(load.id, 'name', e.target.value)}
-                      className="w-full px-2 py-1 bg-transparent border border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 rounded outline-none transition-colors"
+                      className="w-full px-2 py-1 bg-transparent border border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 rounded outline-none transition-colors font-bold text-slate-700"
                       placeholder="例: 会議室照明"
+                      autoFocus={index === loads.length - 1} // 新規行に追加時に自動フォーカス
                     />
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-3 py-1.5">
                     <select 
                       value={load.voltage}
                       onChange={(e) => updateLoad(load.id, 'voltage', e.target.value)}
-                      className="bg-transparent border-0 text-sm font-medium text-slate-700 cursor-pointer hover:bg-slate-100 rounded px-1 py-1"
+                      className="w-full bg-transparent border-0 text-sm font-medium text-slate-700 cursor-pointer hover:bg-slate-100 rounded px-1 py-1"
                     >
                       <option value="100V">100V</option>
                       <option value="200V">200V</option>
                     </select>
                   </td>
-                  <td className="px-4 py-2.5 text-center">
+                  <td className="px-3 py-1.5 text-center">
                     {load.voltage === '200V' ? (
-                      <span className="inline-block px-2 py-0.5 bg-gradient-to-r from-red-100 to-slate-200 text-slate-700 text-xs font-bold rounded border border-slate-300">
-                        U-W (赤黒)
+                      <span className="inline-block w-full px-1 py-1 bg-gradient-to-r from-red-100 to-slate-200 text-slate-700 text-xs font-bold rounded border border-slate-300">
+                        UW
                       </span>
                     ) : (
                       <select 
                         value={load.phase}
                         onChange={(e) => updateLoad(load.id, 'phase', e.target.value)}
-                        className={`border-0 text-xs font-bold rounded-md px-2 py-1 cursor-pointer ${
+                        className={`w-full border-0 text-xs font-bold rounded-md px-1 py-1 cursor-pointer ${
                           load.phase === 'U' 
                             ? 'bg-red-100 text-red-700' 
                             : 'bg-slate-200 text-slate-800'
                         }`}
                       >
-                        <option value="U">U相 (赤)</option>
-                        <option value="W">W相 (黒)</option>
+                        <option value="U">U (赤)</option>
+                        <option value="W">W (黒)</option>
                       </select>
                     )}
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-3 py-1.5">
                     <div className="flex items-center">
                       <input 
                         type="number" 
-                        value={load.va}
+                        value={load.va || ''}
+                        onKeyDown={(e) => handleKeyDown(e, index, 'va')}
                         onChange={(e) => updateLoad(load.id, 'va', Number(e.target.value))}
-                        className="w-16 bg-transparent border-0 border-b border-transparent focus:border-blue-500 focus:ring-0 px-0 py-1 text-sm font-bold text-right"
+                        className="w-full bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-500 rounded outline-none px-2 py-1 text-sm font-bold text-right"
                         step="100"
                       />
-                      <span className="text-xs text-slate-400 ml-1">VA</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <div className="flex items-center">
+                      <input 
+                        type="number" 
+                        value={load.length_m || ''}
+                        onKeyDown={(e) => handleKeyDown(e, index, 'last')}
+                        onChange={(e) => updateLoad(load.id, 'length_m', Number(e.target.value))}
+                        className="w-full bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-500 rounded outline-none px-2 py-1 text-sm font-bold text-right text-slate-600"
+                      />
                     </div>
                   </td>
                   
                   {/* 自動計算列 (U相電流) */}
-                  <td className="px-4 py-2.5 bg-red-50/20 dark:bg-red-900/5 font-mono font-medium text-red-600 border-l border-r border-slate-100">
-                    {load.uCurrent > 0 ? `${load.uCurrent.toFixed(1)} A` : '-'}
+                  <td className="px-3 py-1.5 bg-red-50/20 dark:bg-red-900/5 font-mono text-sm font-medium text-red-600 border-l border-r border-slate-100 text-right">
+                    {load.uCurrent > 0 ? load.uCurrent.toFixed(1) : ''}
                   </td>
                   
                   {/* 自動計算列 (W相電流) */}
-                  <td className="px-4 py-2.5 bg-slate-50/40 dark:bg-slate-100/5 font-mono font-medium text-slate-800 dark:text-slate-200 text-right">
-                    {load.wCurrent > 0 ? `${load.wCurrent.toFixed(1)} A` : '-'}
+                  <td className="px-3 py-1.5 bg-slate-50/40 dark:bg-slate-100/5 font-mono text-sm font-medium text-slate-800 dark:text-slate-200 text-right">
+                    {load.wCurrent > 0 ? load.wCurrent.toFixed(1) : ''}
                   </td>
 
                   {/* 遮断器種別 と 自動選定 (末尾へ移動) */}
-                  <td className="px-4 py-2.5 bg-blue-50/20 border-l border-white text-center">
+                  <td className="px-3 py-1.5 bg-blue-50/20 border-l border-white text-center">
                     <select 
                       value={load.breakerType}
+                      onKeyDown={(e) => handleKeyDown(e, index, 'last')}
                       onChange={(e) => updateLoad(load.id, 'breakerType', e.target.value)}
-                      className={`border-0 text-[11px] font-bold rounded px-1.5 py-1 cursor-pointer w-full min-w-[70px] text-center ${load.breakerType === 'ELCB' ? 'bg-orange-100 text-orange-700' : 'bg-slate-200 text-slate-700'}`}
+                      className={`border border-transparent w-full text-[10px] font-bold rounded px-1 py-1 cursor-pointer text-center ${load.breakerType === 'ELCB' ? 'bg-orange-100 text-orange-700' : 'bg-transparent text-slate-600 hover:bg-white'}`}
                     >
                       <option value="MCCB">MCCB</option>
-                      <option value="ELCB">ELCB(漏)</option>
+                      <option value="ELCB">ELCB</option>
                     </select>
                   </td>
-                  <td className="px-4 py-2.5 bg-blue-50/20 text-center">
-                     <span className="text-sm font-bold text-blue-800 bg-white border border-blue-200 px-2 py-1 rounded shadow-sm">{load.autoBreakerA}A</span>
-                  </td>
                   
-                  <td className="px-2 py-2.5 text-center">
-                    <button 
-                      onClick={() => removeLoad(load.id)}
-                      className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <td className="px-2 py-1.5 text-center">
+                    <div className="flex justify-center items-center gap-2">
+                       {load.is_verified === false && (
+                          <button onClick={() => verifyLoad(load.id)} className="flex items-center gap-1 px-2 py-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 rounded-md text-[10px] font-bold transition-colors">
+                            <Check className="w-3.5 h-3.5" />
+                            確認済
+                          </button>
+                       )}
+                       <button onClick={() => removeLoad(load.id)} className={load.is_verified === false ? "p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors" : "p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors opacity-0 group-hover:opacity-100"}>
+                         <Trash2 className="w-4 h-4" />
+                       </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -484,11 +614,12 @@ export default function LightingCalc() {
             {/* 合計行 */}
             <tfoot className="bg-slate-50 dark:bg-slate-800 border-t-2 border-slate-200 font-bold text-sm">
               <tr>
-                <td colSpan={4} className="px-4 py-3 text-right text-slate-500 uppercase">設計容量計 / 相電流計:</td>
-                <td className="px-4 py-3 text-slate-800 text-right">{summary.totalVA.toLocaleString()} <span className="text-xs font-normal text-slate-500">VA</span></td>
-                <td className="px-4 py-3 text-red-700 bg-red-100/50 border-l border-r border-white text-right">{summary.totalU.toFixed(1)} <span className="text-xs font-normal">A</span></td>
-                <td className="px-4 py-3 text-slate-800 text-right">{summary.totalW.toFixed(1)} <span className="text-xs font-normal">A</span></td>
-                <td colSpan={3}></td>
+                <td colSpan={4} className="px-3 py-3 text-right text-slate-500 uppercase">設計容量計 / 相電流計:</td>
+                <td className="px-3 py-3 text-slate-800 text-right">{summary.totalVA.toLocaleString()}</td>
+                <td className="px-3 py-3 text-slate-800 text-right"></td>
+                <td className="px-3 py-3 text-red-700 bg-red-100/50 border-l border-r border-white text-right">{summary.totalU.toFixed(1)}</td>
+                <td className="px-3 py-3 text-slate-800 text-right">{summary.totalW.toFixed(1)}</td>
+                <td colSpan={2}></td>
               </tr>
             </tfoot>
           </table>
@@ -506,84 +637,174 @@ export default function LightingCalc() {
         </div>
       </div>
 
-      {/* サマリー（計算結果）エリア */}
-      <h2 className="text-lg font-bold text-slate-800 mt-8 mb-4 border-l-4 border-blue-500 pl-3">盤 総合評価</h2>
+        </div>
+      </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* ======= プレビューモーダル ======= */}
+      {showPreview && (
+        <div className="fixed inset-0 z-[100] flex flex-col bg-slate-900/80 backdrop-blur-sm p-4 sm:p-8 animate-in fade-in duration-200">
+          <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-t-xl mb-0 shadow-lg border-b border-slate-200 dark:border-slate-800 shrink-0 max-w-5xl mx-auto w-full">
+             <div className="flex items-center gap-3">
+               <FileSpreadsheet className="w-6 h-6 text-indigo-600" />
+               <h2 className="text-xl font-bold dark:text-white">様式 電-8-1 プレビュー</h2>
+             </div>
+             <div className="flex gap-3">
+                <button 
+                  onClick={() => window.print()}
+                  className="px-5 py-2 bg-slate-800 text-white hover:bg-slate-700 text-sm font-bold rounded-lg transition-colors shadow-sm"
+                >
+                  印刷 / PDF保存
+                </button>
+                <button 
+                  onClick={() => setShowPreview(false)}
+                  className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+             </div>
+          </div>
+          <div className="bg-slate-100 dark:bg-slate-800 p-8 overflow-y-auto w-full max-w-5xl mx-auto rounded-b-xl shadow-2xl flex justify-center items-start print:p-0 print:bg-white print:shadow-none print:w-full print:max-w-none print:block">
+             <div className="print:w-full">
+               <Den81ReportPreview 
+                 title={title}
+                 loads={calculatedLoads}
+                 summary={summary}
+               />
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======= 契約電力シミュレーション モーダル ======= */}
+      {showSimulation && (() => {
+        const simpleTotalKw = summary.totalVA / 1000;
         
-        {/* 1. 不平衡率 */}
-        <div className={`rounded-xl border p-5 flex flex-col items-center justify-center relative overflow-hidden transition-colors ${
-          summary.unbalanceRate <= 30 
-            ? 'bg-white border-slate-200' 
-            : summary.unbalanceRate <= 40 
-              ? 'bg-yellow-50 border-yellow-200' 
-              : 'bg-red-50 border-red-200'
-        }`}>
-          <div className={`absolute top-0 w-full h-1 ${
-             summary.unbalanceRate <= 30 ? 'bg-gradient-to-r from-emerald-400 to-teal-500' :
-             summary.unbalanceRate <= 40 ? 'bg-gradient-to-r from-yellow-400 to-orange-500' :
-             'bg-gradient-to-r from-red-500 to-rose-600'
-          }`} />
-          <h3 className="text-sm font-semibold text-slate-500 mb-4 flex items-center gap-2">
-            <Activity className="w-4 h-4" /> 設備不平衡率 (単相100V)
-          </h3>
-          <div className="flex items-end gap-2">
-            <div className={`text-5xl font-black tracking-tighter ${
-              summary.unbalanceRate <= 30 ? 'text-slate-800' :
-              summary.unbalanceRate <= 40 ? 'text-yellow-700' : 'text-red-700'
-            }`}>
-              {summary.unbalanceRate.toFixed(1)}
+        // 負荷設備契約（東電ルール 電灯負荷圧縮）
+        let compressedKw = simpleTotalKw;
+        if (compressedKw > 6 && compressedKw <= 20) {
+          compressedKw = 6 + (compressedKw - 6) * 0.9;
+        } else if (compressedKw > 20 && compressedKw <= 50) {
+          compressedKw = 6 + 14 * 0.9 + (compressedKw - 20) * 0.8;
+        } else if (compressedKw > 50) {
+          compressedKw = 6 + 14 * 0.9 + 30 * 0.8 + (compressedKw - 50) * 0.7;
+        }
+
+        // 主開閉器契約（単三 200V換算）
+        const breakerKw = (summary.recommendedMainBreaker * 200) / 1000;
+
+        // 小さい方を採用
+        const adoptedKw = Math.min(compressedKw, breakerKw);
+        const isHighVoltage = adoptedKw >= 50;
+        const remainingToLowVoltage = adoptedKw - 49.9;
+
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
+              
+              <div className="bg-slate-800 p-5 flex justify-between items-center text-white">
+                <div className="flex items-center gap-3">
+                  <Calculator className="w-6 h-6 text-blue-400" />
+                  <h2 className="text-xl font-bold">東電・契約電力シミュレーション（電灯）</h2>
+                </div>
+                <button onClick={() => setShowSimulation(false)} className="p-1 hover:bg-slate-700 rounded transition-colors"><X className="w-5 h-5"/></button>
+              </div>
+
+              <div className="p-6">
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                   <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 bg-slate-50 dark:bg-slate-800/50">
+                     <p className="text-xs font-bold text-slate-500 mb-1">① 単純な機器容量合計</p>
+                     <p className="text-2xl font-black text-slate-800 dark:text-slate-200">{simpleTotalKw.toFixed(1)} <span className="text-sm font-normal">kW</span></p>
+                   </div>
+                   <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 bg-slate-50 dark:bg-slate-800/50">
+                     <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-xs font-bold text-slate-500 mb-1">③ 主開閉器契約による容量</p>
+                          <p className="text-2xl font-black text-slate-800 dark:text-slate-200">{breakerKw.toFixed(1)} <span className="text-sm font-normal">kW</span></p>
+                        </div>
+                        <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded font-bold">{summary.recommendedMainBreaker}A</span>
+                     </div>
+                   </div>
+                   <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 bg-slate-50 dark:bg-slate-800/50 col-span-2">
+                     <p className="text-xs font-bold text-slate-500 mb-1">② 特例圧縮適用後（負荷設備契約）の容量</p>
+                     <p className="text-2xl font-black text-slate-800 dark:text-slate-200">{compressedKw.toFixed(1)} <span className="text-sm font-normal">kW</span></p>
+                     <p className="text-[10px] text-slate-400 mt-1">※6kWまで100%, 20kWまで90%, 50kWまで80%...の逓減率を適用</p>
+                   </div>
+                </div>
+
+                <div className={`rounded-xl p-5 border-2 ${isHighVoltage ? 'bg-red-50 border-red-300' : 'bg-emerald-50 border-emerald-300'}`}>
+                  <h3 className={`text-sm font-bold mb-2 ${isHighVoltage ? 'text-red-800' : 'text-emerald-800'}`}>判定結果（50kWの壁）</h3>
+                  <div className="flex items-center gap-4">
+                    <div className={`text-4xl font-black ${isHighVoltage ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {isHighVoltage ? '【高圧】' : '【低圧】'}
+                    </div>
+                    <div className="flex-1">
+                       <p className={`text-lg font-bold ${isHighVoltage ? 'text-red-700' : 'text-emerald-700'}`}>
+                         最終推定契約: {adoptedKw.toFixed(1)} kW
+                       </p>
+                       {isHighVoltage ? (
+                         <p className="text-sm text-red-600 mt-1 font-bold">
+                           ※低圧で収めるには、あと <span className="text-xl">{remainingToLowVoltage.toFixed(1)}</span> kW 分の機器を削減または別系統にする必要があります。
+                         </p>
+                       ) : (
+                         <p className="text-sm text-emerald-600 mt-1 font-bold">
+                           安全に低圧電力以内で収まっています。（残り {(49.9 - adoptedKw).toFixed(1)} kW の余裕）
+                         </p>
+                       )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 不平衡率警告 */}
+                {summary.unbalanceRate > 40 && (
+                  <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded text-sm text-orange-800 flex items-start gap-2">
+                    <ShieldAlert className="w-5 h-5 shrink-0 text-orange-500" />
+                    <div>
+                      <p className="font-bold">内線規程・不平衡率の警告</p>
+                      <p className="text-xs mt-0.5">U相・W相のバランスが著しく崩れています（{summary.unbalanceRate.toFixed(1)}%）。この状態は電圧降下や中性線電流増大のリスクがあるため、相の割り当てを見直してください。</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="text-lg font-bold text-slate-400 mb-1">%</div>
           </div>
-          <p className={`text-xs font-medium px-3 py-1 rounded-full mt-3 ${
-             summary.unbalanceRate <= 40 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-100 text-red-700'
-          }`}>
-            {summary.unbalanceRate <= 40 ? '内線規程クリア (40%以下)' : 'NG: 限界値超過！相の配分を見直してください'}
-          </p>
-        </div>
+        );
+      })()}
 
-        {/* 2. 中性線電流 */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 p-5 flex flex-col items-center justify-center relative overflow-hidden">
-          <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-slate-200 to-slate-400" />
-          <h3 className="text-sm font-semibold text-slate-500 mb-4">
-            中性線(白) 電流
-          </h3>
-          <div className="flex items-end gap-3">
-            <div className="text-5xl font-black text-slate-600 tracking-tighter">
-              {summary.neutralCurrent.toFixed(1)}
+      {/* ======= JSONインポート モーダル ======= */}
+      {showImport && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
+            <div className="bg-slate-800 p-5 flex justify-between items-center text-white">
+              <div className="flex items-center gap-3">
+                <Bot className="w-6 h-6 text-emerald-400" />
+                <h2 className="text-xl font-bold">AI抽出データ（JSON）の取り込み</h2>
+              </div>
+              <button onClick={() => setShowImport(false)} className="p-1 hover:bg-slate-700 rounded transition-colors"><X className="w-5 h-5"/></button>
             </div>
-            <div className="text-lg font-bold text-slate-400 mb-1">A</div>
-          </div>
-          <p className="text-xs text-slate-400 mt-3 font-medium bg-slate-50 px-3 py-1 rounded-full">
-            | U相({summary.totalU.toFixed(1)}A) - W相({summary.totalW.toFixed(1)}A) |
-          </p>
-        </div>
-
-        {/* 3. 推奨主幹ブレーカー */}
-        <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 flex flex-col items-center justify-center relative overflow-hidden shadow-lg">
-          <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-blue-400 to-purple-500" />
-          <h3 className="text-sm font-semibold text-slate-300 mb-4">
-            推奨主幹ブレーカー 
-          </h3>
-          <div className="flex items-end gap-3">
-            <div className="text-5xl font-black text-white tracking-tighter shadow-sm">
-              {summary.recommendedMainBreaker}
-            </div>
-            <div className="text-lg font-bold text-slate-400 mb-1 flex flex-col justify-end">
-              <span>AF/AT</span>
+            <div className="p-6">
+              <p className="text-sm text-slate-600 dark:text-slate-300 mb-4 font-bold">
+                AIが図面から読み取った JSON データを下のテキストボックスに貼り付けてください。現在のリストの末尾に追記されます。
+              </p>
+              <textarea
+                value={importJsonText}
+                onChange={(e) => setImportJsonText(e.target.value)}
+                placeholder={'{\n  "panel_name": "電灯盤 L-1",\n  "loads": [\n    { "name": "照明", "capacity_kw": 0.5, "is_verified": true }\n  ]\n}'}
+                className="w-full h-64 p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-slate-300"
+              />
+              <div className="flex justify-end gap-3 mt-4">
+                <button onClick={() => setShowImport(false)} className="px-5 py-2 text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg">
+                  キャンセル
+                </button>
+                <button onClick={handleImportJSON} className="flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white text-sm font-bold rounded-lg hover:bg-emerald-700 shadow-sm transition-colors">
+                  <Bot className="w-4 h-4" />
+                  解析して取り込む
+                </button>
+              </div>
             </div>
           </div>
-          <p className="text-xs font-medium bg-slate-700/50 text-slate-300 px-3 py-1 rounded-full mt-3 border border-slate-600">
-            最大電流相: {summary.totalU > summary.totalW ? 'U相(赤)' : summary.totalU < summary.totalW ? 'W相(黒)' : '均等'} ベース
-          </p>
         </div>
+      )}
 
-      </div>
-
-        </div>
-      </div>
-      
       {/* カスタムポップアップ */}
       {popupMessage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">

@@ -436,7 +436,7 @@ export default function SiteDesignDashboard() {
     const vals = getNodeValues(node);
 
     const handleOpenCalc = (type: 'power' | 'lighting') => {
-      const url = `/tools/${projectId}/${type}-calc?treeNodeId=${node.id}&name=${encodeURIComponent(node.name)}`;
+      const url = `/tools/${type}-calc?treeNodeId=${node.id}&name=${encodeURIComponent(node.name)}`;
       navigate(url);
     };
 

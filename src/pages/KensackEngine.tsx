@@ -1,12 +1,42 @@
-import React, { useState, useRef } from 'react';
-import { Search, Camera, Cpu, Database, AlertTriangle, CheckCircle2, Loader2, ImagePlus, ShoppingCart, Trash2, Mail, FileText, ChevronUp, ChevronDown, Mic, Plus, GripVertical } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Search, Camera, Cpu, AlertTriangle, CheckCircle2, Loader2, ImagePlus, ShoppingCart, Trash2, Mail, FileText, ChevronUp, ChevronDown, Mic, Plus, GripVertical } from 'lucide-react';
 import { executeKensackSearch, executeKensackVisionSearch, parseVoiceToCartItems } from '../services/KensackService';
-import type { KensackSearchResult, KensackMaterial, CartItem } from '../services/KensackService';
+import type { KensackSearchResult, KensackMaterial, CartItem, ChatMessage } from '../services/KensackService';
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 import { NumpadModal } from '../components/ui/NumpadModal';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, TouchSensor } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+
+function escapeRegExp(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const HighlightText: React.FC<{ text: string, splitQuery: string }> = ({ text, splitQuery }) => {
+  if (!splitQuery || !text) return <>{text}</>;
+  
+  const queryWords = splitQuery.split(/\s+/).filter(Boolean);
+  if (queryWords.length === 0) return <>{text}</>;
+
+  const regex = new RegExp(`(${queryWords.map(escapeRegExp).join('|')})`, 'gi');
+  const parts = text.split(regex);
+  
+  return (
+    <>
+      {parts.map((part, index) => {
+        const isMatch = queryWords.some(word => word.toLowerCase() === part.toLowerCase());
+        return isMatch 
+          ? <span key={index} className="bg-yellow-200 text-slate-900 rounded-sm px-0.5">{part}</span> 
+          : <span key={index}>{part}</span>;
+      })}
+    </>
+  );
+};
 
 interface SortableCartItemProps {
   m: CartItem;
@@ -151,6 +181,8 @@ export const KensackEngine: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [result, setResult] = useState<KensackSearchResult | null>(null);
   
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+
   // カート（キープ機能）用のState
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -165,6 +197,29 @@ export const KensackEngine: React.FC = () => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  // Catalog Viewer Modal State
+  const [isCatalogViewerOpen, setIsCatalogViewerOpen] = useState(false);
+  const [catalogViewerMode, setCatalogViewerMode] = useState<'loading' | 'error' | 'ready'>('loading');
+  const [catalogViewerPages, setCatalogViewerPages] = useState<{page_number: number, catalog_url: string, drive_file_id?: string, page_image_url?: string, pdf_drive_file_id?: string}[]>([]);
+  const [catalogViewerMfg, setCatalogViewerMfg] = useState('');
+  const [catalogViewerTitle, setCatalogViewerTitle] = useState('');
+  const [catalogViewerPdfModeIndex, setCatalogViewerPdfModeIndex] = useState<number | null>(null);
+  const [driveAccessToken, setDriveAccessToken] = useState<string | null>(null);
+
+  useEffect(() => {
+      // Preload Google Identity Services if needed
+      if (!(window as any).google?.accounts) {
+          const script = document.createElement('script');
+          script.src = 'https://accounts.google.com/gsi/client';
+          document.body.appendChild(script);
+      }
+  }, []);
+
+  // 検索窓専用の音声入力設定
+  const [isVoiceSearching, setIsVoiceSearching] = useState(false);
+  const searchRecognitionRef = useRef<any>(null);
+  const latestSearchQueryRef = useRef<string>('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -195,24 +250,118 @@ export const KensackEngine: React.FC = () => {
     }
   };
 
-  const handleTextSearch = async (e?: React.FormEvent) => {
+  const clearChatHistory = () => {
+    setChatHistory([]);
+    setResult(null);
+    setQuery('');
+  };
+
+  const handleTextSearch = async (e?: React.FormEvent, overrideQuery?: string) => {
     if (e) e.preventDefault();
-    if (!query.trim() && selectedMfgs.length === 0) return;
+    const actualQuery = overrideQuery !== undefined ? overrideQuery : query;
+    if (!actualQuery.trim() && selectedMfgs.length === 0) return;
     if (isSearching) return;
 
     setIsSearching(true);
     setResult(null);
 
     // メーカー選択を検索クエリにも付加しつつ、ハードフィルタリング(配列)としても裏側に渡す
-    const finalQuery = [selectedMfgs.join(' '), query].filter(Boolean).join(' ');
+    const finalQuery = [selectedMfgs.join(' '), actualQuery].filter(Boolean).join(' ');
 
     try {
-      const searchRes = await executeKensackSearch(finalQuery, selectedMfgs);
+      const searchRes = await executeKensackSearch(finalQuery, selectedMfgs, chatHistory);
       setResult(searchRes);
+      
+      // Update chat history (keep last 3 turns = 6 messages)
+      setChatHistory(prev => {
+        const newHistory = [...prev];
+        newHistory.push({ role: 'user', content: finalQuery });
+        if (searchRes.aiProposal) {
+          newHistory.push({ role: 'model', content: searchRes.aiProposal });
+        } else if (searchRes.message) {
+          newHistory.push({ role: 'model', content: searchRes.message });
+        }
+        // Slice to keep at most the last 6 messages
+        return newHistory.slice(-6);
+      });
     } catch (error) {
       console.error(error);
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleOpenCatalogViewer = async (m: KensackMaterial, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsCatalogViewerOpen(true);
+    setCatalogViewerMode('loading');
+    setCatalogViewerMfg(m.manufacturers?.name || '');
+    setCatalogViewerTitle(m.name || '');
+    setCatalogViewerPdfModeIndex(null); // reset pdf mode
+
+    // Get the grouped pages, or if empty, just use the single page.
+    const pagesList = m.grouped_pages && m.grouped_pages.length > 0
+      ? m.grouped_pages 
+      : (m.catalog_url ? [{ page_number: m.page_number || 1, catalog_url: m.catalog_url }] : []);
+      
+    if (pagesList.length === 0) {
+      setCatalogViewerMode('error');
+      return;
+    }
+
+    try {
+        let token = driveAccessToken;
+        if (!token && (window as any).google?.accounts) {
+            token = await new Promise<string | null>((resolve) => {
+                try {
+                    const client = (window as any).google.accounts.oauth2.initTokenClient({
+                        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+                        scope: 'https://www.googleapis.com/auth/drive.readonly',
+                        callback: (response: any) => {
+                            if (response && response.access_token) {
+                                setDriveAccessToken(response.access_token);
+                                resolve(response.access_token);
+                            } else {
+                                resolve(null);
+                            }
+                        },
+                    });
+                    client.requestAccessToken({ prompt: '' });
+                } catch (e) {
+                    console.error("Token client init failed", e);
+                    resolve(null);
+                }
+            });
+        }
+    } catch(err) {
+        console.error("Auth flow failed", err);
+    }
+
+    try {
+      const { supabase } = await import('../lib/supabase');
+      // Fetch drive_file_ids for all these pages in parallel
+      const enrichedPages = await Promise.all(
+        pagesList.map(async (p) => {
+          if (!m.manufacturers?.name) return p;
+          const { data } = await supabase
+              .from('catalog_pages')
+              .select('drive_file_id')
+              .eq('manufacturer', m.manufacturers.name)
+              .eq('page_number', p.page_number)
+              .maybeSingle();
+              
+          if (data && data.drive_file_id) {
+            return { ...p, drive_file_id: data.drive_file_id };
+          }
+          return p;
+        })
+      );
+      setCatalogViewerPages(enrichedPages);
+      setCatalogViewerMode('ready');
+    } catch (err) {
+       console.error("Failed to load catalog pages:", err);
+       setCatalogViewerPages(pagesList as any);
+       setCatalogViewerMode('ready'); // Try to proceed even without proxy ids
     }
   };
 
@@ -291,6 +440,54 @@ export const KensackEngine: React.FC = () => {
   const removeMaterialFromCart = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setCartItems(prev => prev.filter(m => m.id !== id));
+  };
+  
+  const handleSearchVoiceInput = () => {
+    if (isVoiceSearching && searchRecognitionRef.current) {
+      searchRecognitionRef.current.stop();
+      setIsVoiceSearching(false);
+      return;
+    }
+
+    const w = window as any;
+    const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("お使いのブラウザは音声入力に対応していません。推奨: Chrome / Safari");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    searchRecognitionRef.current = recognition;
+    recognition.lang = 'ja-JP';
+    recognition.continuous = false; // 単発発話用
+    recognition.interimResults = true;
+    
+    recognition.onstart = () => {
+      setIsVoiceSearching(true);
+      setQuery('');
+      latestSearchQueryRef.current = '';
+    };
+    
+    recognition.onresult = (event: any) => {
+      let fullText = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        fullText += event.results[i][0].transcript;
+      }
+      setQuery(fullText);
+      latestSearchQueryRef.current = fullText;
+    };
+    
+    recognition.onend = () => {
+      setIsVoiceSearching(false);
+      // 自動的に検索を実行する
+      if (latestSearchQueryRef.current.trim()) {
+        handleTextSearch(undefined, latestSearchQueryRef.current);
+      }
+    };
+    
+    recognition.onerror = () => setIsVoiceSearching(false);
+    
+    recognition.start();
   };
   
   const handleVoiceInput = () => {
@@ -401,22 +598,40 @@ export const KensackEngine: React.FC = () => {
 
       {/* 検索バー＆カメラボタン (ハイブリッド・スマートUI) */}
       <div className="w-full max-w-4xl flex flex-col sm:flex-row items-stretch gap-3 mb-6">
-        <form onSubmit={handleTextSearch} className="relative flex-1 flex shadow-lg rounded-2xl md:rounded-[2rem] overflow-hidden group">
+        <form onSubmit={(e) => handleTextSearch(e)} className="relative flex-1 flex shadow-lg rounded-2xl md:rounded-[2rem] overflow-hidden group border-2 border-transparent transition-all focus-within:border-blue-300">
           <div className="absolute inset-y-0 left-0 pl-5 md:pl-6 flex items-center pointer-events-none">
             <Search className="h-6 w-6 md:h-8 md:w-8 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
           </div>
           <input
             type="text"
-            className="block w-full pl-14 md:pl-20 pr-6 py-5 md:py-6 text-lg md:text-2xl font-bold text-slate-900 bg-white border-4 border-transparent focus:border-blue-500 placeholder-slate-400 transition-all outline-none"
+            className="block w-full pl-14 md:pl-20 pr-16 md:pr-36 py-5 md:py-6 text-lg md:text-2xl font-bold text-slate-900 bg-white placeholder-slate-400 transition-all outline-none"
             placeholder="材料名、型番、寸法を入力..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              latestSearchQueryRef.current = e.target.value;
+            }}
             disabled={isSearching}
           />
+          {/* 検索音声マイクボタン */}
+          <div className="absolute inset-y-0 right-2 sm:right-[100px] flex items-center">
+            <button
+              type="button"
+              onClick={handleSearchVoiceInput}
+              disabled={isSearching}
+              className={`p-3 md:p-4 rounded-full transition-all duration-300 outline-none ${
+                isVoiceSearching 
+                  ? 'bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse' 
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800'
+              }`}
+            >
+              <Mic className={`w-5 h-5 md:w-6 md:h-6 ${isVoiceSearching ? 'animate-bounce' : ''}`} />
+            </button>
+          </div>
           <button
             type="submit"
-            disabled={isSearching}
-            className="hidden sm:block absolute right-3 top-3 bottom-3 px-8 bg-slate-900 hover:bg-black text-white font-bold rounded-xl md:rounded-2xl transition-colors disabled:opacity-50"
+            disabled={isSearching || isVoiceSearching}
+            className="hidden sm:flex absolute right-3 top-3 bottom-3 px-8 bg-slate-900 hover:bg-black text-white font-bold rounded-xl md:rounded-2xl items-center transition-colors disabled:opacity-50"
           >
             検索
           </button>
@@ -443,7 +658,7 @@ export const KensackEngine: React.FC = () => {
       {/* メーカー絞り込みチップ (Chips) */}
       <div className="w-full max-w-4xl flex flex-wrap justify-center gap-2 md:gap-3 mb-10 text-sm font-bold">
         <span className="text-slate-500 py-1.5 px-2 mr-1">絞り込むメーカー:</span>
-        {['未来工業', 'パナソニック', 'ネグロス電工', '春日電機', '三菱電機', '富士電機', '日東工業'].map((mfg) => {
+        {['未来工業', 'パナソニック', 'ネグロス電工', '古河電工', '日東工業', '三菱電機', '富士電機', 'IDEC', '内外電機'].map((mfg) => {
           const isSelected = selectedMfgs.includes(mfg);
           return (
             <button
@@ -461,27 +676,67 @@ export const KensackEngine: React.FC = () => {
         })}
       </div>
 
+      {/* 会話履歴 (チャットUI) */}
+      {chatHistory.length > 0 && (
+        <div className="w-full max-w-4xl flex flex-col gap-4 mb-4">
+          <div className="flex justify-between items-center px-2 mb-2">
+            <span className="text-sm font-bold text-slate-400">会話の文脈を引き継いで検索中...</span>
+            <button 
+              onClick={clearChatHistory}
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-red-500 bg-white hover:bg-red-50 px-3 py-1.5 rounded-full transition-colors border border-slate-200 hover:border-red-200"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              リセットして新しく探す
+            </button>
+          </div>
+          {chatHistory.map((msg, idx) => (
+            <div key={idx} className={`flex items-start gap-3 animate-fade-in-up md:gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              
+              {/* アイコン */}
+              {msg.role === 'model' && (
+                <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-2 rounded-full text-white shadow-md flex-none mt-1">
+                  <Cpu className="w-5 h-5" />
+                </div>
+              )}
+              
+              {/* 吹き出し */}
+              <div 
+                className={`max-w-[85%] md:max-w-[75%] p-4 rounded-2xl md:rounded-3xl shadow-sm text-sm md:text-base font-bold leading-relaxed whitespace-pre-wrap ${
+                  msg.role === 'user' 
+                    ? 'bg-slate-900 text-white rounded-tr-none' 
+                    : 'bg-white text-slate-800 border-2 border-blue-50 rounded-tl-none'
+                }`}
+              >
+                {msg.content}
+              </div>
+
+            </div>
+          ))}
+          <div className="h-4"></div>
+        </div>
+      )}
+
       {/* 検索中のローディングインジケーター */}
       {isSearching && (
         <div className="flex flex-col items-center justify-center mt-12 text-blue-600 bg-white px-8 py-6 rounded-3xl shadow-sm border border-blue-100">
           <Loader2 className="h-10 w-10 animate-spin mb-3" />
-          <p className="font-bold text-lg">インフラを検索中...</p>
+          <p className="font-bold text-lg">AIとカタログを同期中...</p>
         </div>
       )}
 
       {/* 検索結果（カード型グリッド） */}
       {result && !isSearching && (
         <div className="w-full max-w-7xl animate-fade-in-up">
-          
-          {/* AI推論理由・結果インジケーター */}
-          {result.source === 'ai-translated' && (
+
+          {/* AI推論エラーまたは通常メッセージ等 (AI提案がなかった場合のフォールバック表示) */}
+          {result.source === 'ai-translated' && !result.aiProposal && (
             <div className="mb-8 p-5 md:p-6 rounded-2xl bg-white border-l-8 border-purple-500 shadow-md">
               <div className="flex items-start gap-4">
                 <div className="p-3 bg-purple-100 text-purple-700 rounded-xl">
                   <Cpu className="w-8 h-8" />
                 </div>
                 <div>
-                  <h3 className="font-black text-xl text-slate-800 mb-1">AIからの提案結果</h3>
+                  <h3 className="font-black text-xl text-slate-800 mb-1">AIからの推論結果</h3>
                   <p className="text-slate-600 font-bold text-base md:text-lg leading-relaxed">
                     {result.message}
                   </p>
@@ -490,18 +745,13 @@ export const KensackEngine: React.FC = () => {
             </div>
           )}
 
-          {result.source === 'database' && (
-            <div className="mb-8 p-4 rounded-xl bg-slate-800 text-white flex items-center gap-3 shadow-md">
-              <Database className="w-6 h-6 text-emerald-400" />
-              <span className="font-bold">データベース高速一致（APIコスト0円）</span>
-            </div>
-          )}
 
           {/* グリッドレイアウト（モバイルで見やすく、タップ領域大） */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {result.materials.map((m) => {
               const isLowConfidence = m.confidence !== undefined && m.confidence < 80;
               const isSelected = cartItems.some(selected => selected.material?.id === m.id);
+              const hasDimensions = m.width_mm || m.height_mm || m.depth_mm;
               
               return (
                 <div 
@@ -512,8 +762,8 @@ export const KensackEngine: React.FC = () => {
                   
                   {/* 選択済みチェックマーク */}
                   {isSelected && (
-                    <div className="absolute top-3 right-3 bg-blue-600 text-white rounded-full p-1 z-20 shadow-lg">
-                      <CheckCircle2 className="w-6 h-6" />
+                    <div className="absolute top-2 right-2 bg-blue-600 text-white rounded-full p-1 z-20 shadow-md">
+                      <CheckCircle2 className="w-5 h-5" />
                     </div>
                   )}
 
@@ -532,123 +782,74 @@ export const KensackEngine: React.FC = () => {
                   )}
 
                   {/* 商品画像プレビュー（無ければプレースホルダー） */}
-                  <div className="h-56 bg-slate-50 flex items-center justify-center p-6 border-b-2 border-slate-100">
+                  <div className="h-40 bg-slate-50 flex items-center justify-center p-4 border-b-2 border-slate-100">
                     {m.image_url ? (
-                      <img src={m.image_url} alt={m.name} className="max-h-full max-w-full object-contain mix-blend-multiply drop-shadow-md" />
+                      <img 
+                        src={m.image_url} 
+                        alt={m.name} 
+                        className="max-h-full max-w-full object-contain mix-blend-multiply drop-shadow-sm" 
+                        onError={(e) => {
+                          e.currentTarget.onerror = null; // Prevent infinite loops
+                          e.currentTarget.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'%3E%3C/circle%3E%3Cpolyline points='21 15 16 10 5 21'%3E%3C/polyline%3E%3C/svg%3E`;
+                          e.currentTarget.className = "w-12 h-12 opacity-50";
+                        }}
+                      />
                     ) : (
                       <div className="text-slate-300 flex flex-col items-center">
-                        <ImagePlus className="w-12 h-12 mb-2 opacity-50" />
-                        <span className="font-bold text-sm">画像なし</span>
+                        <ImagePlus className="w-10 h-10 mb-2 opacity-50" />
+                        <span className="font-bold text-xs">画像なし</span>
                       </div>
                     )}
                   </div>
 
                   {/* 情報エリア */}
-                  <div className="p-5 flex-1 flex flex-col">
-                    <span className="text-sm font-black text-blue-600 mb-2 truncate">
+                  <div className="p-4 flex-1 flex flex-col">
+                    <span className="text-xs font-black text-blue-600 mb-1 truncate">
                       {m.manufacturers?.name || '不明なメーカー'}
                     </span>
-                    <h4 className="text-xl md:text-2xl font-black text-slate-900 mb-3 leading-tight line-clamp-2">
-                      {m.name}
+                    <h4 className="text-lg font-black text-slate-900 mb-2 leading-tight line-clamp-2">
+                      <HighlightText text={m.name || ''} splitQuery={query} />
                     </h4>
                     
-                    {/* 型番ラベル（目立つように） */}
-                    <div className="bg-slate-800 text-white font-mono font-bold px-3 py-1.5 rounded-lg w-fit mb-4 text-sm md:text-base shadow-inner">
-                      {m.model_number}
+                    {/* 型番ラベル */}
+                    <div className="bg-slate-800 text-white font-mono font-bold px-2.5 py-1 rounded-md w-fit mb-3 text-sm shadow-inner">
+                      <HighlightText text={m.model_number || ''} splitQuery={query} />
                     </div>
                     
                     {/* 寸法・価格情報 */}
-                    <div className="bg-slate-50 rounded-2xl p-4 mt-auto border-2 border-slate-100">
-                      <div className="grid grid-cols-3 gap-2 mb-3 items-end">
-                        <div className="flex flex-col">
-                          <span className="text-xs font-black text-slate-400">幅 (W)</span>
-                          <span className="font-bold text-slate-700">{m.width_mm || '-'} <span className="text-xs">mm</span></span>
+                    <div className="bg-slate-50 rounded-xl p-3 mt-auto border border-slate-100">
+                      {hasDimensions && (
+                        <div className="grid grid-cols-3 gap-2 mb-2 items-end">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-slate-400">幅 (W)</span>
+                            <span className="text-sm font-bold text-slate-700">{m.width_mm || '-'} <span className="text-[10px]">mm</span></span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-slate-400">高さ (H)</span>
+                            <span className="text-sm font-bold text-slate-700">{m.height_mm || '-'} <span className="text-[10px]">mm</span></span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-slate-400">奥行 (D)</span>
+                            <span className="text-sm font-bold text-slate-700">{m.depth_mm || '-'} <span className="text-[10px]">mm</span></span>
+                          </div>
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-black text-slate-400">高さ (H)</span>
-                          <span className="font-bold text-slate-700">{m.height_mm || '-'} <span className="text-xs">mm</span></span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-black text-slate-400">奥行 (D)</span>
-                          <span className="font-bold text-slate-700">{m.depth_mm || '-'} <span className="text-xs">mm</span></span>
-                        </div>
-                      </div>
-                      <div className="pt-3 border-t-2 border-slate-200 border-dashed flex justify-between items-center">
+                      )}
+                      <div className={`${hasDimensions ? 'pt-2 border-t border-slate-200 border-dashed' : ''} flex justify-between items-center`}>
                         <span className="text-xs font-black text-slate-400">標準単価</span>
-                        <span className="text-xl font-black text-slate-900">
+                        <span className="text-lg font-black text-slate-900">
                           {m.standard_price ? `¥${m.standard_price.toLocaleString()}` : 'ASK'}
                         </span>
                       </div>
                       {/* カタログ原版リンク (ページ番号付加) */}
                       {m.catalog_url && (
-                        <div className="mt-3 pt-3 border-t-2 border-slate-200 border-dashed">
-                          {(() => {
-                            const driveMatch = m.catalog_url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-                            const isDrive = !!driveMatch;
-                            
-                            if (isDrive) {
-                              const fileId = driveMatch[1];
-                              const stateObj = { action: "open", ids: [fileId] };
-                              const editorUrl = `/pdf-editor?state=${encodeURIComponent(JSON.stringify(stateObj))}&jumpToPage=${m.page_number || ''}`;
-                              
-                              return (
-                                <button
-                                  type="button"
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    const btn = e.currentTarget;
-                                    const originalText = btn.innerHTML;
-                                    btn.innerHTML = '🔄 通信中...';
-                                    btn.disabled = true;
-                                    
-                                    try {
-                                        // 分割済みファイルの検索
-                                        if (m.manufacturers?.name && m.page_number) {
-                                            const { supabase } = await import('../lib/supabase');
-                                            const { data } = await supabase
-                                                .from('catalog_pages')
-                                                .select('drive_file_id')
-                                                .eq('manufacturer', m.manufacturers.name)
-                                                .eq('page_number', m.page_number)
-                                                .maybeSingle();
-
-                                            if (data && data.drive_file_id) {
-                                                // 分割ファイルが存在する場合はそちらを使用（爆速プレビュー）
-                                                const fastStateObj = { action: "open", ids: [data.drive_file_id] };
-                                                const fastEditorUrl = `/pdf-editor?state=${encodeURIComponent(JSON.stringify(fastStateObj))}&jumpToPage=${m.page_number}`;
-                                                window.open(fastEditorUrl, '_blank');
-                                                return;
-                                            }
-                                        }
-                                    } catch (err) {
-                                        console.error('Failed to lookup split catalog', err);
-                                    } finally {
-                                        btn.innerHTML = originalText;
-                                        btn.disabled = false;
-                                    }
-
-                                    // 分割ファイルが無い場合は従来の200MBフルサイズ版（遅い）
-                                    window.open(editorUrl, '_blank');
-                                  }}
-                                  className="w-full flex justify-center items-center gap-2 bg-white border-2 border-blue-600 text-blue-700 hover:bg-blue-50 py-2.5 rounded-xl font-black text-sm transition-colors disabled:opacity-50"
-                                >
-                                  📘 最速プレビューを開く {m.page_number && <span className="opacity-70 text-xs">({m.page_number}P)</span>}
-                                </button>
-                              );
-                            }
-
-                            return (
-                              <a 
-                                href={m.page_number ? `${m.catalog_url}#page=${m.page_number}` : m.catalog_url} 
-                                target="_blank" 
-                                rel="noreferrer"
-                                className="w-full flex justify-center items-center gap-2 bg-white border-2 border-blue-600 text-blue-700 hover:bg-blue-50 py-2.5 rounded-xl font-black text-sm transition-colors"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                📘 カタログ原版を開く {m.page_number && <span className="opacity-70 text-xs">({m.page_number}P)</span>}
-                              </a>
-                            );
-                          })()}
+                        <div className="mt-2 pt-2 border-t border-slate-200 border-dashed">
+                          <button
+                            type="button"
+                            onClick={(e) => handleOpenCatalogViewer(m, e)}
+                            className="w-full flex justify-center items-center gap-1.5 bg-white border-2 border-blue-600 text-blue-700 hover:bg-blue-50 py-1.5 rounded-lg font-black text-xs transition-colors"
+                          >
+                            📘 カタログビューアを開く {m.grouped_pages && m.grouped_pages.length > 1 ? <span className="opacity-70 text-[10px]">({m.grouped_pages.length}P抜粋)</span> : (m.page_number && <span className="opacity-70 text-[10px]">({m.page_number}P)</span>)}
+                          </button>
                         </div>
                       )}
                     </div>
@@ -857,6 +1058,7 @@ export const KensackEngine: React.FC = () => {
           </div>
         </div>
       {/* サブモーダル: テンキー入力 */}
+      {/* サブモーダル: テンキー入力 */}
       <NumpadModal 
         isOpen={numpadItemId !== null}
         initialValue={numpadInitialValue}
@@ -868,6 +1070,143 @@ export const KensackEngine: React.FC = () => {
         }}
         onClose={() => setNumpadItemId(null)}
       />
+
+      {/* サブモーダル: カタログビューア */}
+      {isCatalogViewerOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/50">
+              <div>
+                <div className="text-xs font-bold text-blue-600 mb-0.5">{catalogViewerMfg}</div>
+                <h3 className="text-lg font-black text-slate-800">{catalogViewerTitle}</h3>
+              </div>
+              <button
+                onClick={() => setIsCatalogViewerOpen(false)}
+                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors"
+              >
+                <Plus className="w-6 h-6 rotate-45" />
+              </button>
+            </div>
+            
+            {/* Body */}
+            <div className="flex-1 overflow-x-auto overflow-y-hidden snap-x snap-mandatory flex bg-slate-100/50">
+              {catalogViewerMode === 'loading' && (
+                <div className="m-auto flex flex-col items-center justify-center text-slate-400 gap-3 w-full">
+                  <Loader2 className="w-8 h-8 animate-spin" />
+                  <p className="font-bold">カタログ情報を取得中...</p>
+                </div>
+              )}
+              
+              {catalogViewerMode === 'error' && (
+                <div className="m-auto flex flex-col items-center justify-center text-red-400 gap-3 w-full">
+                  <AlertTriangle className="w-8 h-8" />
+                  <p className="font-bold">プレビューの読み込みに失敗しました。</p>
+                </div>
+              )}
+
+              {catalogViewerMode === 'ready' && catalogViewerPages.map((page, idx) => {
+                let imgUrl = '';
+                
+                if (page.page_image_url) {
+                   imgUrl = page.page_image_url;
+                } else if (page.drive_file_id) {
+                   imgUrl = `https://drive.google.com/thumbnail?id=${page.drive_file_id}&sz=w800`;
+                }
+
+                const pdfUrl = page.pdf_drive_file_id 
+                    ? `https://drive.google.com/uc?export=download&id=${page.pdf_drive_file_id}`
+                    : page.catalog_url;
+
+                const isPdfMode = catalogViewerPdfModeIndex === idx;
+
+                return (
+                  <div key={idx} className="shrink-0 w-full snap-center h-full flex flex-col items-center relative p-4 pb-20">
+                    <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
+                      <div className="bg-slate-800 text-white px-4 py-2 text-sm font-bold flex justify-between items-center shrink-0">
+                        <span>PAGE {page.page_number}</span>
+                      </div>
+                      <div className="p-0 flex-1 flex justify-center bg-slate-50 relative overflow-auto">
+                        
+                        {!isPdfMode ? (
+                          imgUrl ? (
+                             <img 
+                                src={imgUrl} 
+                                alt={`カタログ ページ ${page.page_number}`}
+                                className="w-full h-auto object-contain shadow-sm border border-slate-200 mx-auto"
+                                loading="lazy"
+                             />
+                          ) : (
+                             <div className="flex flex-col items-center justify-center text-slate-400 py-10 gap-3 w-full h-full absolute inset-0">
+                                <ImagePlus className="w-8 h-8 opacity-50" />
+                                <span className="text-sm font-bold">画像準備中</span>
+                                {page.catalog_url && (
+                                    <a 
+                                      href={page.catalog_url} 
+                                      target="_blank" 
+                                      rel="noreferrer" 
+                                      className="mt-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-bold hover:bg-blue-100 transition-colors pointer-events-auto"
+                                    >
+                                      PDF原本を開く
+                                    </a>
+                                )}
+                             </div>
+                          )
+                        ) : (
+                          // PDF Mode
+                          <div className="w-full h-full flex flex-col items-center p-2">
+                             {pdfUrl ? (
+                               <Document 
+                                 file={pdfUrl}
+                                 loading={<div className="p-8 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />PDF読込中...</div>}
+                                 error={<div className="p-8 text-red-500">PDFの読み込みに失敗しました</div>}
+                               >
+                                  <Page 
+                                    className="shadow-md border border-slate-200" 
+                                    pageNumber={1} 
+                                    renderTextLayer={true} 
+                                    renderAnnotationLayer={false} 
+                                    width={typeof window !== 'undefined' ? Math.min(window.innerWidth - 48, 600) : 600} 
+                                  />
+                               </Document>
+                             ) : (
+                                <div className="p-8 text-red-500">PDFファイルのURLが見つかりません</div>
+                             )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Floating Action Button for Copying Text */}
+                    <div className="absolute bottom-6 left-0 right-0 flex justify-center z-10">
+                       <button
+                         onClick={() => setCatalogViewerPdfModeIndex(isPdfMode ? null : idx)}
+                         className={`shadow-xl px-6 py-4 rounded-full font-black text-sm md:text-base flex items-center justify-center gap-3 transition-all active:scale-95 border-4 ${
+                            isPdfMode 
+                            ? 'bg-slate-800 hover:bg-slate-900 border-slate-700 text-white shadow-slate-900/30' 
+                            : 'bg-blue-600 hover:bg-blue-700 border-white/20 text-white shadow-blue-600/30'
+                         }`}
+                       >
+                         {isPdfMode ? (
+                           <>
+                              <ImagePlus className="w-5 h-5" />
+                              見やすい画像ビューワーに戻る
+                           </>
+                         ) : (
+                           <>
+                              <FileText className="w-5 h-5" />
+                              📄 このページの文字をコピーする
+                           </>
+                         )}
+                       </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

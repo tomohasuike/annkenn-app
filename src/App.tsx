@@ -25,6 +25,7 @@ import WorkerAttendance from "./pages/attendance/WorkerAttendance"
 import Login from "./pages/Login"
 import ProtectedRoute from "./components/auth/ProtectedRoute"
 
+import ToolsLayout from "./pages/tools/ToolsLayout"
 import ToolsDashboard from "./pages/tools/ToolsDashboard"
 import SiteDesignDashboard from "./pages/tools/SiteDesignDashboard"
 import PowerCalc from "./pages/tools/PowerCalc"
@@ -79,12 +80,12 @@ function App() {
               {/* AI材料提案（独立したグローバルツール） */}
               <Route path="kensack-engine" element={<KensackEngine />} />
 
-              {/* 現場用ツール群 */}
-              <Route path="tools">
+              {/* 現場用ツール群 (タブ化レイアウト) */}
+              <Route path="tools" element={<ToolsLayout />}>
                 <Route index element={<ToolsDashboard />} />
-                <Route path=":projectId/site-design" element={<SiteDesignDashboard />} />
-                <Route path=":projectId/power-calc" element={<PowerCalc />} />
-                <Route path=":projectId/lighting-calc" element={<LightingCalc />} />
+                <Route path="site-design" element={<SiteDesignDashboard />} />
+                <Route path="power-calc" element={<PowerCalc />} />
+                <Route path="lighting-calc" element={<LightingCalc />} />
               </Route>
             </Route>
           </Route>

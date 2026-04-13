@@ -6,11 +6,22 @@ import logoImg from "../../assets/logo.png"
 import { supabase } from "../../lib/supabase"
 
 export default function AppLayout() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024)
   const [userInitial, setUserInitial] = useState("U");
   const [allowedApps, setAllowedApps] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [appMode, setAppMode] = useState<'core' | 'tools'>('core');
+
+  // Handle window resize for responsive sidebar
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setIsSidebarOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -81,10 +92,10 @@ export default function AppLayout() {
 
       {/* Main Content Area with Sidebar */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Overlay for mobile when sidebar is open */}
+        {/* Overlay for mobile/tablet when sidebar is open */}
         {isSidebarOpen && (
           <div 
-            className="fixed inset-0 bg-black/50 z-20 xl:hidden md:hidden" 
+            className="fixed inset-0 bg-black/50 z-20 lg:hidden" 
             onClick={() => setIsSidebarOpen(false)}
           />
         )}
@@ -92,8 +103,8 @@ export default function AppLayout() {
         {/* Sidebar */}
         <aside className={`border-r bg-card flex flex-col transition-all duration-300 ease-in-out z-30 ${
           isSidebarOpen 
-            ? 'w-64 fixed inset-y-0 left-0 top-16 md:relative md:top-0 md:translate-x-0 translate-x-0' 
-            : 'w-0 overflow-hidden md:w-0 md:border-r-0 fixed inset-y-0 left-0 top-16 md:relative md:top-0 -translate-x-full md:translate-x-0'
+            ? 'w-64 fixed inset-y-0 left-0 top-14 sm:top-16 lg:relative lg:top-0 lg:translate-x-0 translate-x-0' 
+            : 'w-0 overflow-hidden lg:w-0 lg:border-r-0 fixed inset-y-0 left-0 top-14 sm:top-16 lg:relative lg:top-0 -translate-x-full lg:translate-x-0'
         }`}>
           
           <div className="p-3 border-b border-border/50">
