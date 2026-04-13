@@ -1,6 +1,4 @@
 import { useMemo } from 'react';
-import { AlertCircle } from 'lucide-react';
-import type { CalcLoad } from '../utils/calcEngine';
 
 interface PowerLoad {
   id: string;

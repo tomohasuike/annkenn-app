@@ -114,7 +114,7 @@ export default function Den81ReportPreview({ title, loads, summary }: Den81Repor
           </tr>
         </thead>
         <tbody>
-          {calculatedRows.map((row, i) => (
+          {calculatedRows.map((row) => (
             <tr key={row.id} className="border-b border-black">
               <td className="border border-black p-1">{row.circuitNo}</td>
               <td className="border border-black p-1 text-left px-2">{row.name}</td>

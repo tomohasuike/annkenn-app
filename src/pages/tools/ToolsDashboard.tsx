@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Zap, Lightbulb, Network, Clock, FolderOpen, User, PlusCircle, X, ChevronDown, ChevronRight, Hash, Search, Filter, XCircle } from "lucide-react";
-import { Link, useNavigate, useOutletContext } from "react-router-dom";
+import { Zap, Lightbulb, Network, Clock, FolderOpen, User, X, ChevronDown, ChevronRight, Hash, Search, Filter, XCircle } from "lucide-react";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 
 interface GroupedProject {

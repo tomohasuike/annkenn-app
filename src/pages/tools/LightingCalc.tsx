@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Plus, Trash2, Activity, Settings2, FileText, List, PlusCircle, Save, ChevronLeft, ShieldAlert, CheckCircle2, FileSpreadsheet, X, Calculator, Bot, Check } from 'lucide-react';
+import { Plus, Trash2, Settings2, List, PlusCircle, Save, ChevronLeft, ShieldAlert, FileSpreadsheet, X, Calculator, Bot, Check } from 'lucide-react';
 import Den81ReportPreview from '../../components/Den81ReportPreview';
 
 interface LightingLoad {

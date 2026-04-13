@@ -1,6 +1,6 @@
-import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { Outlet, NavLink } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { FolderOpen, Zap, Lightbulb, Network, Clock, List } from "lucide-react";
+import { FolderOpen, Zap, Lightbulb, Network, List } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
 interface Project {
@@ -23,7 +23,7 @@ export default function ToolsLayout() {
     }
   }, [selectedProjectId]);
 
-  const location = useLocation();
+
 
   useEffect(() => {
     supabase.from('projects')

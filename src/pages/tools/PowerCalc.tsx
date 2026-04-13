@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { NumpadModal } from '../../components/ui/NumpadModal';
-import { Plus, Trash2, Settings2, FileText, List, PlusCircle, Save, ChevronLeft, Zap, ShieldAlert, CheckCircle2, FileSpreadsheet, X, Calculator, Bot, Check, Menu, Lock, Loader2 } from 'lucide-react';
+import { Trash2, Settings2, List, PlusCircle, Save, ChevronLeft, Zap, FileSpreadsheet, X, Calculator, Bot, Check, Menu, Lock, Loader2 } from 'lucide-react';
 import PowerReportPreview from '../../components/PowerReportPreview';
 import { calculateTrunkAllowableCurrent } from '../../constants/wiringStandards';
 import { CalcEngine } from '../../utils/calcEngine';
@@ -562,7 +562,7 @@ export default function PowerCalc() {
                   <tr>
                     <th className="px-4 py-3 font-semibold min-w-[280px] whitespace-nowrap sticky left-0 z-20 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] select-none">
                       <div className="flex items-center gap-2">
-                        <Lock className="w-3.5 h-3.5 text-blue-600" title="既設ロック" />
+                        <span title="既設ロック"><Lock className="w-3.5 h-3.5 text-blue-600" /></span>
                         <span className="w-20">負荷記号</span>
                         <span>負荷名称</span>
                       </div>
