@@ -453,7 +453,7 @@ export default function Settings() {
             onClick={() => setActiveTab('app-settings')}
           >
             <SettingsIcon className="w-4 h-4" />
-            システム設定
+            安否確認設定
           </button>
         </div>
 
@@ -719,7 +719,7 @@ export default function Settings() {
               <div className="space-y-6">
                  <div className="flex items-center justify-between">
                     <div>
-                        <h3 className="text-lg font-semibold">システム設定</h3>
+                        <h3 className="text-lg font-semibold">安否確認設定</h3>
                         <p className="text-sm text-muted-foreground">システム全体に関わる外部連携設定等を行います。</p>
                     </div>
                     <button 
@@ -863,7 +863,7 @@ export default function Settings() {
                                        )
                                    })}
                                </div>
-                               <p className="text-xs text-muted-foreground pt-1">※実際に指定時刻に自動送信を行うには、バックエンド（Edge Functions等）の開発が必要です。</p>
+
                            </div>
                        )}
                     </div>
@@ -913,9 +913,7 @@ export default function Settings() {
                                </div>
                            </div>
                        )}
-                       {appSettings.enable_earthquake_alert && (
-                          <p className="text-xs text-muted-foreground pl-14 pt-2">※実際に気象庁データ等と連動して自動送信を行うには、バックエンド（Edge Functions等）の別途開発・設定が必要です。</p>
-                       )}
+
                     </div>
                   </div>
                 )}
