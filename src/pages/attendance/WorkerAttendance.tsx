@@ -236,8 +236,8 @@ export default function WorkerAttendance() {
         )
       `)
       .eq('worker_id', wId)
-      .gte('daily_reports.report_date', startDate)
-      .lte('daily_reports.report_date', endDate);
+      .gte('daily_reports.report_date', `${startDate}T00:00:00+09:00`)
+      .lte('daily_reports.report_date', `${endDate}T23:59:59+09:00`);
 
     // Fetch reports for projects the worker is ASSIGNED to, even if they aren't explicitly in report_personnel
     const assignedProjectIds = assignmentsData ? Array.from(new Set(assignmentsData.map(a => a.project_id))) : [];
@@ -255,8 +255,8 @@ export default function WorkerAttendance() {
           projects(project_number, project_name, client_name, client_company_name, site_name, category)
         `)
         .in('project_id', assignedProjectIds)
-        .gte('report_date', startDate)
-        .lte('report_date', endDate);
+        .gte('report_date', `${startDate}T00:00:00+09:00`)
+        .lte('report_date', `${endDate}T23:59:59+09:00`);
       if (data) assignedReportsData = data;
     }
 
@@ -404,74 +404,77 @@ export default function WorkerAttendance() {
     
     if (existingRecord) {
         setRecordId(existingRecord.id);
-        const ci = formatTime(existingRecord.clock_in_time);
-        if (ci) initialEvents.push({ id: crypto.randomUUID(), time: ci, type: 'clock_in' });
         
-        let decls = [...(existingRecord.site_declarations || [])].sort((a,b) => (a.start_time || '').localeCompare(b.start_time || ''));
-        const assignedForDate = assignedProjects[dateStr] || [];
-        const isAllImported = decls.length > 0 && decls.every(p => p.project_id === 'imported' || p.project_id === 'unassigned');
-        
-        if (isAllImported && assignedForDate.length > 0) {
-             const originalTimes = { 
-                 start: decls[0]?.start_time || '08:00', 
-                 end: decls[decls.length - 1]?.end_time || '17:00' 
-             };
-             decls = assignedForDate.map(ap => ({
-                   project_id: ap.project_id,
-                   project_name: ap.project_name,
-                   start_time: originalTimes.start,
-                   end_time: originalTimes.end,
-                   role: '一般'
-             }));
-        } else if (isAllImported) {
-             decls = [];
-        }
+        // timeline_eventsが保存済みであれば直接復元（推測不要）
+        if (existingRecord.timeline_events && Array.isArray(existingRecord.timeline_events) && existingRecord.timeline_events.length > 0) {
+            initialEvents = existingRecord.timeline_events.map((ev: any) => ({
+                id: crypto.randomUUID(),
+                time: ev.time || '',
+                type: ev.type as TimelineEvent['type'],
+                project_id: ev.project_id || undefined,
+                project_name: ev.project_name || undefined,
+                role: ev.role || undefined
+            }));
+        } else {
+            // 旧データ用：ヒューリスティック復元（後方互換）
+            const ci = formatTime(existingRecord.clock_in_time);
+            if (ci) initialEvents.push({ id: crypto.randomUUID(), time: ci, type: 'clock_in' });
+            
+            let decls = [...(existingRecord.site_declarations || [])].sort((a,b) => (a.start_time || '').localeCompare(b.start_time || ''));
+            const assignedForDate = assignedProjects[dateStr] || [];
+            const isAllImported = decls.length > 0 && decls.every(p => p.project_id === 'imported' || p.project_id === 'unassigned');
+            
+            if (isAllImported && assignedForDate.length > 0) {
+                 const originalTimes = { 
+                     start: decls[0]?.start_time || '08:00', 
+                     end: decls[decls.length - 1]?.end_time || '17:00' 
+                 };
+                 decls = assignedForDate.map(ap => ({
+                       project_id: ap.project_id,
+                       project_name: ap.project_name,
+                       start_time: originalTimes.start,
+                       end_time: originalTimes.end,
+                       role: '一般'
+                 }));
+            } else if (isAllImported) {
+                 decls = [];
+            }
 
-        let lastEnd = ci;
-        let remainingPrep = existingRecord.prep_time_minutes || 0;
-        let remainingMisc = existingRecord.misc_time_minutes || 0;
+            let lastEnd = ci;
+            let remainingMisc = existingRecord.misc_time_minutes || 0;
 
-        const toMins = (hhmm: string | null | undefined) => {
-            if (!hhmm) return 0;
-            const [h, m] = hhmm.split(':').map(Number);
-            return (h * 60) + (m || 0);
-        };
+            const toMins = (hhmm: string | null | undefined) => {
+                if (!hhmm) return 0;
+                const [h, m] = hhmm.split(':').map(Number);
+                return (h * 60) + (m || 0);
+            };
 
-        for (const d of decls) {
-             if (d.start_time) {
-                 if (lastEnd && lastEnd !== d.start_time) {
-                     const diffMins = toMins(d.start_time) - toMins(lastEnd);
-                     let gapType: 'travel' | 'prep' | 'misc' = 'travel';
-                     if (diffMins > 0) {
-                         if (remainingPrep === diffMins) { gapType = 'prep'; remainingPrep -= diffMins; }
-                         else if (remainingMisc === diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
-                         else if (remainingPrep > 0 && remainingPrep >= diffMins) { gapType = 'prep'; remainingPrep -= diffMins; }
-                         else if (remainingMisc > 0 && remainingMisc >= diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
+            for (const d of decls) {
+                 if (d.start_time) {
+                     if (lastEnd && lastEnd !== d.start_time) {
+                         const diffMins = toMins(d.start_time) - toMins(lastEnd);
+                         let gapType: 'travel' | 'misc' = 'travel';
+                         if (diffMins > 0 && remainingMisc >= diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
+                         initialEvents.push({ id: crypto.randomUUID(), time: lastEnd, type: gapType });
                      }
+                     initialEvents.push({
+                         id: crypto.randomUUID(), time: d.start_time, type: 'site_work',
+                         project_id: d.project_id, project_name: d.project_name, role: d.role || '一般'
+                     });
+                     lastEnd = d.end_time;
+                 }
+            }
+            
+            const co = formatTime(existingRecord.clock_out_time);
+            if (co) {
+                 if (lastEnd && lastEnd !== co) {
+                     const diffMins = toMins(co) - toMins(lastEnd);
+                     let gapType: 'travel' | 'misc' = 'travel';
+                     if (diffMins > 0 && remainingMisc >= diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
                      initialEvents.push({ id: crypto.randomUUID(), time: lastEnd, type: gapType });
                  }
-                 initialEvents.push({
-                     id: crypto.randomUUID(), time: d.start_time, type: 'site_work',
-                     project_id: d.project_id, project_name: d.project_name, role: d.role || '一般'
-                 });
-                 lastEnd = d.end_time;
-             }
-        }
-        
-        const co = formatTime(existingRecord.clock_out_time);
-        if (co) {
-             if (lastEnd && lastEnd !== co) {
-                 const diffMins = toMins(co) - toMins(lastEnd);
-                 let gapType: 'travel' | 'prep' | 'misc' = 'travel';
-                 if (diffMins > 0) {
-                     if (remainingPrep === diffMins) { gapType = 'prep'; remainingPrep -= diffMins; }
-                     else if (remainingMisc === diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
-                     else if (remainingPrep > 0 && remainingPrep >= diffMins) { gapType = 'prep'; remainingPrep -= diffMins; }
-                     else if (remainingMisc > 0 && remainingMisc >= diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
-                 }
-                 initialEvents.push({ id: crypto.randomUUID(), time: lastEnd, type: gapType });
-             }
-             initialEvents.push({ id: crypto.randomUUID(), time: co, type: 'clock_out' });
+                 initialEvents.push({ id: crypto.randomUUID(), time: co, type: 'clock_out' });
+            }
         }
         
         setPersonalOuts(existingRecord.personal_outs || []);
@@ -607,7 +610,7 @@ export default function WorkerAttendance() {
     let clock_in_time = null;
     let clock_out_time = null;
     let travel_time_minutes = 0;
-    let prep_time_minutes = 0;
+    // prep_time_minutes は travel に統合済み（DB列はゼロ固定で保持）
     let misc_time_minutes = 0;
     const site_declarations: any[] = [];
     
@@ -638,9 +641,7 @@ export default function WorkerAttendance() {
             const prev = validEvents[i-1];
             const diffMins = toMins(ev.time) - toMins(prev.time);
             
-            if (prev.type === 'clock_in' || prev.type === 'prep') {
-                prep_time_minutes += diffMins;
-            } else if (prev.type === 'travel') {
+            if (prev.type === 'travel' || prev.type === 'prep') {
                 travel_time_minutes += diffMins;
             } else if (prev.type === 'misc') {
                 misc_time_minutes += diffMins;
@@ -667,18 +668,28 @@ export default function WorkerAttendance() {
       });
     }
 
+    // タイムライン全体をJSONとして保存
+    const timeline_events_payload = validEvents.map(ev => ({
+      time: ev.time,
+      type: ev.type,
+      project_id: ev.project_id || null,
+      project_name: ev.project_name || null,
+      role: ev.role || null
+    }));
+
     const payload = {
       worker_id: workerId,
       target_date: selectedDate,
       clock_in_time,
       clock_out_time,
-      prep_time_minutes,
+      prep_time_minutes: 0,
       travel_time_minutes,
       misc_time_minutes,
       personal_out_minutes: totalPrivateOutMins,
       personal_outs: personalOuts,
       memo: memo,
       site_declarations,
+      timeline_events: timeline_events_payload,
       role: site_declarations.length > 0 ? (site_declarations.some(d => d.role === '職長') ? '職長' : '一般') : '一般'
     };
 
@@ -775,8 +786,8 @@ export default function WorkerAttendance() {
                   <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-24 text-center">現場出</th>
                   <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 min-w-[200px]">作業現場名 (日報連携)</th>
                   <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-12 text-center">役割</th>
-                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-16 text-center">移動</th>
-                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-16 text-center">準備</th>
+                  <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-16 text-center">移動・準備</th>
+
                   <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-16 text-center">雑務</th>
                   <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 w-20 text-center">私用外出</th>
                   <th className="font-medium p-2 sticky top-0 bg-slate-100 z-10 border-b border-slate-200 min-w-[150px]">備考</th>
@@ -1167,8 +1178,8 @@ export default function WorkerAttendance() {
                                             onChange={(e) => updateEventInfo(idx, { type: e.target.value as any, project_id: '', project_name: '' })}
                                             className="w-full h-10 rounded-md border-0 ring-1 ring-slate-300 font-bold text-sm px-3 shadow-inner bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                                             >
-                                            <option value="travel">🚕 移動</option>
-                                            <option value="prep">🔧 準備</option>
+                                            <option value="travel">🚗 移動・準備</option>
+
                                             <option value="misc">🧹 雑務</option>
                                             <option value="site_work">👷 現場で作業</option>
                                             </select>

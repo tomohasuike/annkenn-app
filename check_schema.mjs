@@ -1,21 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
-const supabaseUrl = 'https://gsczefdkcrvudddeotlx.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzY3plZmRrY3J2dWRkZGVvdGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxODU2MzcsImV4cCI6MjA4ODc2MTYzN30.N-mPmVKlDQGzZ57EvrWuCd2VviuK0lTTRHsBPCC0Frs';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '.env.local') });
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function check() {
-  const { data: cols } = await supabase.rpc('get_table_columns_by_name', { table_name: 'personnel' });
-  console.log("personnel:", cols ? cols.map(c => c.column_name).join(", ") : "RPC might not exist");
-  
-  // Alternative way to check columns via a single select
-  const tables = ['personnel', 'reports', 'report_workers', 'schedules', 'daily_attendance'];
-  for (let t of tables) {
-    const { data: d, error: e } = await supabase.from(t).select('*').limit(1);
-    if (!e && d) {
-       console.log(`Table ${t} columns:`, d.length > 0 ? Object.keys(d[0]).join(", ") : "empty table");
-    } else {
-       console.log(`Table ${t} error/absent:`, e ? e.message : 'no data');
-    }
-  }
+  const { data } = await supabase.from('safety_notification_history').select('*').limit(1);
+  console.log('Columns:', Object.keys(data?.[0] || {}));
 }
 check();

@@ -28,7 +28,15 @@
     "completed": false
   },
   "/Users/hasuiketomoo/Downloads/fujidenki62D2-J-0030f_web_1952nq3img.pdf": {
-    "last_processed_page": 5,
-    "completed": false
+    "last_processed_page": 664,
+    "completed": true
+  },
+  "/Users/hasuiketomoo/Downloads/naigai0447_20240701.pdf": {
+    "last_processed_page": 688,
+    "completed": true
+  },
+  "/Users/hasuiketomoo/Downloads/mitsubisi-catalog.pdf": {
+    "last_processed_page": 574,
+    "completed": true
   }
 }

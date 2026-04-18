@@ -187,7 +187,7 @@ export default function ReportForm() {
                  .from('daily_reports')
                  .select('progress')
                  .eq('project_id', report.project_id)
-                 .lt('report_date', report.보고日時)
+                 .lt('report_date', `${report.보고日時.split('T')[0]}T00:00:00+09:00`)
                  .order('report_date', { ascending: false })
                  .limit(1)
                  .single();
@@ -318,7 +318,7 @@ export default function ReportForm() {
 
         setReport({
           project_id: rData.project_id || '',
-          보고日時: formatTime(rData.report_date) || format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+          보고日時: formatTime(rData.report_date) || (rData.start_time ? `${rData.start_time.substring(0, 10)}T00:00:00` : format(new Date(), "yyyy-MM-dd'T'HH:mm")),
           作業区分: rData.work_category || '',
           作業開始時間: formatTime(rData.start_time),
           作業終了時間: formatTime(rData.end_time),
@@ -540,7 +540,7 @@ export default function ReportForm() {
         
         const basePayload = {
             project_id: report.project_id,
-            report_date: new Date(report.보고日時).toISOString(),
+            report_date: `${report.보고日時.split('T')[0]}T00:00:00+09:00`,
             work_category: report.作業区分,
             start_time: report.作業開始時間,
             end_time: report.作業終了時間,

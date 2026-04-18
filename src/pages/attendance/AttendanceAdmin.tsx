@@ -35,6 +35,7 @@ interface DailyAttendance {
   clock_in_time?: string | null;
   clock_out_time?: string | null;
   site_declarations?: { project_id: string; project_name: string; start_time: string; end_time: string; role?: string }[];
+  timeline_events?: { time: string; type: string; project_id?: string | null; project_name?: string | null; role?: string | null }[] | null;
 }
 
 interface DraftSite {
@@ -366,14 +367,24 @@ export default function AttendanceAdmin() {
           )
         `)
         .eq('worker_id', workerId)
-        .gte('daily_reports.report_date', startDateStr)
-        .lte('daily_reports.report_date', endDateStr);
+        .gte('daily_reports.report_date', `${startDateStr}T00:00:00+09:00`)
+        .lte('daily_reports.report_date', `${endDateStr}T23:59:59+09:00`);
+
+      // JST日付を確実に取得するユーティリティ（report_dateのタイムゾーンずれを防ぐ）
+      const toJSTDateString = (isoStr: string): string => {
+        const dt = new Date(isoStr);
+        const jst = new Date(dt.getTime() + 9 * 60 * 60 * 1000);
+        const yyyy = jst.getUTCFullYear();
+        const mm = String(jst.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(jst.getUTCDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      };
 
       const projMap: Record<string, {name: string, sStr: string | null, eStr: string | null, reportId?: string, projectId?: string, cn?: string, pName?: string, ord?: string, siteName?: string, category?: string}[]> = {};
       if (reportData) {
         reportData.forEach((r: any) => {
            const rawDateStr = Array.isArray(r.daily_reports) ? r.daily_reports[0]?.report_date : r.daily_reports?.report_date;
-           const d = rawDateStr ? format(new Date(rawDateStr), 'yyyy-MM-dd') : null;
+           const d = rawDateStr ? toJSTDateString(rawDateStr) : null;
            
            // Navigate relationship: daily_reports -> projects
            const _r = Array.isArray(r.daily_reports) ? r.daily_reports[0] : r.daily_reports;
@@ -665,8 +676,7 @@ export default function AttendanceAdmin() {
                      <th className="p-3 border-r w-16 bg-blue-50/50 font-bold text-slate-700">現場出</th>
                      <th className="p-3 border-r min-w-[120px] font-bold text-slate-700 text-left">作業現場名 (日報連携)</th>
                      <th className="p-3 border-r w-16 font-bold text-slate-700 text-center">役割</th>
-                     <th className="p-3 border-r w-16 font-bold text-slate-700">移動</th>
-                     <th className="p-3 border-r w-16 font-bold text-slate-700">準備</th>
+                     <th className="p-3 border-r w-16 font-bold text-slate-700">移動・準備</th>
                      <th className="p-3 border-r w-16 font-bold text-slate-700">雑務</th>
                      <th className="p-3 border-r w-16 font-bold text-slate-700">私用外出</th>
                      <th className="p-3 border-r min-w-[150px] font-bold text-slate-700 text-left">備考</th>
@@ -736,6 +746,9 @@ export default function AttendanceAdmin() {
                           }
                           return false;
                        })();
+
+                       // 日報はあるが勤怠（出退勤時間）が未入力の日を検知
+                       const hasReportButNoAttendance = projs.length > 0 && !record;
 
                        const combinedRecords: any[] = [];
                        projs.forEach((p: any) => {
@@ -833,29 +846,47 @@ export default function AttendanceAdmin() {
                        });
 
                        return (
-                         <tr key={dateStr} className={`border-b hover:bg-slate-50 transition-colors ${isWeekend ? (dow===0?'bg-red-50/20':'bg-blue-50/20') : ''} ${draft ? 'bg-yellow-50/20' : ''}`}>
+                         <tr key={dateStr} className={`border-b hover:bg-slate-50 transition-colors ${isWeekend ? (dow===0?'bg-red-50/20':'bg-blue-50/20') : ''} ${draft ? 'bg-yellow-50/20' : ''} ${hasReportButNoAttendance ? 'bg-orange-50/60' : ''}`}>
                            <td className={`p-2 border-r ${dow===0 ? 'text-red-500 font-bold' : dow===6 ? 'text-blue-500 font-bold' : 'text-slate-700'}`}>
                               {d.getMonth() + 1}/{d.getDate()}
                            </td>
                            <td className={`p-2 border-r ${dow===0 ? 'text-red-500 font-bold' : dow===6 ? 'text-blue-500 font-bold' : 'text-slate-700'}`}>
                               {dowStr}
                            </td>
-                           <td className="p-1 border-r font-medium text-slate-700 hover:bg-slate-100 transition-colors">
-                              <input 
-                                 type="time" 
-                                 value={currentClockIn || ''} 
-                                 onChange={e => handleClockInChange(e.target.value)} 
-                                 className={`w-full text-center bg-transparent outline-none focus:ring-1 focus:ring-blue-500 rounded p-1 ${draft?.clockIn !== undefined ? 'text-amber-600 font-bold bg-amber-50' : ''}`}
-                              />
-                           </td>
-                           <td className="p-1 border-r font-medium text-slate-700 hover:bg-slate-100 transition-colors">
-                              <input 
-                                 type="time" 
-                                 value={currentClockOut || ''} 
-                                 onChange={e => handleClockOutChange(e.target.value)} 
-                                 className={`w-full text-center bg-transparent outline-none focus:ring-1 focus:ring-blue-500 rounded p-1 ${draft?.clockOut !== undefined ? 'text-amber-600 font-bold bg-amber-50' : ''}`}
-                              />
-                           </td>
+                            <td className="p-1 border-r font-medium text-slate-700 align-top pt-2 px-1 min-w-[80px]">
+                               <div className="flex flex-col gap-0.5">
+                                 <div className="flex justify-between items-center text-[11px]">
+                                    <span className="text-[9px] text-slate-400 mr-1">TOT</span>
+                                    <span className="text-slate-500">{formatInputTime(record?.tot_clock_in_time) || <span className="text-slate-300">---</span>}</span>
+                                 </div>
+                                 <div className="flex justify-between items-center border-t border-slate-100 pt-0.5 mt-0.5">
+                                    <span className="text-[9px] text-blue-400 mr-1">本人</span>
+                                    <input
+                                       type="time"
+                                       value={currentClockIn || ''}
+                                       onChange={e => handleClockInChange(e.target.value)}
+                                       className={`w-16 text-center bg-transparent outline-none focus:ring-1 focus:ring-blue-500 rounded text-[11px] font-medium p-0 m-0 ${draft?.clockIn !== undefined ? 'text-amber-600 font-bold bg-amber-50' : 'text-blue-700'}`}
+                                    />
+                                 </div>
+                               </div>
+                            </td>
+                            <td className="p-1 border-r font-medium text-slate-700 align-top pt-2 px-1 min-w-[80px]">
+                               <div className="flex flex-col gap-0.5">
+                                 <div className="flex justify-between items-center text-[11px]">
+                                    <span className="text-[9px] text-slate-400 mr-1">TOT</span>
+                                    <span className="text-slate-500">{formatInputTime(record?.tot_clock_out_time) || <span className="text-slate-300">---</span>}</span>
+                                 </div>
+                                 <div className="flex justify-between items-center border-t border-slate-100 pt-0.5 mt-0.5">
+                                    <span className="text-[9px] text-blue-400 mr-1">本人</span>
+                                    <input
+                                       type="time"
+                                       value={currentClockOut || ''}
+                                       onChange={e => handleClockOutChange(e.target.value)}
+                                       className={`w-16 text-center bg-transparent outline-none focus:ring-1 focus:ring-blue-500 rounded text-[11px] font-medium p-0 m-0 ${draft?.clockOut !== undefined ? 'text-amber-600 font-bold bg-amber-50' : 'text-blue-700'}`}
+                                    />
+                                 </div>
+                               </div>
+                            </td>
                            
                            {/* 現場入 Column */}
                            <td className={`p-2 border-r font-medium align-top pt-2 px-1 text-left min-w-[80px] ${hasOverlap ? "bg-red-50/50 text-slate-700" : "bg-blue-50/10 text-slate-700"}`}>
@@ -964,6 +995,11 @@ export default function AttendanceAdmin() {
                            <td className={`p-2 border-r text-left max-w-[250px] font-medium h-[48px] overflow-hidden align-top pt-2 ${hasOverlap ? "bg-red-50/50 text-red-700" : "text-slate-600"}`}>
                               {combinedRecords.length > 0 ? (
                                  <div className="flex flex-col gap-1 w-full">
+                                    {hasReportButNoAttendance && (
+                                       <div className="h-[20px] bg-orange-500 text-white rounded text-[10px] font-bold flex items-center justify-center shadow-md w-full border border-orange-600 animate-pulse mb-0.5">
+                                          ⚠️ 勤怠未入力
+                                       </div>
+                                    )}
                                     {hasOverlap && (
                                        <div className="h-[20px] bg-red-50 text-red-600 rounded text-[10px] font-bold flex items-center justify-center shadow-sm w-full border border-red-200">
                                           日報重複
@@ -1075,9 +1111,6 @@ export default function AttendanceAdmin() {
                            <td className="p-2 border-r font-medium text-blue-700">
                               {record && record.travel_time_minutes > 0 ? `${record.travel_time_minutes} 分` : <span className="text-slate-300">-</span>}
                            </td>
-                           <td className="p-2 border-r font-medium text-emerald-700">
-                              {record && record.prep_time_minutes > 0 ? `${record.prep_time_minutes} 分` : <span className="text-slate-300">-</span>}
-                           </td>
                            <td className="p-2 border-r font-medium text-purple-700">
                               {record && (record.misc_time_minutes || 0) > 0 ? `${record.misc_time_minutes} 分` : <span className="text-slate-300">-</span>}
                            </td>
@@ -1119,9 +1152,6 @@ export default function AttendanceAdmin() {
                       <td colSpan={8} className="p-3 text-right border-r text-slate-700">月間合計 :</td>
                       <td className="p-3 border-r text-center text-blue-700 text-sm">
                          {records.reduce((acc, r) => acc + (r.travel_time_minutes || 0), 0)} 分
-                      </td>
-                      <td className="p-3 border-r text-center text-emerald-700 text-sm">
-                         {records.reduce((acc, r) => acc + (r.prep_time_minutes || 0), 0)} 分
                       </td>
                       <td className="p-3 border-r text-center text-purple-700 text-sm">
                          {records.reduce((acc, r) => acc + (r.misc_time_minutes || 0), 0)} 分

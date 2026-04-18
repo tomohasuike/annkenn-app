@@ -1,0 +1,191 @@
+{
+  "rules_version": "R6_2024",
+  "branch_protection_rules": {
+    "length_max_3m": { "min_ratio": 0.0 },
+    "length_3m_to_8m": { "min_ratio": 0.35 },
+    "length_over_8m": { "min_ratio": 0.55 }
+  },
+  "motor_rules": [
+    {
+      "min_kW": 0.0,
+      "max_kW": 0.2,
+      "standard_kW": 0.2,
+      "rated_current_A": 1.6,
+      "recommended_breaker_AT": 15,
+      "recommended_cable_sq": 2.0,
+      "starting_methods": {
+        "direct": { "breaker_AT": 15 },
+        "y_delta": { "breaker_AT": null }
+      }
+    },
+    {
+      "min_kW": 0.201,
+      "max_kW": 0.4,
+      "standard_kW": 0.4,
+      "rated_current_A": 2.6,
+      "recommended_breaker_AT": 15,
+      "recommended_cable_sq": 2.0,
+      "starting_methods": {
+        "direct": { "breaker_AT": 15 },
+        "y_delta": { "breaker_AT": null }
+      }
+    },
+    {
+      "min_kW": 0.401,
+      "max_kW": 0.75,
+      "standard_kW": 0.75,
+      "rated_current_A": 4.1,
+      "recommended_breaker_AT": 15,
+      "recommended_cable_sq": 2.0,
+      "starting_methods": {
+        "direct": { "breaker_AT": 15 },
+        "y_delta": { "breaker_AT": null }
+      }
+    },
+    {
+      "min_kW": 0.751,
+      "max_kW": 1.5,
+      "standard_kW": 1.5,
+      "rated_current_A": 7.3,
+      "recommended_breaker_AT": 20,
+      "recommended_cable_sq": 2.0,
+      "starting_methods": {
+        "direct": { "breaker_AT": 20 },
+        "y_delta": { "breaker_AT": null }
+      }
+    },
+    {
+      "min_kW": 1.501,
+      "max_kW": 2.2,
+      "standard_kW": 2.2,
+      "rated_current_A": 10.3,
+      "recommended_breaker_AT": 30,
+      "recommended_cable_sq": 2.0,
+      "starting_methods": {
+        "direct": { "breaker_AT": 30 },
+        "y_delta": { "breaker_AT": null }
+      }
+    },
+    {
+      "min_kW": 2.201,
+      "max_kW": 3.7,
+      "standard_kW": 3.7,
+      "rated_current_A": 15.0,
+      "recommended_breaker_AT": 40,
+      "recommended_cable_sq": 5.5,
+      "starting_methods": {
+        "direct": { "breaker_AT": 40 },
+        "y_delta": { "breaker_AT": 30 }
+      }
+    },
+    {
+      "min_kW": 3.701,
+      "max_kW": 5.5,
+      "standard_kW": 5.5,
+      "rated_current_A": 22.0,
+      "recommended_breaker_AT": 60,
+      "recommended_cable_sq": 5.5,
+      "starting_methods": {
+        "direct": { "breaker_AT": 60 },
+        "y_delta": { "breaker_AT": 40 }
+      }
+    },
+    {
+      "min_kW": 5.501,
+      "max_kW": 7.5,
+      "standard_kW": 7.5,
+      "rated_current_A": 30.0,
+      "recommended_breaker_AT": 75,
+      "recommended_cable_sq": 8.0,
+      "starting_methods": {
+        "direct": { "breaker_AT": 75 },
+        "y_delta": { "breaker_AT": 50 }
+      }
+    },
+    {
+      "min_kW": 7.501,
+      "max_kW": 11.0,
+      "standard_kW": 11.0,
+      "rated_current_A": 44.0,
+      "recommended_breaker_AT": 100,
+      "recommended_cable_sq": 14.0,
+      "starting_methods": {
+        "direct": { "breaker_AT": 100 },
+        "y_delta": { "breaker_AT": 60 }
+      }
+    },
+    {
+      "min_kW": 11.001,
+      "max_kW": 15.0,
+      "standard_kW": 15.0,
+      "rated_current_A": 58.0,
+      "recommended_breaker_AT": 150,
+      "recommended_cable_sq": 22.0,
+      "starting_methods": {
+        "y_delta": { "breaker_AT": 100 }
+      }
+    },
+    {
+      "min_kW": 15.001,
+      "max_kW": 18.5,
+      "standard_kW": 18.5,
+      "rated_current_A": 71.0,
+      "recommended_breaker_AT": 175,
+      "recommended_cable_sq": 38.0,
+      "starting_methods": {
+        "y_delta": { "breaker_AT": 100 }
+      }
+    },
+    {
+      "min_kW": 18.501,
+      "max_kW": 22.0,
+      "standard_kW": 22.0,
+      "rated_current_A": 85.0,
+      "recommended_breaker_AT": 200,
+      "recommended_cable_sq": 38.0,
+      "starting_methods": {
+        "y_delta": { "breaker_AT": 125 }
+      }
+    },
+    {
+      "min_kW": 22.001,
+      "max_kW": 30.0,
+      "standard_kW": 30.0,
+      "rated_current_A": 114.0,
+      "recommended_breaker_AT": 250,
+      "recommended_cable_sq": 60.0,
+      "starting_methods": {
+        "y_delta": { "breaker_AT": 175 }
+      }
+    },
+    {
+      "min_kW": 30.001,
+      "max_kW": 37.0,
+      "standard_kW": 37.0,
+      "rated_current_A": 140.0,
+      "recommended_breaker_AT": 300,
+      "recommended_cable_sq": 100.0,
+      "starting_methods": {
+        "y_delta": { "breaker_AT": 200 }
+      }
+    }
+  ],
+  "lighting_cable_ampacity": {
+    "IV_30C": {
+      "2.0": 27,
+      "3.5": 37,
+      "5.5": 49,
+      "8.0": 61,
+      "14.0": 88
+    },
+    "EM-IE_40C": {
+      "2.0": 27,
+      "3.5": 37,
+      "5.5": 49,
+      "8.0": 61,
+      "14.0": 88,
+      "22.0": 115,
+      "38.0": 162
+    }
+  }
+}

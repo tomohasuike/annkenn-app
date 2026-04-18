@@ -155,8 +155,8 @@ export function useWorkSummary() {
         `);
 
       if (!isAllTime) {
-        query = query.gte('report_date', `${startDate}T00:00:00`)
-                     .lte('report_date', `${endDate}T23:59:59`);
+        query = query.gte('report_date', `${startDate}T00:00:00+09:00`)
+                     .lte('report_date', `${endDate}T23:59:59+09:00`);
       }
       
       if (projectId) {

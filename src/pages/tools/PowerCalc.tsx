@@ -1,12 +1,13 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { NumpadModal } from '../../components/ui/NumpadModal';
-import { Trash2, Settings2, List, PlusCircle, Save, ChevronLeft, Zap, FileSpreadsheet, X, Calculator, Bot, Check, Menu, Lock, Loader2 } from 'lucide-react';
+import { Trash2, Settings2, List, PlusCircle, Save, ChevronLeft, Zap, FileSpreadsheet, X, Calculator, Bot, Check, Menu, Lock, Loader2, CheckCircle2, CloudOff } from 'lucide-react';
 import PowerReportPreview from '../../components/PowerReportPreview';
 import { calculateTrunkAllowableCurrent } from '../../constants/wiringStandards';
 import { CalcEngine } from '../../utils/calcEngine';
 import type { CalcLoad } from '../../utils/calcEngine';
+import { addBoardToPortalTree, fetchParentNodes, moveNodeToNewParent } from '../../utils/syncPortalTree';
 
 // データの型定義 (CalcLoadを拡張)
 interface MotorLoad extends Omit<CalcLoad, 'equipment_type'> {
@@ -16,6 +17,7 @@ interface MotorLoad extends Omit<CalcLoad, 'equipment_type'> {
   breakerType: 'MCCB' | 'ELCB';
   is_verified?: boolean;
   symbol?: string;
+  phase?: '3P' | '1P'; // 接続方式: 三相(3P) / 単相(1P)
 }
 
 const generateId = () => crypto.randomUUID();
@@ -30,8 +32,13 @@ export default function PowerCalc() {
   const loadId = searchParams.get('load_id');
 
   const [savedBoards, setSavedBoards] = useState<any[]>([]);
-  const [currentBoardId, setCurrentBoardId] = useState<string | null>(loadId || (targetTreeNodeId && targetTreeNodeId !== 'undefined' ? targetTreeNodeId : null));
+  const [currentBoardId, setCurrentBoardId] = useState<string | null>(loadId || null);
+  const [treeNodeId, setTreeNodeId] = useState<string | null>(targetTreeNodeId && targetTreeNodeId !== 'undefined' ? targetTreeNodeId : null);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('saved');
+  const isDataLoaded = useRef(false);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [parentNodes, setParentNodes] = useState<{id: string; name: string; type: string; depth: number}[]>([]);
   const [popupMessage, setPopupMessage] = useState<{title: string, message: string} | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<{ id: string, name: string } | null>(null);
   
@@ -72,20 +79,63 @@ export default function PowerCalc() {
   const [title, setTitle] = useState('動力盤-1');
   const [voltage, setVoltage] = useState<'200V' | '400V'>('200V');
   const [demandFactor, setDemandFactor] = useState(100); 
+
+  // 列幅リサイズ―各列のpx幅をステートで管理
+  const [colWidths, setColWidths] = useState<Record<string, number>>({
+    name: 280,
+    phase: 64,
+    operation: 88,
+    starting: 110,
+    kw: 80,
+    wire: 56,
+    current: 80,
+    cable: 64,
+    breaker: 96,
+    override: 76,
+  });
+  const resizingRef = useRef<{ col: string; startX: number; startW: number } | null>(null);
+
+  const handleResizeStart = useCallback((col: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingRef.current = { col, startX: e.clientX, startW: colWidths[col] };
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = ev.clientX - resizingRef.current.startX;
+      const newW = Math.max(40, resizingRef.current.startW + delta);
+      setColWidths(prev => ({ ...prev, [resizingRef.current!.col]: newW }));
+    };
+    const onUp = () => {
+      resizingRef.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [colWidths]);
+
+  // テーブル全体の幅 = 全列合計 + 設定アイコン列(40px)
+  const tableWidth = Object.values(colWidths).reduce((s, v) => s + v, 0) + 40;
   
-  const [loads, setLoads] = useState<MotorLoad[]>([
-    { id: generateId(), symbol: 'SF-1', name: '送風機1', kw: 3.7, starting_method: 'direct', wireLength: 20, voltageDropLimit: 2, breakerType: 'MCCB', capacity_kw: 3.7, is_existing: false, operation_mode: 'simultaneous' },
-    { id: generateId(), symbol: 'P-1', name: 'ポンプ1', kw: 7.5, starting_method: 'star_delta', wireLength: 30, voltageDropLimit: 2, breakerType: 'ELCB', capacity_kw: 7.5, is_existing: false, operation_mode: 'alternating', interlock_group_id: 'pump_group' },
-    { id: generateId(), symbol: 'P-2', name: '予備ポンプ', kw: 7.5, starting_method: 'star_delta', wireLength: 35, voltageDropLimit: 2, breakerType: 'ELCB', capacity_kw: 7.5, is_existing: false, operation_mode: 'alternating', interlock_group_id: 'pump_group' }
-  ]);
+  const [loads, setLoads] = useState<MotorLoad[]>([]); // 新規は空の状態で開始
 
   useEffect(() => {
     loadBoardsList();
   }, [projectId]);
 
+  // 自動保存（1500ms debounce）
+  useEffect(() => {
+    if (!isDataLoaded.current) return;
+    if (isSaving) return; // 保存中はスキップ（二重保存防止）
+    setSaveStatus('idle');
+    const timeoutId = setTimeout(() => {
+      saveBoard(true);
+    }, 1500);
+    return () => clearTimeout(timeoutId);
+  }, [title, voltage, demandFactor, loads]);
+
   const loadBoardsList = async () => {
     let query = supabase.from('calc_panels')
-      .select('id, name')
+      .select('id, name, tree_node_id')
       .eq('panel_type', 'POWER')
       .order('created_at', { ascending: false });
 
@@ -102,8 +152,14 @@ export default function PowerCalc() {
       if (loadId && !currentBoardId) {
          await loadBoard(loadId, data.find((b: any) => b.id === loadId)?.name);
       } else if (targetTreeNodeId && !currentBoardId) {
-         createNewBoard();
-         if (initialName) setTitle(initialName);
+         // treeNodeId一致の盤があればロード、なければ新規作成
+         const matchingBoard = data.find((b: any) => b.tree_node_id === targetTreeNodeId);
+         if (matchingBoard) {
+           await loadBoard(matchingBoard.id, matchingBoard.name);
+         } else {
+           createNewBoard();
+           if (initialName) setTitle(initialName);
+         }
       } else if (!currentBoardId && data.length > 0) {
          await loadBoard(data[0].id, data[0].name);
       }
@@ -119,6 +175,26 @@ export default function PowerCalc() {
       if (panelData.name) setTitle(panelData.name);
       if (panelData.voltage_system) setVoltage(panelData.voltage_system === '3Φ3W 400V' ? '400V' : '200V');
       if (panelData.reduction_factor) setDemandFactor(panelData.reduction_factor * 100);
+      // ツリーノードIDをstateに反映
+      const existingTreeNodeId = panelData.tree_node_id || null;
+      setTreeNodeId(existingTreeNodeId);
+
+      // tree_node_idがnull（未連携）の場合はポータルに自動追加
+      if (!existingTreeNodeId && projectId) {
+        const newTreeNodeId = await addBoardToPortalTree({
+          projectId,
+          boardName: panelData.name || '動力盤',
+          panelType: 'POWER',
+        });
+        if (newTreeNodeId) {
+          setTreeNodeId(newTreeNodeId);
+          await supabase.from('calc_panels').update({ tree_node_id: newTreeNodeId }).eq('id', id);
+        }
+      }
+
+      // データロード完了フラグ
+      isDataLoaded.current = true;
+      setSaveStatus('saved');
 
       const { data: loadsData } = await supabase.from('calc_loads').select('*').eq('panel_id', id).order('circuit_no', { ascending: true });
       if (loadsData && loadsData.length > 0) {
@@ -140,21 +216,47 @@ export default function PowerCalc() {
     }
   };
 
-  const createNewBoard = () => {
-    setCurrentBoardId(null);
-    setTitle('新規動力盤');
-    setLoads([{ id: generateId(), symbol: 'P-1', name: 'ポンプ1', kw: 2.2, starting_method: 'direct', wireLength: 20, voltageDropLimit: 2, breakerType: 'MCCB', capacity_kw: 2.2, is_existing: false, operation_mode: 'simultaneous' }]);
-    setDemandFactor(100);
-    // URLのload_idをクリア
-    if (loadId) {
-      const newParams = new URLSearchParams(searchParams);
-      newParams.delete('load_id');
-      setSearchParams(newParams, { replace: true });
+  const createNewBoard = async () => {
+    try {
+      // 新規盤なので既存のtreeNodeIdを引き継がず、必ず新規ノードをポータルに追加する
+      let newTreeNodeId: string | null = null;
+      if (projectId) {
+        newTreeNodeId = await addBoardToPortalTree({
+          projectId,
+          boardName: '新規動力盤',
+          panelType: 'POWER',
+        });
+        setTreeNodeId(newTreeNodeId);
+      } else {
+        setTreeNodeId(null);
+      }
+
+      const newPanelData = {
+        project_id: projectId,
+        name: '新規動力盤',
+        panel_type: 'POWER',
+        voltage_system: '3Φ3W 200V',
+        reduction_factor: 1.0,
+        tree_node_id: newTreeNodeId,
+      };
+      const { data, error } = await supabase.from('calc_panels').insert([newPanelData]).select().single();
+      if (error) throw error;
+
+      const newPanelId = data.id;
+
+      // デフォルト負荷は作成しない（空の状態で開始）
+
+      await loadBoardsList(newPanelId);
+      await loadBoard(newPanelId, '新規動力盤');
+      setIsPanelListOpen(true);
+    } catch (e: any) {
+      setPopupMessage({ title: 'エラー', message: '盤の作成に失敗しました: ' + e.message });
     }
   };
 
-  const saveBoard = async () => {
+  const saveBoard = async (isAutoSave = false) => {
     setIsSaving(true);
+    setSaveStatus('saving');
     try {
       let panelId = currentBoardId;
       
@@ -164,6 +266,7 @@ export default function PowerCalc() {
          panel_type: 'POWER',
          voltage_system: voltage === '400V' ? '3Φ3W 400V' : '3Φ3W 200V',
          reduction_factor: demandFactor / 100.0,
+         tree_node_id: treeNodeId,
       };
 
       if (panelId) {
@@ -182,7 +285,6 @@ export default function PowerCalc() {
          await supabase.from('calc_loads').delete().eq('panel_id', panelId);
 
          const insertLoads = loads.map((l, idx) => ({
-            id: l.id,
             panel_id: panelId,
             circuit_no: idx + 1,
             symbol: l.symbol || null,
@@ -201,7 +303,10 @@ export default function PowerCalc() {
          if (loadError) throw loadError;
       }
 
-      setPopupMessage({ title: "保存完了", message: currentBoardId ? "上書き保存しました。" : "新しく保存しました。" });
+      if (!isAutoSave) {
+        setPopupMessage({ title: "保存完了", message: currentBoardId ? "上書き保存しました。" : "新しく保存しました。" });
+      }
+      setSaveStatus('saved');
       await loadBoardsList();
     } catch (e: any) {
       console.error(e);
@@ -214,11 +319,21 @@ export default function PowerCalc() {
   const deleteBoard = async (id: string) => {
     try {
       await supabase.from('calc_panels').delete().eq('id', id);
-      if (currentBoardId === id) createNewBoard();
-      await loadBoardsList();
+
+      const remaining = savedBoards.filter((b: any) => b.id !== id);
+      setSavedBoards(remaining);
       setConfirmDeleteId(null);
+
+      if (currentBoardId === id) {
+        setCurrentBoardId(null);
+        setLoads([]);
+        setTitle('新規動力盤');
+        if (remaining.length > 0) {
+          await loadBoard(remaining[0].id, remaining[0].name);
+        }
+      }
     } catch (e: any) {
-      setPopupMessage({ title: "エラー", message: "削除に失敗しました" });
+      setPopupMessage({ title: 'エラー', message: '削除に失敗しました' });
     }
   };
 
@@ -226,10 +341,12 @@ export default function PowerCalc() {
   const calculatedLoads = useMemo(() => {
     return loads.map(load => {
       // エンジンに渡すためにフォーマット
+      // ヒーター（抵抗負荷）かモーター（誘導負荷）かをstarting_methodで判別
+      const isHeater = load.starting_method === 'heater';
       const engineLoad: CalcLoad = {
         name: load.name,
         capacity_kw: load.kw,
-        equipment_type: 'motor',
+        equipment_type: isHeater ? 'heater' : 'motor', // 力率に応じて設備種別を設定
         starting_method: load.starting_method,
         is_existing: load.is_existing,
         operation_mode: load.operation_mode,
@@ -240,8 +357,23 @@ export default function PowerCalc() {
       const breakerStr = calcResult.calculated_breaker_size || '0AT';
       const breakerInt = parseInt(breakerStr.replace('AT', '')) || 0;
 
-      // 概算電流計算（従来の簡易版）
-      const currentA = load.kw * 4.5;
+      // 推定電流計算: 三相/単相・モーター/ヒーター で力率と計算式を切り替え
+      const is1Phase = load.phase === '1P';
+      const currentA = (() => {
+        const kW = load.kw;
+        const V = 200;
+        if (isHeater) {
+          // ヒーター: cosφ=1.0, 純抵抗
+          return is1Phase
+            ? (kW * 1000) / (V * 1.0)         // 単相: I=P/(V×1)
+            : (kW * 1000) / (1.732 * V * 1.0); // 三相: I=P/(√3×V×1)
+        } else {
+          // モーター: cosφ≈0.85, 誘導負荷
+          return is1Phase
+            ? (kW * 1000) / (V * 0.85)         // 単相: I=P/(V×cosφ)
+            : (kW * 1000) / (1.732 * V * 0.85); // 三相: I=P/(√3×V×cosφ) ≈ kW×3.40
+        }
+      })();
       
       return {
         ...load,
@@ -290,7 +422,7 @@ export default function PowerCalc() {
   const addLoad = () => {
     setLoads([...loads, { 
       id: generateId(), name: `新規負荷${loads.length + 1}`, kw: 2.2, capacity_kw: 2.2,
-      starting_method: 'direct', wireLength: 15, voltageDropLimit: 2,
+      starting_method: 'direct', phase: '3P', wireLength: 15, voltageDropLimit: 2,
       breakerType: 'MCCB', is_existing: false, operation_mode: 'simultaneous'
     }]);
   };
@@ -458,7 +590,7 @@ export default function PowerCalc() {
                     <span className="truncate flex-1">{board.name || '無題の動力盤'}</span>
                   </div>
                   <span className="text-[10px] opacity-60">
-                    {new Date(board.updated_at).toLocaleDateString()}
+                    {board.updated_at ? new Date(board.updated_at).toLocaleDateString() : ''}
                   </span>
                 </div>
               </button>
@@ -471,7 +603,58 @@ export default function PowerCalc() {
             </div>
           ))}
         </div>
+        {currentBoardId && treeNodeId && projectId && (
+          <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950">
+            <button
+              onClick={async () => {
+                const nodes = await fetchParentNodes(projectId);
+                setParentNodes(nodes);
+                setShowMoveModal(true);
+              }}
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-3 py-2 rounded transition-colors border border-slate-200 dark:border-slate-700"
+            >
+              📍 系統図の位置を変更
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* 位置変更モーダル */}
+      {showMoveModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-6 max-w-sm w-full border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">系統図の配置を変更</h3>
+            <p className="text-xs text-slate-500 mb-4">この盤をどの親盤の下に移動しますか？</p>
+            <div className="space-y-1 max-h-64 overflow-y-auto mb-4">
+              {parentNodes.filter(n => n.id !== treeNodeId).map(node => (
+                <button
+                  key={node.id}
+                  onClick={async () => {
+                    if (!projectId || !treeNodeId) return;
+                    const ok = await moveNodeToNewParent({ projectId, targetNodeId: treeNodeId, newParentId: node.id });
+                    if (ok) {
+                      setPopupMessage({ title: '移動完了', message: `「${node.name}」の下に移動しました。` });
+                    } else {
+                      setPopupMessage({ title: 'エラー', message: '移動に失敗しました。' });
+                    }
+                    setShowMoveModal(false);
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors border border-transparent hover:border-blue-200"
+                  style={{ paddingLeft: `${(node.depth * 16) + 12}px` }}
+                >
+                  <span className="text-slate-400 mr-1">{['🏢','⚡','🔴','💡'][Math.min(node.depth, 3)]}</span>
+                  {node.name}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end">
+              <button onClick={() => setShowMoveModal(false)} className="px-4 py-2 text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg">
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 右側の計算書メインエリア */}
       <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-white dark:bg-[#0B1120]">
@@ -503,15 +686,20 @@ export default function PowerCalc() {
                 <p className="text-sm text-slate-500 mt-1">電線の太さから主幹ブレーカーまでを一瞬で自動設計（内線規程・東電公式準拠）</p>
               </div>
             </div>
-            <div className="flex gap-3 w-full sm:w-auto mt-2 sm:mt-0">
-              <button 
-                onClick={saveBoard}
-                disabled={isSaving}
-                className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors"
-              >
-                <Save className="w-4 h-4" />
-                {isSaving ? '保存中...' : 'クラウド保存'}
-              </button>
+            <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto mt-2 sm:mt-0">
+              {saveStatus === 'saving' ? (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 rounded-lg border border-blue-100">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />保存中...
+                </span>
+              ) : saveStatus === 'saved' ? (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 rounded-lg border border-emerald-100">
+                  <CheckCircle2 className="w-3.5 h-3.5" />保存完了
+                </span>
+              ) : saveStatus === 'error' ? (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 rounded-lg border border-red-100">
+                  <CloudOff className="w-3.5 h-3.5" />保存失敗
+                </span>
+              ) : null}
               <button 
                 onClick={() => setShowImport(true)}
                 className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors"
@@ -557,25 +745,53 @@ export default function PowerCalc() {
           {/* メインテーブル */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
+              <table className="text-sm text-left" style={{ tableLayout: 'fixed', width: tableWidth }}>
                 <thead className="text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-800/50 uppercase border-b border-slate-200 dark:border-slate-800">
                   <tr>
-                    <th className="px-4 py-3 font-semibold min-w-[280px] whitespace-nowrap sticky left-0 z-20 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] select-none">
+                    {/* 負荷記号・名称列（リサイズ対応） */}
+                    <th
+                      style={{ width: colWidths.name, minWidth: 160 }}
+                      className="relative px-4 py-3 font-semibold whitespace-nowrap sticky left-0 z-20 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] select-none"
+                    >
                       <div className="flex items-center gap-2">
                         <span title="既設ロック"><Lock className="w-3.5 h-3.5 text-blue-600" /></span>
                         <span className="w-20">負荷記号</span>
                         <span>負荷名称</span>
                       </div>
+                      <div
+                        onMouseDown={(e) => handleResizeStart('name', e)}
+                        className="absolute right-0 top-0 h-full w-2 cursor-col-resize group/resizer flex items-center justify-center z-10"
+                      >
+                        <div className="w-0.5 h-4 bg-slate-300 dark:bg-slate-600 rounded group-hover/resizer:bg-blue-500 transition-colors" />
+                      </div>
                     </th>
-                    <th className="px-3 py-3 font-semibold w-24 text-center whitespace-nowrap">制御モード</th>
-                    <th className="px-3 py-3 font-semibold w-24 whitespace-nowrap">始動方式</th>
-                    <th className="px-3 py-3 font-semibold w-20 whitespace-nowrap">容量(kW)</th>
-                    <th className="px-3 py-3 font-semibold w-16 text-center whitespace-nowrap">配線長(m)</th>
-                    <th className="px-3 py-3 font-semibold bg-gray-50 dark:bg-slate-800/70 text-right w-16 whitespace-nowrap">推定電流(A)</th>
-                    <th className="px-3 py-3 font-semibold bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 w-16 text-center whitespace-nowrap">電線(sq)</th>
-                    <th className="px-3 py-3 font-semibold bg-blue-50/60 dark:bg-blue-900/30 text-blue-800 text-center whitespace-nowrap">推奨ブレーカ</th>
-                    <th className="px-3 py-3 font-semibold w-20 text-blue-800 text-center whitespace-nowrap">オーバーライド</th>
-                    <th className="px-2 py-3 w-10 text-center whitespace-nowrap"><Settings2 className="w-4 h-4 mx-auto text-slate-400" /></th>
+                    {([
+                      { key: 'phase',     label: '接続',       cls: 'text-center' },
+                      { key: 'operation', label: '制御モード',  cls: 'text-center' },
+                      { key: 'starting',  label: '始動方式',   cls: '' },
+                      { key: 'kw',        label: '容量(kW)',   cls: '' },
+                      { key: 'wire',      label: '配線長(m)',  cls: 'text-center' },
+                      { key: 'current',   label: '推定電流(A)', cls: 'bg-gray-50 dark:bg-slate-800/70 text-right' },
+                      { key: 'cable',     label: '電線(sq)',   cls: 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 text-center' },
+                      { key: 'breaker',   label: '推奨ブレーカ', cls: 'bg-blue-50/60 dark:bg-blue-900/30 text-blue-800 text-center' },
+                      { key: 'override',  label: '手動(AT)',   cls: 'text-blue-800 text-center' },
+                    ] as const).map(({ key, label, cls }) => (
+                      <th
+                        key={key}
+                        style={{ width: colWidths[key], minWidth: 40 }}
+                        className={`relative py-3 font-semibold whitespace-nowrap select-none ${cls}`}
+                      >
+                        <span className="px-2">{label}</span>
+                        {/* リサイズハンドル */}
+                        <div
+                          onMouseDown={(e) => handleResizeStart(key, e)}
+                          className="absolute right-0 top-0 h-full w-2 cursor-col-resize group/resizer flex items-center justify-center z-10"
+                        >
+                          <div className="w-0.5 h-4 bg-slate-300 dark:bg-slate-600 rounded group-hover/resizer:bg-blue-500 transition-colors" />
+                        </div>
+                      </th>
+                    ))}
+                    <th className="px-1 py-3 w-10 text-center whitespace-nowrap"><Settings2 className="w-4 h-4 mx-auto text-slate-400" /></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -614,7 +830,19 @@ export default function PowerCalc() {
                           {load.operation_mode === 'alternating' && <span className="absolute bottom-1 left-12 text-[9px] text-orange-500 font-bold mt-0.5 truncate pointer-events-none">※交互運転グループ（特例圧縮）</span>}
                         </div>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-2 py-2 text-center">
+                        <select
+                          value={load.phase || '3P'}
+                          onChange={(e) => updateLoad(load.id as string, 'phase', e.target.value)}
+                          className={`bg-slate-100 dark:bg-slate-800 border-0 text-[12px] font-bold rounded px-2 py-1 w-full cursor-pointer h-7 ${
+                            load.phase === '1P' ? 'text-purple-700 bg-purple-50 dark:text-purple-300 dark:bg-purple-900/40' : 'text-slate-600 dark:text-slate-300'
+                          }`}
+                        >
+                          <option value="3P">3Φ</option>
+                          <option value="1P">1Φ</option>
+                        </select>
+                      </td>
+                      <td className="px-2 py-2">
                         <select 
                           value={load.operation_mode}
                           onChange={(e) => updateLoad(load.id as string, 'operation_mode', e.target.value)}
@@ -624,7 +852,7 @@ export default function PowerCalc() {
                           <option value="alternating">交互 / 予備</option>
                         </select>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-2 py-2">
                         <select 
                           value={load.starting_method}
                           onChange={(e) => updateLoad(load.id as string, 'starting_method', e.target.value)}
@@ -633,9 +861,10 @@ export default function PowerCalc() {
                           <option value="direct">直入 (6倍)</option>
                           <option value="star_delta">Y-Δ (2倍)</option>
                           <option value="inverter">インバータ</option>
+                          <option value="heater">ヒーター</option>
                         </select>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-2 py-2">
                           <input 
                             type="number" 
                             step="0.1"
@@ -645,19 +874,19 @@ export default function PowerCalc() {
                             className="w-16 bg-transparent text-sm font-black border border-transparent focus:bg-white focus:border-blue-500 rounded px-2 py-1 text-slate-800 dark:text-slate-100"
                           />
                       </td>
-                      <td className="px-3 py-2 text-center">
+                      <td className="px-2 py-2 text-center">
                         <input 
                            type="number" 
                            value={load.wireLength || ''}
                            onKeyDown={(e) => handleKeyDown(e, index, 'length')}
                            onChange={(e) => updateLoad(load.id as string, 'wireLength', Number(e.target.value))}
-                           className="w-14 text-center bg-transparent text-sm border border-transparent focus:bg-white focus:border-blue-500 rounded px-1 py-1 dark:text-slate-100" 
+                           className="w-12 text-center bg-transparent text-sm border border-transparent focus:bg-white focus:border-blue-500 rounded px-1 py-1 dark:text-slate-100" 
                         />
                       </td>
-                      <td className="px-3 py-2 bg-slate-50/50 dark:bg-slate-800/10 text-right font-medium text-slate-600 dark:text-slate-400">
+                      <td className="px-2 py-2 bg-slate-50/50 dark:bg-slate-800/10 text-right font-medium text-slate-600 dark:text-slate-400">
                         {load.currentA?.toFixed(1)} <span className="text-[10px]">A</span>
                       </td>
-                      <td className="px-3 py-2 bg-indigo-50/30 dark:bg-indigo-900/10 text-center font-bold text-indigo-700 dark:text-indigo-400 border-x border-white dark:border-slate-900">
+                      <td className="px-2 py-2 bg-indigo-50/30 dark:bg-indigo-900/10 text-center font-bold text-indigo-700 dark:text-indigo-400 border-x border-white dark:border-slate-900">
                         {load.wireSq} <span className="text-[10px]">sq</span>
                       </td>
                       

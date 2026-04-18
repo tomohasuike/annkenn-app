@@ -79,74 +79,76 @@ export default function TimelineModal({
     let initialEvents: TimelineEvent[] = [];
     
     if (existingRecord) {
-        const ci = formatTime(existingRecord.clock_in_time);
-        if (ci) initialEvents.push({ id: crypto.randomUUID(), time: ci, type: 'clock_in' });
-        
-        let decls = [...(existingRecord.site_declarations || [])].sort((a:any,b:any) => (a.start_time || '').localeCompare(b.start_time || ''));
-        const assignedForDate = assignedProjectsForDate || [];
-        const isAllImported = decls.length > 0 && decls.every(p => p.project_id === 'imported' || p.project_id === 'unassigned');
-        
-        if (isAllImported && assignedForDate.length > 0) {
-             const originalTimes = { 
-                 start: decls[0]?.start_time || '08:00',
-                 end: decls[decls.length - 1]?.end_time || '17:00' 
-             };
-             decls = assignedForDate.map(ap => ({
-                   project_id: ap.project_id,
-                   project_name: ap.project_name,
-                   start_time: originalTimes.start,
-                   end_time: originalTimes.end,
-                   role: '一般'
-             }));
-        } else if (isAllImported) {
-             decls = [];
-        }
+        // timeline_eventsが保存済みであれば推測不要・直接復元
+        if (existingRecord.timeline_events && Array.isArray(existingRecord.timeline_events) && existingRecord.timeline_events.length > 0) {
+            initialEvents = existingRecord.timeline_events.map((ev: any) => ({
+                id: crypto.randomUUID(),
+                time: ev.time || '',
+                type: ev.type as TimelineEvent['type'],
+                project_id: ev.project_id || undefined,
+                project_name: ev.project_name || undefined,
+                role: ev.role || undefined
+            }));
+        } else {
+            // 旧データ用：ヒューリスティック復元（後方互換）
+            const ci = formatTime(existingRecord.clock_in_time);
+            if (ci) initialEvents.push({ id: crypto.randomUUID(), time: ci, type: 'clock_in' });
+            
+            let decls = [...(existingRecord.site_declarations || [])].sort((a:any,b:any) => (a.start_time || '').localeCompare(b.start_time || ''));
+            const assignedForDate = assignedProjectsForDate || [];
+            const isAllImported = decls.length > 0 && decls.every(p => p.project_id === 'imported' || p.project_id === 'unassigned');
+            
+            if (isAllImported && assignedForDate.length > 0) {
+                 const originalTimes = { 
+                     start: decls[0]?.start_time || '08:00',
+                     end: decls[decls.length - 1]?.end_time || '17:00' 
+                 };
+                 decls = assignedForDate.map(ap => ({
+                       project_id: ap.project_id,
+                       project_name: ap.project_name,
+                       start_time: originalTimes.start,
+                       end_time: originalTimes.end,
+                       role: '一般'
+                 }));
+            } else if (isAllImported) {
+                 decls = [];
+            }
 
-        let lastEnd = ci;
-        let remainingPrep = existingRecord.prep_time_minutes || 0;
-        let remainingMisc = existingRecord.misc_time_minutes || 0;
+            let lastEnd = ci;
+            let remainingMisc = existingRecord.misc_time_minutes || 0;
 
-        const toMins = (hhmm: string | null | undefined) => {
-            if (!hhmm) return 0;
-            const [h, m] = hhmm.split(':').map(Number);
-            return (h * 60) + (m || 0);
-        };
+            const toMins = (hhmm: string | null | undefined) => {
+                if (!hhmm) return 0;
+                const [h, m] = hhmm.split(':').map(Number);
+                return (h * 60) + (m || 0);
+            };
 
-        for (const d of decls) {
-             if (d.start_time) {
-                 if (lastEnd && lastEnd !== d.start_time) {
-                     const diffMins = toMins(d.start_time) - toMins(lastEnd);
-                     let gapType: 'travel' | 'prep' | 'misc' = 'travel';
-                     if (diffMins > 0) {
-                         if (remainingPrep === diffMins) { gapType = 'prep'; remainingPrep -= diffMins; }
-                         else if (remainingMisc === diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
-                         else if (remainingPrep > 0 && remainingPrep >= diffMins) { gapType = 'prep'; remainingPrep -= diffMins; }
-                         else if (remainingMisc > 0 && remainingMisc >= diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
+            for (const d of decls) {
+                 if (d.start_time) {
+                     if (lastEnd && lastEnd !== d.start_time) {
+                         const diffMins = toMins(d.start_time) - toMins(lastEnd);
+                         let gapType: 'travel' | 'misc' = 'travel';
+                         if (diffMins > 0 && remainingMisc >= diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
+                         initialEvents.push({ id: crypto.randomUUID(), time: lastEnd, type: gapType });
                      }
+                     initialEvents.push({
+                         id: crypto.randomUUID(), time: d.start_time, type: 'site_work',
+                         project_id: d.project_id, project_name: d.project_name, role: d.role || '一般'
+                     });
+                     lastEnd = d.end_time;
+                 }
+            }
+            
+            const co = formatTime(existingRecord.clock_out_time);
+            if (co) {
+                 if (lastEnd && lastEnd !== co) {
+                     const diffMins = toMins(co) - toMins(lastEnd);
+                     let gapType: 'travel' | 'misc' = 'travel';
+                     if (diffMins > 0 && remainingMisc >= diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
                      initialEvents.push({ id: crypto.randomUUID(), time: lastEnd, type: gapType });
                  }
-                 initialEvents.push({
-                     id: crypto.randomUUID(), time: d.start_time, type: 'site_work',
-                     project_id: d.project_id, project_name: d.project_name, role: d.role || '一般'
-                 });
-                 lastEnd = d.end_time;
-             }
-        }
-        
-        const co = formatTime(existingRecord.clock_out_time);
-        if (co) {
-             if (lastEnd && lastEnd !== co) {
-                 const diffMins = toMins(co) - toMins(lastEnd);
-                 let gapType: 'travel' | 'prep' | 'misc' = 'travel';
-                 if (diffMins > 0) {
-                     if (remainingPrep === diffMins) { gapType = 'prep'; remainingPrep -= diffMins; }
-                     else if (remainingMisc === diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
-                     else if (remainingPrep > 0 && remainingPrep >= diffMins) { gapType = 'prep'; remainingPrep -= diffMins; }
-                     else if (remainingMisc > 0 && remainingMisc >= diffMins) { gapType = 'misc'; remainingMisc -= diffMins; }
-                 }
-                 initialEvents.push({ id: crypto.randomUUID(), time: lastEnd, type: gapType });
-             }
-             initialEvents.push({ id: crypto.randomUUID(), time: co, type: 'clock_out' });
+                 initialEvents.push({ id: crypto.randomUUID(), time: co, type: 'clock_out' });
+            }
         }
         
         setPersonalOuts(existingRecord.personal_outs || []);
@@ -183,7 +185,7 @@ export default function TimelineModal({
           case 'clock_out': return 'bg-amber-100/50 text-amber-800 border-amber-200';
           case 'site_work': return 'bg-blue-50 text-blue-900 border-blue-200';
           case 'travel': return 'bg-slate-50 text-slate-700 border-slate-200';
-          case 'prep': return 'bg-emerald-50 text-emerald-800 border-emerald-200';
+          case 'prep': return 'bg-slate-50 text-slate-700 border-slate-200'; // 旧データ互換 - travelと同じ色
           default: return 'bg-white';
       }
   };
@@ -194,7 +196,7 @@ export default function TimelineModal({
           case 'clock_out': return 'bg-red-500';
           case 'site_work': return 'bg-blue-500';
           case 'travel': return 'bg-slate-400';
-          case 'prep': return 'bg-emerald-400';
+          case 'prep': return 'bg-slate-400'; // 旧データ互換
           default: return 'bg-slate-400';
       }
   };
@@ -332,7 +334,7 @@ export default function TimelineModal({
     let clock_in_time = null;
     let clock_out_time = null;
     let travel_time_minutes = 0;
-    let prep_time_minutes = 0;
+    // prep_time_minutes は travel に統合済み（DB列はゼロ固定で保持）
     let misc_time_minutes = 0;
     const site_declarations: any[] = [];
     
@@ -363,9 +365,7 @@ export default function TimelineModal({
             const prev = validEvents[i-1];
             const diffMins = toMins(ev.time) - toMins(prev.time);
             
-            if (prev.type === 'clock_in' || prev.type === 'prep') {
-                prep_time_minutes += diffMins;
-            } else if (prev.type === 'travel') {
+            if (prev.type === 'travel' || prev.type === 'prep') {
                 travel_time_minutes += diffMins;
             } else if (prev.type === 'misc') {
                 misc_time_minutes += diffMins;
@@ -392,18 +392,28 @@ export default function TimelineModal({
       });
     }
 
+    // タイムライン全体をJSONとして保存（再表示時に正確に復元するため）
+    const timeline_events_payload = validEvents.map(ev => ({
+      time: ev.time,
+      type: ev.type,
+      project_id: ev.project_id || null,
+      project_name: ev.project_name || null,
+      role: ev.role || null
+    }));
+
     const payload = {
       worker_id: workerId,
       target_date: selectedDate,
       clock_in_time,
       clock_out_time,
-      prep_time_minutes,
+      prep_time_minutes: 0, // 移動に統合済み
       travel_time_minutes,
       misc_time_minutes,
       personal_out_minutes: totalPrivateOutMins,
       personal_outs: personalOuts,
       memo: memo,
       site_declarations,
+      timeline_events: timeline_events_payload,
       role: site_declarations.length > 0 ? (site_declarations.some(d => d.role === '職長') ? '職長' : '一般') : '一般'
     };
 
@@ -487,8 +497,8 @@ export default function TimelineModal({
                                         disabled={readOnly}
                                         className="w-full h-10 rounded-md border-0 ring-1 ring-slate-300 font-bold text-sm px-3 shadow-inner bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-600 appearance-none"
                                     >
-                                    <option value="travel">🚕 移動</option>
-                                    <option value="prep">🔧 準備</option>
+                                    <option value="travel">🚗 移動・準備</option>
+
                                     <option value="misc">🧹 雑務</option>
                                     <option value="site_work">👷 現場で作業</option>
                                     </select>

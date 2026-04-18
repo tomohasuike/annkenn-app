@@ -54,10 +54,12 @@ async function processSafetyTest() {
 
   let scheduleObj: any = {};
   try {
-     scheduleObj = JSON.parse(settingsData.auto_test_schedule) || {};
+     const rawSchedule = settingsData.auto_test_schedule || '{}';
+     console.log(`Raw auto_test_schedule: ${rawSchedule}`);
+     scheduleObj = JSON.parse(rawSchedule) || {};
   } catch(e) {
-     console.error("Invalid schedule JSON:", e);
-     return { success: false, reason: "Invalid JSON format in settings" };
+     console.error("Invalid schedule JSON:", e, "Raw value:", settingsData.auto_test_schedule);
+     return { success: false, reason: "Invalid JSON format in settings", raw: settingsData.auto_test_schedule };
   }
 
   const monthArray = scheduleObj[currentMonth] || [];

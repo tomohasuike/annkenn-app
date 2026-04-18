@@ -186,6 +186,8 @@ export class CalcEngine {
               breakerMultiplier = 2.0; // Y-Δ
           } else if (load.starting_method === 'inverter') {
               breakerMultiplier = 1.25; // インバータ・ソフトスタータ (突入制御)
+          } else if (load.starting_method === 'heater') {
+              breakerMultiplier = 1.0; // ヒーター (抵抗負荷・突入電流なし)
           }
 
           const requiredAmp = currentA * breakerMultiplier;

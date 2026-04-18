@@ -206,8 +206,8 @@ export default function Dashboard() {
       const { data: todayReports } = await supabase
         .from('daily_reports')
         .select('id, project_id')
-        .gte('report_date', `${todayStr}T00:00:00`)
-        .lte('report_date', `${todayStr}T23:59:59.999Z`);
+        .gte('report_date', `${todayStr}T00:00:00+09:00`)
+        .lte('report_date', `${todayStr}T23:59:59+09:00`);
         
       const submittedMap: Record<string, string> = {};
       if (todayReports) {

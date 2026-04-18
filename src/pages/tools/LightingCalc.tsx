@@ -1,15 +1,20 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Plus, Trash2, Settings2, List, PlusCircle, Save, ChevronLeft, ShieldAlert, FileSpreadsheet, X, Calculator, Bot, Check } from 'lucide-react';
+import { Plus, Trash2, Settings2, List, PlusCircle, Save, ChevronLeft, ShieldAlert, FileSpreadsheet, X, Calculator, Bot, Check, GripVertical, Undo2, Redo2, Loader2, CloudOff, CheckCircle2 } from 'lucide-react';
 import Den81ReportPreview from '../../components/Den81ReportPreview';
+import VACalculatorModal from '../../components/tools/VACalculatorModal';
+import { useBoardHistory } from '../../hooks/useBoardHistory';
+import { addBoardToPortalTree, fetchPortalTreeNodes, fetchParentNodes, moveNodeToNewParent } from '../../utils/syncPortalTree';
 
 interface LightingLoad {
   id: string;
-  circuitNo: number;
+  symbol?: string; // 回路記号（旧回路番号を含む）
+  circuitNo: number; // DB連携用の並び順
   name: string;
   voltage: '100V' | '200V';
-  phase: 'U' | 'W' | 'UW'; // U相(赤), W相(黒), U-W両相(赤黒200V用)
+  equipment_type?: string; // 負荷の種別 (L, C, F, A, etc.)
+  phase: 'U' | 'W' | 'UW'; // 表示用（内部状態は配列インデックスに依存させる）
   va: number; // 容量(VA)
   length_m: number; // こう長(m)
   breakerType: 'MCCB' | 'ELCB'; // 遮断器種別
@@ -17,6 +22,8 @@ interface LightingLoad {
 }
 
 const generateId = () => crypto.randomUUID();
+
+export const STANDARD_MAIN_BREAKERS = [20, 30, 40, 50, 60, 75, 100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 500, 600];
 
 export default function LightingCalc() {
   const { selectedProjectId } = useOutletContext<{ selectedProjectId: string }>();
@@ -28,32 +35,98 @@ export default function LightingCalc() {
   const loadId = searchParams.get('load_id');
 
   const [savedBoards, setSavedBoards] = useState<any[]>([]);
-  const [currentBoardId, setCurrentBoardId] = useState<string | null>(loadId || (targetTreeNodeId && targetTreeNodeId !== 'undefined' ? targetTreeNodeId : null));
+  const [currentBoardId, setCurrentBoardId] = useState<string | null>(loadId);
+  const [treeNodeId, setTreeNodeId] = useState<string | null>(targetTreeNodeId && targetTreeNodeId !== 'undefined' ? targetTreeNodeId : null);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('saved');
+  const skipHistory = useRef(false);
+  const isDataLoaded = useRef(false);
+
+  const { initHistory, pushHistory, undo, redo, canUndo, canRedo } = useBoardHistory<{title: string, demandFactor: number, mainBreakerOverride: number | null, loads: LightingLoad[]}>();
+
   const [popupMessage, setPopupMessage] = useState<{title: string, message: string} | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<{ id: string, name: string } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showSimulation, setShowSimulation] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importJsonText, setImportJsonText] = useState('');
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [parentNodes, setParentNodes] = useState<{id: string; name: string; type: string; depth: number}[]>([]);
+  
+  // VA Calculator State
+  const [calculatorOpenId, setCalculatorOpenId] = useState<string | null>(null);
+  const [typePopoverId, setTypePopoverId] = useState<string | null>(null);
 
-  const [title, setTitle] = useState('電灯盤-1');
+  // 設備種別ボタン定義
+  const EQUIPMENT_TYPES = [
+    { code: 'L',  label: '照明',     color: 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-300' },
+    { code: 'C',  label: 'コンセント', color: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300' },
+    { code: 'F',  label: '換気',     color: 'bg-cyan-100 text-cyan-800 border-cyan-300 dark:bg-cyan-900/40 dark:text-cyan-300' },
+    { code: 'A',  label: '空調',     color: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-300' },
+    { code: 'X',  label: 'その他',   color: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-300' },
+  ] as const;
+
+  // VACalculatorModalのカテゴリ→種別コードのマッピング
+  const CATEGORY_TO_TYPE: Record<string, string> = {
+    led:     'L',
+    legacy:  'L',
+    outlets: 'C',
+    heavy:   'A',
+    special: 'X',
+  };
+
+  const [title, setTitle] = useState('新規電灯盤');
   const [demandFactor, setDemandFactor] = useState(100);
+  const [mainBreakerOverride, setMainBreakerOverride] = useState<number | null>(null);
 
-  const [loads, setLoads] = useState<LightingLoad[]>([
-    { id: generateId(), circuitNo: 1, name: '照明 L1', voltage: '100V', phase: 'U', va: 600, length_m: 10, breakerType: 'MCCB' },
-    { id: generateId(), circuitNo: 2, name: 'コンセント C1', voltage: '100V', phase: 'W', va: 1200, length_m: 15, breakerType: 'ELCB' },
-    { id: generateId(), circuitNo: 3, name: '空調機', voltage: '200V', phase: 'UW', va: 2000, length_m: 20, breakerType: 'ELCB' },
-  ]);
+  // Drag and Drop state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  // 列幅リサイズ―各列のpx幅をステートで管理
+  const [colWidths, setColWidths] = useState<Record<string, number>>({
+    circuit: 72,
+    type:    72,
+    name:    200,
+    voltage: 88,
+    va:      100,
+    uA:      64,
+    wA:      64,
+    breaker: 80,
+  });
+  const resizingRef = useRef<{ col: string; startX: number; startW: number } | null>(null);
+
+  const handleResizeStart = useCallback((col: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingRef.current = { col, startX: e.clientX, startW: colWidths[col] };
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = ev.clientX - resizingRef.current.startX;
+      const newW = Math.max(40, resizingRef.current.startW + delta);
+      setColWidths(prev => ({ ...prev, [resizingRef.current!.col]: newW }));
+    };
+    const onUp = () => {
+      resizingRef.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [colWidths]);
+
+  // テーブル全体の幅 = 全列合計 + ドラッグハンドル列(32px)
+  const tableWidth = Object.values(colWidths).reduce((s, v) => s + v, 0) + 32;
+
+  const [loads, setLoads] = useState<LightingLoad[]>([]); // 新規は空の状態で開始
 
   // 初回ロードで保存済みリストを取得
   useEffect(() => {
-    loadBoardsList();
+    loadBoardsList(currentBoardId);
   }, [projectId]);
 
-  const loadBoardsList = async () => {
-    let query = supabase.from('calc_panels')
-      .select('id, name, updated_at')
+  const loadBoardsList = async (activeId?: string | null) => {
+    let query = supabase
+      .from('calc_panels')
+      .select('id, name, tree_node_id')
       .eq('panel_type', 'LIGHTING')
       .order('created_at', { ascending: false });
 
@@ -62,20 +135,27 @@ export default function LightingCalc() {
     } else {
       query = query.is('project_id', null);
     }
+
     const { data } = await query;
       
     if (data) {
-      setSavedBoards(data);
+      if (data.length > 0) {
+        setSavedBoards(data);
+      }
 
-      // URL引数があれば自動ロード/新規作成判定
-      if (loadId && !currentBoardId) {
-         await loadBoard(loadId, data.find((b: any) => b.id === loadId)?.name);
-      } else if (targetTreeNodeId && !currentBoardId) {
-         // ツリーと calc_panels の連携は一旦省略または id マッチで代用
-         createNewBoard();
-         if (initialName) setTitle(initialName);
-      } else if (!currentBoardId && data.length > 0) {
-        // 通常アクセスで何もない場合は最新をロード
+      if (loadId && !activeId) {
+        // load_id指定の場合は直接ロード
+        await loadBoard(loadId, data.find((b: any) => b.id === loadId)?.name);
+      } else if (targetTreeNodeId && !activeId) {
+        // treeNodeId指定の場合: 一致する盤があればロード、なければ新規作成
+        const matchingBoard = data.find((b: any) => b.tree_node_id === targetTreeNodeId);
+        if (matchingBoard) {
+          await loadBoard(matchingBoard.id, matchingBoard.name);
+        } else {
+          createNewBoard(initialName || undefined);
+        }
+      } else if (!activeId && data.length > 0) {
+        // 通常アクセス: 最新をロード
         await loadBoard(data[0].id, data[0].name);
       }
     }
@@ -91,39 +171,153 @@ export default function LightingCalc() {
       // Set name and attributes
       if (panelData.name) setTitle(panelData.name);
       if (panelData.reduction_factor) setDemandFactor(panelData.reduction_factor * 100);
+      if (panelData.main_breaker_at) setMainBreakerOverride(panelData.main_breaker_at);
+      else setMainBreakerOverride(null);
+      // ツリーノードIDをstateに反映（saveBoard時に正しく保存するため）
+      const existingTreeNodeId = panelData.tree_node_id || null;
+      setTreeNodeId(existingTreeNodeId);
 
-      // Fetch loads
+      // tree_node_idがnull（未連携）の場合はポータルに自動追加
+      if (!existingTreeNodeId && projectId) {
+        const newTreeNodeId = await addBoardToPortalTree({
+          projectId,
+          boardName: panelData.name || '電灯盤',
+          panelType: 'LIGHTING',
+        });
+        if (newTreeNodeId) {
+          setTreeNodeId(newTreeNodeId);
+          // DBも更新
+          await supabase.from('calc_panels').update({ tree_node_id: newTreeNodeId }).eq('id', id);
+        }
+      }
+
       const { data: loadsData } = await supabase.from('calc_loads').select('*').eq('panel_id', id).order('circuit_no', { ascending: true });
       if (loadsData && loadsData.length > 0) {
-         setLoads(loadsData.map((l: any) => ({
+         const parsedLoads = loadsData.map((l: any) => ({
            id: l.id,
            circuitNo: l.circuit_no,
+           symbol: l.symbol || '',
+           equipment_type: l.equipment_type || '',
            name: l.name,
            voltage: l.phase === 'UW' ? '200V' : '100V',
            phase: l.phase,
            va: Math.round(l.capacity_kw * 1000),
            length_m: l.cable_length_m || 20,
-           breakerType: 'MCCB' // DBにないので固定
-         })));
+           breakerType: 'MCCB'
+         }));
+         skipHistory.current = true;
+         setLoads(parsedLoads);
+         initHistory({ title: panelData.name || '', demandFactor: (panelData.reduction_factor || 1) * 100, mainBreakerOverride: panelData.main_breaker_at || null, loads: parsedLoads });
       }
+      // loadsがあってもなくても isDataLoaded を true にする
+      isDataLoaded.current = true;
+      setSaveStatus('saved');
     }
   };
 
-  const createNewBoard = () => {
-    setCurrentBoardId(null);
-    setTitle('新規電灯盤');
-    setLoads([{ id: generateId(), circuitNo: 1, name: '照明 L1', voltage: '100V', phase: 'U', va: 1000, length_m: 10, breakerType: 'MCCB' }]);
-    setDemandFactor(100);
-    // URLのload_idをクリア
-    if (loadId) {
-      const newParams = new URLSearchParams(searchParams);
-      newParams.delete('load_id');
-      setSearchParams(newParams, { replace: true });
+  const createNewBoard = async (overrideName?: any) => {
+    const isEvent = overrideName && typeof overrideName === 'object' && ('_reactName' in overrideName || 'nativeEvent' in overrideName || 'type' in overrideName);
+    const finalName = (!overrideName || isEvent || typeof overrideName !== 'string') ? '新規電灯盤' : overrideName;
+    const initLoads: LightingLoad[] = []; // 新規は空の状態で開始
+
+    try {
+      // 新規盤なので既存のtreeNodeIdを引き継がず、必ず新規ノードをポータルに追加する
+      let newTreeNodeId: string | null = null;
+      if (projectId) {
+        newTreeNodeId = await addBoardToPortalTree({
+          projectId,
+          boardName: finalName,
+          panelType: 'LIGHTING',
+        });
+        setTreeNodeId(newTreeNodeId);
+      } else {
+        setTreeNodeId(null);
+      }
+
+      const newPanelData = {
+        project_id: projectId,
+        name: finalName,
+        panel_type: 'LIGHTING',
+        voltage_system: '1Φ3W 100/200V',
+        reduction_factor: 1.0,
+        main_breaker_at: null,
+        tree_node_id: newTreeNodeId,
+      };
+      const { data, error } = await supabase.from('calc_panels').insert([newPanelData]).select().single();
+      if (error) throw error;
+
+      const newPanelId = data.id;
+
+      // デフォルト負荷は作成しない（空の状態で開始）
+
+      // 直接stateをセット
+      setCurrentBoardId(newPanelId);
+      setTitle(finalName);
+      setLoads([]);
+      setDemandFactor(100);
+      setMainBreakerOverride(null);
+      setSaveStatus('saved');
+      initHistory({ title: finalName, demandFactor: 100, mainBreakerOverride: null, loads: [] });
+      isDataLoaded.current = true;
+
+      // サイドバーに即座に追加（DBの再取得に依存しない）
+      setSavedBoards(prev => [{ id: newPanelId, name: finalName, tree_node_id: newTreeNodeId }, ...prev]);
+
+      // URLのload_idをクリア
+      if (loadId) {
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('load_id');
+        setSearchParams(newParams, { replace: true });
+      }
+    } catch (e: any) {
+      console.error('createNewBoard error:', e);
+      setPopupMessage({ title: '盤の作成エラー', message: e.message || JSON.stringify(e) });
     }
   };
 
-  const saveBoard = async () => {
+  // --- Undo/Redo & AutoSave ---
+  const handleUndo = () => {
+    const prev = undo();
+    if (prev) {
+      skipHistory.current = true;
+      setTitle(prev.title);
+      setDemandFactor(prev.demandFactor);
+      setMainBreakerOverride(prev.mainBreakerOverride);
+      setLoads(prev.loads);
+    }
+  };
+
+  const handleRedo = () => {
+    const next = redo();
+    if (next) {
+      skipHistory.current = true;
+      setTitle(next.title);
+      setDemandFactor(next.demandFactor);
+      setMainBreakerOverride(next.mainBreakerOverride);
+      setLoads(next.loads);
+    }
+  };
+
+  useEffect(() => {
+    if (!isDataLoaded.current) return;
+    
+    setSaveStatus('idle');
+
+    const timeoutId = setTimeout(() => {
+      const currentState = { title, demandFactor, mainBreakerOverride, loads };
+      if (!skipHistory.current) {
+         pushHistory(currentState);
+      }
+      skipHistory.current = false;
+      saveBoard(true);
+    }, 1500);
+
+    return () => clearTimeout(timeoutId);
+  }, [title, demandFactor, mainBreakerOverride, loads]);
+
+  const saveBoard = async (isAutoSave = false) => {
     setIsSaving(true);
+    setSaveStatus('saving');
     try {
       let panelId = currentBoardId;
       
@@ -133,6 +327,8 @@ export default function LightingCalc() {
          panel_type: 'LIGHTING',
          voltage_system: '1Φ3W 100/200V',
          reduction_factor: demandFactor / 100.0,
+         main_breaker_at: mainBreakerOverride,
+         tree_node_id: treeNodeId
       };
 
       if (panelId) {
@@ -156,6 +352,8 @@ export default function LightingCalc() {
             id: l.id,
             panel_id: panelId,
             circuit_no: l.circuitNo,
+            symbol: l.symbol || '',
+            equipment_type: l.equipment_type || 'X', // NOT NULL制約: undefinedの場合は「その他」
             name: l.name,
             is_spare: false,
             capacity_kw: l.va / 1000.0,
@@ -167,11 +365,20 @@ export default function LightingCalc() {
          if (loadError) throw loadError;
       }
 
-      setPopupMessage({ title: "保存完了", message: currentBoardId ? "上書き保存しました。" : "新しく保存しました。" });
-      await loadBoardsList();
+      const isAuto = typeof isAutoSave === 'boolean' ? isAutoSave : false;
+      if (!isAuto) {
+         setPopupMessage({ title: "保存完了", message: currentBoardId ? "上書き保存しました。" : "新しく保存しました。" });
+      }
+      setSaveStatus('saved');
+      // 手動保存時のみサイドバーを更新
+      if (!isAuto) {
+         await loadBoardsList(panelId);
+      }
     } catch (e: any) {
       console.error('Save failed:', e);
-      setPopupMessage({ title: "保存エラー", message: "保存に失敗しました: " + e.message });
+      setSaveStatus('error');
+      // 自動保存でも常にエラー内容を表示（デバッグ用）
+      setPopupMessage({ title: '保存エラー', message: '保存に失敗しました: ' + (e.message || JSON.stringify(e)) });
     } finally {
       setIsSaving(false);
     }
@@ -184,7 +391,9 @@ export default function LightingCalc() {
       
       setPopupMessage({ title: "削除完了", message: "盤のデータを削除しました。" });
       if (currentBoardId === id) {
-        createNewBoard();
+        // 現在表示中の盤を削除した場合はstateをリセットしてloadBoardsListに任せる
+        setCurrentBoardId(null);
+        isDataLoaded.current = false;
       }
       await loadBoardsList();
       setConfirmDeleteId(null);
@@ -196,24 +405,30 @@ export default function LightingCalc() {
 
   // 各回路の電流をU相・W相に分配する計算
   const calculatedLoads = useMemo(() => {
-    return loads.map(load => {
+    let count100V = 0;
+
+    return loads.map((load) => {
       let uCurrent = 0;
       let wCurrent = 0;
 
+      let computedPhase: 'U' | 'W' | 'UW' = 'UW';
       if (load.voltage === '100V') {
-        if (load.phase === 'U') {
+        computedPhase = count100V % 2 === 0 ? 'U' : 'W';
+        count100V++;
+      }
+
+      if (load.voltage === '100V') {
+        if (computedPhase === 'U') {
           uCurrent = load.va / 100;
-        } else if (load.phase === 'W') {
+        } else {
           wCurrent = load.va / 100;
         }
       } else if (load.voltage === '200V') {
-        // 200V負荷はU相とW相の両方に均等に電流が流れる
         const current = load.va / 200;
         uCurrent = current;
         wCurrent = current;
       }
 
-      // 自動ブレーカ選定
       const maxCurrent = Math.max(uCurrent, wCurrent);
       let autoBreakerA = 20;
       if (maxCurrent > 15) autoBreakerA = 30;
@@ -224,6 +439,7 @@ export default function LightingCalc() {
 
       return {
         ...load,
+        phase: computedPhase,
         uCurrent,
         wCurrent,
         autoBreakerA
@@ -242,15 +458,14 @@ export default function LightingCalc() {
     const totalW = rawTotalW * df;
 
     // 内線規程による不平衡率の計算
-    // 不平衡率(%) = (各相間に接続される単相負荷設備の容量の最大と最小の差) / (総単相負荷容量の1/2) * 100
-    // ここでは簡易的に(U-Wの差) / ((U+W)/2) * 100 とし、200V負荷は相殺されるため影響しないようにします
+    // 不平衡率(%) = (各相間に接続される単相負荷設備の容量の最大と最小の差) / (総負荷容量の1/2) * 100
+    // 分母となる総負荷容量には、200V機器の容量も含めます。
     const u100VA = calculatedLoads.filter(l => l.voltage === '100V' && l.phase === 'U').reduce((sum, l) => sum + l.va, 0);
     const w100VA = calculatedLoads.filter(l => l.voltage === '100V' && l.phase === 'W').reduce((sum, l) => sum + l.va, 0);
-    const total100VA = u100VA + w100VA;
     
     let unbalanceRate = 0;
-    if (total100VA > 0) {
-      unbalanceRate = (Math.abs(u100VA - w100VA) / (total100VA / 2)) * 100;
+    if (totalVA > 0) {
+      unbalanceRate = (Math.abs(u100VA - w100VA) / (totalVA / 2)) * 100;
     }
 
     // 主幹ブレーカーの選定
@@ -273,6 +488,7 @@ export default function LightingCalc() {
     const nextCircuit = loads.length > 0 ? Math.max(...loads.map(l => l.circuitNo)) + 1 : 1;
     setLoads([...loads, { 
       id: generateId(), 
+      symbol: String(nextCircuit),
       circuitNo: nextCircuit, 
       name: ``, 
       voltage: '100V', 
@@ -298,16 +514,41 @@ export default function LightingCalc() {
   };
 
   const updateLoad = (id: string, field: keyof LightingLoad, value: any) => {
-    setLoads(loads.map(l => {
+    setLoads(prev => prev.map(l => {
       if (l.id === id) {
-        // 電圧が200Vに変更された場合、自動的に相を'UW'にする
-        const newVoltage = field === 'voltage' ? value : l.voltage;
-        const newPhase = field === 'phase' ? value : (newVoltage === '200V' ? 'UW' : (l.phase === 'UW' ? 'U' : l.phase));
-        
-        return { ...l, [field]: value, phase: newPhase };
+        return { ...l, [field]: value };
       }
       return l;
     }));
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (index: number) => {
+    if (draggedIndex === null || draggedIndex === index) return;
+    
+    const newLoads = [...loads];
+    const draggedItem = newLoads[draggedIndex];
+    newLoads.splice(draggedIndex, 1);
+    newLoads.splice(index, 0, draggedItem);
+    
+    // index順にcircuitNoを振り直す
+    newLoads.forEach((l, i) => {
+      l.circuitNo = i + 1;
+      // symbolが自動採番の数字だけであれば、連動して更新する
+      if (/^\d+$/.test(l.symbol || '')) {
+         l.symbol = String(i + 1);
+      }
+    });
+
+    setLoads(newLoads);
+    setDraggedIndex(null);
   };
 
   const verifyLoad = (id: string) => {
@@ -371,12 +612,12 @@ export default function LightingCalc() {
                 <div className="flex flex-col gap-1">
                   <div className="flex justify-between items-center">
                     <span className="truncate flex-1">{board.name || '無題の電灯盤'}</span>
-                    {board.data_payload?.treeNodeId && (
+                    {board.tree_node_id && (
                       <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded border border-green-200 ml-1 shrink-0" title="ツリーと連携中">Link</span>
                     )}
                   </div>
                   <span className="text-[10px] opacity-60">
-                    {new Date(board.updated_at).toLocaleDateString()} {new Date(board.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {board.updated_at ? `${new Date(board.updated_at).toLocaleDateString()} ${new Date(board.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
                   </span>
                 </div>
               </button>
@@ -393,6 +634,21 @@ export default function LightingCalc() {
             </div>
           ))}
         </div>
+        {/* 現在選択中の盤の系統図位置変更 */}
+        {currentBoardId && treeNodeId && projectId && (
+          <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950">
+            <button
+              onClick={async () => {
+                const nodes = await fetchParentNodes(projectId);
+                setParentNodes(nodes);
+                setShowMoveModal(true);
+              }}
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-3 py-2 rounded transition-colors border border-slate-200 dark:border-slate-700"
+            >
+              📍 系統図の位置を変更
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 右側の計算書メインエリア */}
@@ -417,35 +673,54 @@ export default function LightingCalc() {
               </h1>
               <p className="text-sm text-muted-foreground mt-1">電灯・コンセント容量から、回路の相バランス・不平衡率と主幹ブレーカーを自動計算</p>
             </div>
-            <div className="flex gap-3 w-full sm:w-auto mt-2 sm:mt-0">
-              <button 
-                onClick={saveBoard}
-                disabled={isSaving}
-                className="flex-1 sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors"
-              >
-                <Save className="w-4 h-4" />
-                {isSaving ? '保存中...' : 'クラウド保存'}
-              </button>
-              <button 
-                onClick={() => setShowImport(true)}
-                className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors"
-              >
-                <Bot className="w-4 h-4" />
-                AIデータ取り込み
-              </button>
+            <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0 items-center justify-end flex-wrap">
+              {/* Undo / Redo */}
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <button
+                  disabled={!canUndo}
+                  onClick={handleUndo}
+                  className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 disabled:opacity-30 rounded hover:bg-white dark:hover:bg-slate-700 transition-all shadow-sm"
+                  title="元に戻す"
+                >
+                  <Undo2 className="w-4 h-4" />
+                </button>
+                <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                <button
+                  disabled={!canRedo}
+                  onClick={handleRedo}
+                  className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 disabled:opacity-30 rounded hover:bg-white dark:hover:bg-slate-700 transition-all shadow-sm"
+                  title="やり直す"
+                >
+                  <Redo2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Save Status Indicator */}
+              <div className="flex items-center gap-2 px-3 py-2 min-w-[110px] justify-center bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm shadow-sm">
+                {saveStatus === 'saving' ? (
+                  <><Loader2 className="w-4 h-4 text-blue-500 animate-spin" /><span className="text-slate-500 font-medium text-[11px]">保存中...</span></>
+                ) : saveStatus === 'saved' ? (
+                  <><CheckCircle2 className="w-4 h-4 text-emerald-500" /><span className="text-emerald-700 dark:text-emerald-400 font-bold text-[11px]">保存完了</span></>
+                ) : saveStatus === 'error' ? (
+                  <><CloudOff className="w-4 h-4 text-red-500" /><span className="text-red-600 font-bold text-[11px]">エラー</span></>
+                ) : (
+                  <><Settings2 className="w-4 h-4 text-slate-400" /><span className="text-slate-500 font-medium text-[11px]">編集中...</span></>
+                )}
+              </div>
+
               <button 
                 onClick={() => setShowPreview(true)}
-                className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors"
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors ml-2"
               >
                 <FileSpreadsheet className="w-4 h-4" />
-                プレビュー/出力
+                プレビュー
               </button>
               <button 
                 onClick={() => setShowSimulation(true)}
-                className="flex-1 sm:flex-none px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors"
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors"
               >
                 <Calculator className="w-4 h-4" />
-                契約電力シミュレーション
+                シミュレーション
               </button>
             </div>
           </div>
@@ -475,21 +750,100 @@ export default function LightingCalc() {
         </div>
       </div>
 
+      {/* 総合サマリパネル */}
+      <div className="bg-blue-50 dark:bg-slate-800/80 border border-blue-100 dark:border-slate-700 rounded-xl shadow-sm p-4 flex flex-wrap gap-x-6 gap-y-4 items-center">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">総容量(ΣVA)</span>
+          <span className="text-xl font-black text-slate-800 dark:text-white">{(summary.totalVA).toLocaleString()} <span className="text-sm font-bold text-slate-500">VA</span></span>
+        </div>
+        <div className="h-8 w-px bg-blue-200 dark:bg-slate-700 hidden sm:block"></div>
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">各相電流 (需要率加味)</span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-slate-800 dark:text-white font-bold text-sm">U: {summary.totalU.toFixed(1)}A</span>
+            <span className="text-slate-600 font-bold text-sm">/</span>
+            <span className="text-slate-800 dark:text-white font-bold text-sm">W: {summary.totalW.toFixed(1)}A</span>
+          </div>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">設備不平衡率 (40%以下)</span>
+          <div className="flex items-baseline gap-2">
+            <div className="flex items-baseline gap-0.5">
+              <span className={`text-xl font-black ${summary.unbalanceRate <= 40 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                {summary.unbalanceRate.toFixed(1)}
+              </span>
+              <span className={`text-sm font-bold ${summary.unbalanceRate <= 40 ? 'text-emerald-600/80' : 'text-red-600/80'}`}>%</span>
+            </div>
+            {summary.unbalanceRate <= 40 ? (
+              <span className="text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 px-1 py-0.5 rounded leading-none border border-emerald-200 dark:border-emerald-800">OK</span>
+            ) : (
+              <span className="text-[10px] font-bold bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400 px-1 py-0.5 rounded leading-none border border-red-200 dark:border-red-800">NG</span>
+            )}
+          </div>
+        </div>
+        <div className="h-8 w-px bg-blue-200 dark:bg-slate-700 hidden sm:block"></div>
+        <div className="flex flex-col ml-auto pl-4 border-l-4 border-blue-200 dark:border-blue-900">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-bold text-blue-600 dark:text-blue-400">盤 主幹サイズ</span>
+            {mainBreakerOverride ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400 px-1.5 py-0.5 rounded border border-orange-200 dark:border-orange-800">手動</span>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${mainBreakerOverride < summary.recommendedMainBreaker ? 'bg-red-100 border-red-300 text-red-700' : 'bg-emerald-100 border-emerald-300 text-emerald-700'}`}>
+                   {mainBreakerOverride < summary.recommendedMainBreaker ? 'NG' : 'OK'}
+                </span>
+              </div>
+            ) : (
+              <span className="text-[10px] font-bold bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">自動</span>
+            )}
+          </div>
+          <div className="flex items-baseline gap-1 relative" title="主幹サイズを選択（自動枠を選ぶと再計算に追従します）">
+            <span className="text-xs font-bold text-slate-500">MCCB</span>
+            <select
+              value={mainBreakerOverride || ''}
+              onChange={(e) => setMainBreakerOverride(e.target.value ? Number(e.target.value) : null)}
+              className={`text-3xl font-black bg-transparent border-0 outline-none cursor-pointer appearance-none text-center ${mainBreakerOverride ? (mainBreakerOverride < summary.recommendedMainBreaker ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400') : 'text-blue-700 dark:text-blue-400'}`}
+            >
+              <option value="">{summary.recommendedMainBreaker}</option>
+              {STANDARD_MAIN_BREAKERS.map(size => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+            <span className="text-sm font-bold text-blue-600">AT</span>
+          </div>
+        </div>
+      </div>
+
+
       {/* メインテーブル */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden min-h-[200px]">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          <table className="text-sm text-left" style={{ tableLayout: 'fixed', width: tableWidth }}>
             <thead className="text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-800/50 uppercase border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="px-3 py-2 font-semibold w-12 text-center">回路</th>
-                <th className="px-3 py-2 font-semibold min-w-[200px] whitespace-nowrap">名称</th>
-                <th className="px-3 py-2 font-semibold w-24">電圧</th>
-                <th className="px-3 py-2 font-semibold w-24 text-center">接続相</th>
-                <th className="px-3 py-2 font-semibold w-28 text-right">容量 (VA)</th>
-                <th className="px-3 py-2 font-semibold w-24 text-right">こう長 (m)</th>
-                <th className="px-3 py-2 font-semibold text-red-600 w-16 text-right border-l border-slate-100">U(A)</th>
-                <th className="px-3 py-2 font-semibold text-slate-800 dark:text-slate-200 w-16 text-right">W(A)</th>
-                <th className="px-3 py-2 font-semibold w-16 text-center border-l border-white">遮断器</th>
+                {([
+                  { key: 'circuit', label: '回路',      cls: 'text-center' },
+                  { key: 'type',    label: '種別',      cls: 'text-center' },
+                  { key: 'name',    label: '名称',      cls: '' },
+                  { key: 'voltage', label: '電圧',      cls: '' },
+                  { key: 'va',      label: '容量 (VA)', cls: 'text-right' },
+                  { key: 'uA',      label: 'U(A)',     cls: 'text-right border-l border-slate-100' },
+                  { key: 'wA',      label: 'W(A)',     cls: 'text-right' },
+                  { key: 'breaker', label: '遮断器',    cls: 'text-center border-l border-white' },
+                ] as const).map(({ key, label, cls }) => (
+                  <th
+                    key={key}
+                    style={{ width: colWidths[key], minWidth: 40 }}
+                    className={`relative py-2 font-semibold whitespace-nowrap select-none ${cls}`}
+                  >
+                    <span className="px-2">{label}</span>
+                    <div
+                      onMouseDown={(e) => handleResizeStart(key, e)}
+                      className="absolute right-0 top-0 h-full w-2 cursor-col-resize group/resizer flex items-center justify-center z-10"
+                    >
+                      <div className="w-0.5 h-4 bg-slate-300 dark:bg-slate-600 rounded group-hover/resizer:bg-blue-500 transition-colors" />
+                    </div>
+                  </th>
+                ))}
                 <th className="px-2 py-2 w-8 text-center">
                   <Settings2 className="w-4 h-4 mx-auto text-slate-400" />
                 </th>
@@ -497,14 +851,93 @@ export default function LightingCalc() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {calculatedLoads.map((load, index) => (
-                <tr key={load.id} className={`group hover:bg-blue-50/50 dark:hover:bg-slate-800/40 transition-colors ${load.is_verified === false ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-white dark:bg-slate-900'}`}>
-                  <td className="px-3 py-1.5 text-center">
+                <tr 
+                  key={load.id} 
+                  draggable
+                  onDragStart={() => handleDragStart(index)}
+                  onDragOver={handleDragOver}
+                  onDragEnd={() => setDraggedIndex(null)}
+                  onDrop={() => handleDrop(index)}
+                  className={`group transition-colors cursor-move relative
+                    ${draggedIndex === index ? 'opacity-50 bg-blue-50 dark:bg-blue-900/30' : ''} 
+                    ${load.is_verified === false 
+                      ? 'bg-yellow-50 dark:bg-yellow-900/20' 
+                      : load.voltage === '200V'
+                        ? 'bg-indigo-50/40 dark:bg-indigo-900/10 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
+                        : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/40'}`}
+                >
+                  <td className="px-3 py-1.5 text-center relative">
+                    {load.voltage === '200V' && (
+                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-400 dark:bg-indigo-600"></div>
+                    )}
                     <input 
-                      type="number" 
-                      value={load.circuitNo}
-                      onChange={(e) => updateLoad(load.id, 'circuitNo', Number(e.target.value))}
-                      className="w-full bg-transparent border border-transparent focus:border-blue-500 focus:bg-white px-1 py-1 text-sm font-mono text-center mx-auto text-slate-500 rounded outline-none"
+                      type="text" 
+                      value={load.symbol || ''}
+                      onChange={(e) => updateLoad(load.id, 'symbol', e.target.value)}
+                      className="w-full bg-transparent border border-transparent focus:border-blue-500 hover:border-slate-200 focus:bg-white dark:focus:bg-slate-800/80 px-1 py-1 text-sm font-mono text-center flex-1 mx-auto text-slate-700 dark:text-slate-300 rounded outline-none w-16"
+                      placeholder="1"
                     />
+                  </td>
+                  <td className="py-1.5 text-center relative">
+                    {/* 複数種別バッジ表示ボタン */}
+                    <button
+                      onClick={() => setTypePopoverId(typePopoverId === load.id ? null : load.id)}
+                      className={`flex flex-wrap gap-0.5 items-center justify-center min-w-[36px] min-h-[28px] px-1 py-0.5 rounded border transition-colors mx-auto ${
+                        (load.equipment_type || '').length > 0
+                          ? 'border-slate-200 hover:border-blue-300'
+                          : 'bg-slate-50 border-dashed border-slate-300 hover:border-blue-400'
+                      }`}
+                    >
+                      {(load.equipment_type || '').split(',').filter(Boolean).length > 0
+                        ? (load.equipment_type || '').split(',').filter(Boolean).map(code => {
+                            const t = EQUIPMENT_TYPES.find(t => t.code === code);
+                            return (
+                              <span key={code} className={`text-[10px] font-black px-1 rounded ${t?.color || 'bg-slate-100 text-slate-700'}`}>
+                                {code}
+                              </span>
+                            );
+                          })
+                        : <span className="text-slate-400 text-xs font-bold">+</span>
+                      }
+                    </button>
+                    {/* 種別選択ポップオーバー（複数選択対応） */}
+                    {typePopoverId === load.id && (
+                      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl p-2 w-48">
+                        <div className="text-[10px] font-bold text-slate-400 px-1 mb-1.5">種別を選択（複数可）</div>
+                        <div className="grid grid-cols-3 gap-1">
+                          {EQUIPMENT_TYPES.map(t => {
+                            const codes = (load.equipment_type || '').split(',').filter(Boolean);
+                            const isSelected = codes.includes(t.code);
+                            return (
+                              <button
+                                key={t.code}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newCodes = isSelected
+                                    ? codes.filter(c => c !== t.code)
+                                    : [...codes, t.code];
+                                  updateLoad(load.id, 'equipment_type', newCodes.join(','));
+                                }}
+                                className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-lg border text-[10px] font-bold transition-all ${
+                                  isSelected
+                                    ? t.color + ' ring-2 ring-blue-500'
+                                    : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-blue-300 hover:bg-blue-50'
+                                }`}
+                              >
+                                <span className="text-sm font-black">{t.code}</span>
+                                <span>{t.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <button
+                          onClick={() => setTypePopoverId(null)}
+                          className="mt-2 w-full text-[10px] text-slate-400 hover:text-slate-600 py-1 border-t border-slate-100"
+                        >
+                          ✓ 確定
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-1.5 min-w-[200px]">
                     <input 
@@ -512,7 +945,7 @@ export default function LightingCalc() {
                       value={load.name}
                       onKeyDown={(e) => handleKeyDown(e, index, 'name')}
                       onChange={(e) => updateLoad(load.id, 'name', e.target.value)}
-                      className="w-full px-2 py-1 bg-transparent border border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 rounded outline-none transition-colors font-bold text-slate-700"
+                      className="w-full px-2 py-1 bg-transparent border border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 rounded outline-none transition-colors font-bold text-slate-700 dark:text-slate-200"
                       placeholder="例: 会議室照明"
                       autoFocus={index === loads.length - 1} // 新規行に追加時に自動フォーカス
                     />
@@ -521,58 +954,37 @@ export default function LightingCalc() {
                     <select 
                       value={load.voltage}
                       onChange={(e) => updateLoad(load.id, 'voltage', e.target.value)}
-                      className="w-full bg-transparent border-0 text-sm font-medium text-slate-700 cursor-pointer hover:bg-slate-100 rounded px-1 py-1"
+                      className={`w-full border-0 text-sm font-medium cursor-pointer rounded px-1 py-1 
+                        ${load.voltage === '200V' 
+                          ? 'bg-indigo-100 text-indigo-800 font-bold dark:bg-indigo-900/40 dark:text-indigo-300 shadow-sm' 
+                          : 'bg-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                     >
                       <option value="100V">100V</option>
                       <option value="200V">200V</option>
                     </select>
                   </td>
-                  <td className="px-3 py-1.5 text-center">
-                    {load.voltage === '200V' ? (
-                      <span className="inline-block w-full px-1 py-1 bg-gradient-to-r from-red-100 to-slate-200 text-slate-700 text-xs font-bold rounded border border-slate-300">
-                        UW
-                      </span>
-                    ) : (
-                      <select 
-                        value={load.phase}
-                        onChange={(e) => updateLoad(load.id, 'phase', e.target.value)}
-                        className={`w-full border-0 text-xs font-bold rounded-md px-1 py-1 cursor-pointer ${
-                          load.phase === 'U' 
-                            ? 'bg-red-100 text-red-700' 
-                            : 'bg-slate-200 text-slate-800'
-                        }`}
-                      >
-                        <option value="U">U (赤)</option>
-                        <option value="W">W (黒)</option>
-                      </select>
-                    )}
-                  </td>
-                  <td className="px-3 py-1.5">
-                    <div className="flex items-center">
+                  <td className="px-3 py-1.5 focus-within:bg-blue-50 dark:focus-within:bg-blue-900/10 transition-colors">
+                    <div className="flex items-center gap-1 group/va">
                       <input 
                         type="number" 
-                        value={load.va || ''}
+                        value={load.va === 0 ? '' : load.va}
                         onKeyDown={(e) => handleKeyDown(e, index, 'va')}
                         onChange={(e) => updateLoad(load.id, 'va', Number(e.target.value))}
-                        className="w-full bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-500 rounded outline-none px-2 py-1 text-sm font-bold text-right"
+                        className="w-full bg-transparent border border-transparent group-hover/va:border-slate-200 focus:bg-white focus:border-blue-500 rounded outline-none px-2 py-1 text-sm font-bold text-right"
                         step="100"
                       />
-                    </div>
-                  </td>
-                  <td className="px-3 py-1.5">
-                    <div className="flex items-center">
-                      <input 
-                        type="number" 
-                        value={load.length_m || ''}
-                        onKeyDown={(e) => handleKeyDown(e, index, 'last')}
-                        onChange={(e) => updateLoad(load.id, 'length_m', Number(e.target.value))}
-                        className="w-full bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-500 rounded outline-none px-2 py-1 text-sm font-bold text-right text-slate-600"
-                      />
+                      <button 
+                        onClick={() => setCalculatorOpenId(load.id)}
+                        className="p-1.5 text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors opacity-0 group-hover/va:opacity-100 focus:opacity-100"
+                        title="容量内訳を計算"
+                      >
+                        <Calculator className="w-4 h-4" />
+                      </button>
                     </div>
                   </td>
                   
                   {/* 自動計算列 (U相電流) */}
-                  <td className="px-3 py-1.5 bg-red-50/20 dark:bg-red-900/5 font-mono text-sm font-medium text-red-600 border-l border-r border-slate-100 text-right">
+                  <td className="px-3 py-1.5 bg-slate-50/40 dark:bg-slate-100/5 font-mono text-sm font-medium text-slate-800 dark:text-slate-200 border-l border-r border-slate-100 text-right">
                     {load.uCurrent > 0 ? load.uCurrent.toFixed(1) : ''}
                   </td>
                   
@@ -582,16 +994,21 @@ export default function LightingCalc() {
                   </td>
 
                   {/* 遮断器種別 と 自動選定 (末尾へ移動) */}
-                  <td className="px-3 py-1.5 bg-blue-50/20 border-l border-white text-center">
-                    <select 
-                      value={load.breakerType}
-                      onKeyDown={(e) => handleKeyDown(e, index, 'last')}
-                      onChange={(e) => updateLoad(load.id, 'breakerType', e.target.value)}
-                      className={`border border-transparent w-full text-[10px] font-bold rounded px-1 py-1 cursor-pointer text-center ${load.breakerType === 'ELCB' ? 'bg-orange-100 text-orange-700' : 'bg-transparent text-slate-600 hover:bg-white'}`}
-                    >
-                      <option value="MCCB">MCCB</option>
-                      <option value="ELCB">ELCB</option>
-                    </select>
+                  <td className="px-3 py-1.5 bg-blue-50/20 dark:bg-blue-900/10 border-l border-white dark:border-slate-800 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <select 
+                        value={load.breakerType}
+                        onKeyDown={(e) => handleKeyDown(e, index, 'last')}
+                        onChange={(e) => updateLoad(load.id, 'breakerType', e.target.value)}
+                        className={`border border-transparent text-[10px] font-bold rounded px-1 py-0.5 cursor-pointer text-center appearance-none ${load.breakerType === 'ELCB' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30' : 'bg-transparent text-slate-500 hover:bg-white dark:hover:bg-slate-800'}`}
+                      >
+                        <option value="MCCB">M</option>
+                        <option value="ELCB">EL</option>
+                      </select>
+                      <span className="text-sm font-black text-blue-700 dark:text-blue-400">
+                        {load.autoBreakerA}AT
+                      </span>
+                    </div>
                   </td>
                   
                   <td className="px-2 py-1.5 text-center">
@@ -614,11 +1031,10 @@ export default function LightingCalc() {
             {/* 合計行 */}
             <tfoot className="bg-slate-50 dark:bg-slate-800 border-t-2 border-slate-200 font-bold text-sm">
               <tr>
-                <td colSpan={4} className="px-3 py-3 text-right text-slate-500 uppercase">設計容量計 / 相電流計:</td>
-                <td className="px-3 py-3 text-slate-800 text-right">{summary.totalVA.toLocaleString()}</td>
-                <td className="px-3 py-3 text-slate-800 text-right"></td>
-                <td className="px-3 py-3 text-red-700 bg-red-100/50 border-l border-r border-white text-right">{summary.totalU.toFixed(1)}</td>
-                <td className="px-3 py-3 text-slate-800 text-right">{summary.totalW.toFixed(1)}</td>
+                <td colSpan={3} className="px-3 py-3 text-right text-slate-500 uppercase">設計容量計 / 相電流計:</td>
+                <td className="px-3 py-3 text-slate-800 dark:text-slate-200 text-right">{summary.totalVA.toLocaleString()}</td>
+                <td className="px-3 py-3 text-slate-800 dark:text-slate-200 bg-slate-100/50 dark:bg-slate-700/50 border-l border-r border-white dark:border-slate-700 text-right">{summary.totalU.toFixed(1)}</td>
+                <td className="px-3 py-3 text-slate-800 dark:text-slate-200 text-right">{summary.totalW.toFixed(1)}</td>
                 <td colSpan={2}></td>
               </tr>
             </tfoot>
@@ -823,6 +1239,43 @@ export default function LightingCalc() {
         </div>
       )}
 
+      {/* 系統図の位置変更モーダル */}
+      {showMoveModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-6 max-w-sm w-full border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">系統図の配置を変更</h3>
+            <p className="text-xs text-slate-500 mb-4">この盤をどの親盤の下に移動しますか？</p>
+            <div className="space-y-1 max-h-64 overflow-y-auto mb-4">
+              {parentNodes.filter(n => n.id !== treeNodeId).map(node => (
+                <button
+                  key={node.id}
+                  onClick={async () => {
+                    if (!projectId || !treeNodeId) return;
+                    const ok = await moveNodeToNewParent({ projectId, targetNodeId: treeNodeId, newParentId: node.id });
+                    if (ok) {
+                      setPopupMessage({ title: '移動完了', message: `「${node.name}」の下に移動しました。` });
+                    } else {
+                      setPopupMessage({ title: 'エラー', message: '移動に失敗しました。' });
+                    }
+                    setShowMoveModal(false);
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors border border-transparent hover:border-blue-200"
+                  style={{ paddingLeft: `${(node.depth * 16) + 12}px` }}
+                >
+                  <span className="text-slate-400 mr-1">{['🏢','⚡','🔴','💡'][Math.min(node.depth, 3)]}</span>
+                  {node.name}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end">
+              <button onClick={() => setShowMoveModal(false)} className="px-4 py-2 text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg">
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 削除確認モーダル */}
       {confirmDeleteId && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -851,6 +1304,32 @@ export default function LightingCalc() {
           </div>
         </div>
       )}
+
+      {/* 容量計算ポップアップ */}
+      <VACalculatorModal
+        isOpen={calculatorOpenId !== null}
+        onClose={() => setCalculatorOpenId(null)}
+        targetName={loads.find(l => l.id === calculatorOpenId)?.name}
+        targetId={calculatorOpenId || undefined}
+        onApply={(totalVA, primaryCategoryId) => {
+          if (calculatorOpenId) {
+            const currentLoad = loads.find(l => l.id === calculatorOpenId);
+            updateLoad(calculatorOpenId, 'va', totalVA);
+            // カテゴリから種別コードを取得（L, C, A, X など）
+            const autoType = CATEGORY_TO_TYPE[primaryCategoryId] || 'X';
+            // テーブルのVAとモーダルの合計が一致 → 上書き（同じ内訳で管理されている）
+            // 不一致（新規 or 変更）→ 追記（重複なし）
+            if (currentLoad?.va === totalVA) {
+              updateLoad(calculatorOpenId, 'equipment_type', autoType);
+            } else {
+              const existingCodes = (currentLoad?.equipment_type || '').split(',').filter(Boolean);
+              if (!existingCodes.includes(autoType)) {
+                updateLoad(calculatorOpenId, 'equipment_type', [...existingCodes, autoType].join(','));
+              }
+            }
+          }
+        }}
+      />
     </div>
   );
 }

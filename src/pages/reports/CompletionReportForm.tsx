@@ -295,6 +295,10 @@ export function CompletionReportForm() {
         alert("工事案件を選択してください。");
         return;
     }
+    if (!formData.inspection_result) {
+        alert("検査結果（合格 / 不合格）を選択してください。");
+        return;
+    }
     
     try {
       setSaving(true);
@@ -304,7 +308,7 @@ export function CompletionReportForm() {
         reporter: formData.reporter,
         project_id: formData.project_id,
         completion_date: formData.completion_date || null,
-        inspection_datetime: formData.inspection_datetime ? new Date(formData.inspection_datetime).toISOString() : null,
+        inspection_datetime: formData.inspection_datetime ? `${formData.inspection_datetime.substring(0, 16)}:00+09:00` : null,
         inspector: formData.inspector,
         witness: formData.witness,
         inspection_items: formData.inspection_items,

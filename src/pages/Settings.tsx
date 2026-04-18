@@ -158,7 +158,7 @@ export default function Settings() {
             safety_webhook_url: '', 
             safety_app_url: '',
             enable_auto_test: false,
-            auto_test_schedule: '1 9 * * *',
+            auto_test_schedule: '{"1":[{"date":"9","time":"12:00"},{"date":"18","time":"20:00"}],"4":[{"date":"10","time":"12:00"},{"date":"17","time":"20:00"}],"7":[{"date":"17","time":"12:00"},{"date":"26","time":"20:00"}],"10":[{"date":"7","time":"12:00"},{"date":"15","time":"20:00"}]}',
             enable_earthquake_alert: false,
             earthquake_threshold: '6-',
             earthquake_target_region: '本社周辺'
@@ -832,6 +832,7 @@ export default function Settings() {
                                                        <span className="text-sm font-bold text-slate-600 shrink-0">日</span>
                                                        <input 
                                                            type="time"
+                                                           step={3600}
                                                            value={currentMonthData[0]?.time || ''}
                                                            onChange={(e) => updateSchedule(0, 'time', e.target.value)}
                                                            className="w-full min-w-[110px] border border-slate-300 rounded-md px-2 py-1.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -853,6 +854,7 @@ export default function Settings() {
                                                        <span className="text-sm font-bold text-slate-600 shrink-0">日</span>
                                                        <input 
                                                            type="time"
+                                                           step={3600}
                                                            value={currentMonthData[1]?.time || ''}
                                                            onChange={(e) => updateSchedule(1, 'time', e.target.value)}
                                                            className="w-full min-w-[110px] border border-slate-300 rounded-md px-2 py-1.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/50"

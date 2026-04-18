@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { ShieldCheck, AlertTriangle, AlertCircle, Home, Users, MapPin, Send, ArrowLeft } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, AlertCircle, Home, Users, MapPin, Send, ArrowLeft, BarChart2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AutocompleteInput } from '../components/ui/AutocompleteInput';
 
@@ -14,6 +14,7 @@ export default function SafetyReportForm() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Form state
   const [workerName, setWorkerName] = useState('');
@@ -31,6 +32,7 @@ export default function SafetyReportForm() {
         const { data: { session } } = await supabase.auth.getSession();
         const user = session?.user;
         if (user && user.email) {
+          setIsLoggedIn(true);
           const { data: workerMatch } = await supabase
             .from('worker_master')
             .select('name')
@@ -144,6 +146,16 @@ export default function SafetyReportForm() {
               緊急安否報告
             </h1>
           </div>
+          {isLoggedIn && (
+            <button
+              onClick={() => navigate('/safety-dashboard')}
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-700 transition-colors shadow-sm"
+              title="管理者ダッシュボード"
+            >
+              <BarChart2 size={14} />
+              管理
+            </button>
+          )}
         </div>
 
         {/* Form Body */}

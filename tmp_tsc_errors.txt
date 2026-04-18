@@ -1,0 +1,17 @@
+src/components/Den81ReportPreview.tsx(117,37): error TS6133: 'i' is declared but its value is never read.
+src/components/PowerReportPreview.tsx(2,1): error TS6133: 'AlertCircle' is declared but its value is never read.
+src/components/PowerReportPreview.tsx(3,1): error TS6133: 'CalcLoad' is declared but its value is never read.
+src/pages/tools/LightingCalc.tsx(4,24): error TS6133: 'Activity' is declared but its value is never read.
+src/pages/tools/LightingCalc.tsx(4,45): error TS6133: 'FileText' is declared but its value is never read.
+src/pages/tools/LightingCalc.tsx(4,105): error TS6133: 'CheckCircle2' is declared but its value is never read.
+src/pages/tools/PowerCalc.tsx(5,10): error TS6133: 'Plus' is declared but its value is never read.
+src/pages/tools/PowerCalc.tsx(5,35): error TS6133: 'FileText' is declared but its value is never read.
+src/pages/tools/PowerCalc.tsx(5,87): error TS6133: 'ShieldAlert' is declared but its value is never read.
+src/pages/tools/PowerCalc.tsx(5,100): error TS6133: 'CheckCircle2' is declared but its value is never read.
+src/pages/tools/PowerCalc.tsx(565,69): error TS2322: Type '{ className: string; title: string; }' is not assignable to type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+  Property 'title' does not exist on type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+src/pages/tools/ToolsDashboard.tsx(2,60): error TS6133: 'PlusCircle' is declared but its value is never read.
+src/pages/tools/ToolsDashboard.tsx(3,10): error TS6133: 'Link' is declared but its value is never read.
+src/pages/tools/ToolsLayout.tsx(1,27): error TS6133: 'useNavigate' is declared but its value is never read.
+src/pages/tools/ToolsLayout.tsx(3,47): error TS6133: 'Clock' is declared but its value is never read.
+src/pages/tools/ToolsLayout.tsx(26,9): error TS6133: 'location' is declared but its value is never read.

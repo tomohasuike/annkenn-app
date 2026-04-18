@@ -1,236 +1,313 @@
+import puppeteer from 'puppeteer-core';
+import http from 'http';
 import fs from 'fs';
-import { PDFDocument } from 'pdf-lib';
+import path from 'path';
+import { google } from 'googleapis';
+import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname, resolve } from 'path';
+import { PDFDocument } from 'pdf-lib';
+import { PDFParse } from 'pdf-parse';
 
-// --- 初期設定 ---
-const __dirname = dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: resolve(__dirname, '../.env.local') });
+// === 設定 ==========================================
+dotenv.config({ path: '.env.local' });
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-const apiKey = process.env.VITE_GOOGLE_API_KEY;
-if (!apiKey) {
-  console.error("❌ 必要な環境変数が見つかりません。");
-  process.exit(1);
+const functionsEnvPath = path.resolve('./supabase/functions/.env');
+if (fs.existsSync(functionsEnvPath)) {
+    const envConfig = dotenv.parse(fs.readFileSync(functionsEnvPath));
+    for (const k in envConfig) process.env[k] = envConfig[k];
 }
 
-// --- 処理対象のPDFファイルリスト ---
-const targetPdfs = [
-  { 
-    path: '/Users/hasuiketomoo/Downloads/nitto-SK-25A.pdf', 
-    manufacturer: '日東工業',
-    catalogUrl: 'https://drive.google.com/drive/folders/'
-  },
-  { 
-    path: '/Users/hasuiketomoo/Downloads/idec-SJPJA01B.pdf', 
-    manufacturer: 'IDEC',
-    catalogUrl: 'https://drive.google.com/drive/folders/'
-  },
-  { 
-    path: '/Users/hasuiketomoo/Downloads/fujidenki62D2-J-0030f_web_1952nq3img.pdf', 
-    manufacturer: '富士電機',
-    catalogUrl: 'https://drive.google.com/drive/folders/'
-  },
-  { 
-    path: '/Users/hasuiketomoo/Downloads/mitsubisi-catalog.pdf', 
-    manufacturer: '三菱電機',
-    catalogUrl: 'https://drive.google.com/drive/folders/'
-  },
-  { 
-    path: '/Users/hasuiketomoo/Downloads/naigai0447_20240701.pdf', 
-    manufacturer: '内外電機',
-    catalogUrl: 'https://drive.google.com/drive/folders/'
-  },
-  { 
-    path: '/Users/hasuiketomoo/Downloads/KasugaProductsGuide_catalog_20230410.pdf', 
-    manufacturer: '春日電機',
-    catalogUrl: 'https://drive.google.com/drive/folders/'
-  }
-];
+const GOOGLE_SA_EMAIL = process.env.GOOGLE_SA_EMAIL;
+const GOOGLE_SA_PRIVATE_KEY = (process.env.GOOGLE_SA_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+const TARGET_FOLDER_ID = process.env.VITE_CATALOG_IMAGES_FOLDER_ID || '185swK8kWHsCWXrB3R22vW4_DuGDxau_1';
 
-const chunkSize = 1; // 節約・精密モード（1ページずつ単独で送信し、コンテキスト肥大化による高額トークン消費を完全に防ぐ）
-const progressFile = resolve(__dirname, 'ingestion_progress.json');
-const sqlOutputFile = resolve(__dirname, 'catalogs_insert.sql');
+const BASE_DIR = '/Users/hasuiketomoo/Downloads/カタログ';
+const PROGRESS_FILE = path.resolve('./ingest_all_progress.json');
 
-// --- メイン処理 ---
-async function runIngestion() {
-  console.log("🚀 全自動 PDFインジェスター（SQL生成＆Driveリンク連携版）起動...");
+// マップ定義（メーカー名とカタログ名）
+const CATALOG_MAP = {
+    '2025_1mirai.pdf': { manufacturer: '未来工業', catalog_name: '総合カタログ2025' },
+    'catalog_densetsu-kai.pdf': { manufacturer: 'ネグロス電工', catalog_name: '電設一般カタログ' },
+    'catalog_taflock-kai.pdf': { manufacturer: 'ネグロス電工', catalog_name: 'タフロック' },
+    'fujidenki62D2-J-0030f_web_1952nq3img.pdf': { manufacturer: '富士電機', catalog_name: 'Webカタログ' },
+    'idec-SJPJA01B.pdf': { manufacturer: 'IDEC', catalog_name: 'SJPJA01B' },
+    'kanro_zenbun-rurukawa.pdf': { manufacturer: '古河電気工業', catalog_name: '管路カタログ' },
+    'mitsubisi-catalog.pdf': { manufacturer: '三菱電機', catalog_name: '総合カタログ' },
+    'naigai0447_20240701.pdf': { manufacturer: '内外電機', catalog_name: '総合カタログ2024' },
+    'nitto-SK-25A.pdf': { manufacturer: '日東工業', catalog_name: 'SK-25A' }
+};
 
-  // 初期SQLファイル作成（無ければ）
-  if (!fs.existsSync(sqlOutputFile)) {
-    fs.writeFileSync(sqlOutputFile, "-- カタログ自動抽出SQLデータ\n\n");
-  }
+let driveService = null;
+let currentServer = null;
 
-  let progress = {};
-  if (fs.existsSync(progressFile)) {
-    progress = JSON.parse(fs.readFileSync(progressFile, 'utf8'));
-    console.log("🔄 前回の進捗から再開します:", progress);
-  }
+async function initGoogleDrive() {
+    console.log("Initializing Google Drive API...");
+    const auth = new google.auth.GoogleAuth({
+        credentials: { client_email: GOOGLE_SA_EMAIL, private_key: GOOGLE_SA_PRIVATE_KEY },
+        scopes: ['https://www.googleapis.com/auth/drive']
+    });
+    driveService = google.drive({ version: 'v3', auth });
+}
 
-  for (const pdfItem of targetPdfs) {
-    const pdfPath = pdfItem.path;
-    const mfgName = pdfItem.manufacturer;
-    const catalogUrl = pdfItem.catalogUrl;
-
-    if (progress[pdfPath] && progress[pdfPath].completed) {
-      console.log(`⏭️ スキップ: ${pdfPath} (完了済み)`);
-      continue;
-    }
-
-    if (!fs.existsSync(pdfPath)) {
-      console.error(`❌ ファイルが見つかりません: ${pdfPath}`);
-      continue;
-    }
-
-    // 1. メーカー事前登録用SQL（念のため）
-    fs.appendFileSync(sqlOutputFile, `\n-- ${mfgName} のデータ\n`);
-
-    // 2. PDFの読み込み
-    console.log(`\n📄 読み込み中: ${pdfPath}`);
-    const pdfBytes = fs.readFileSync(pdfPath);
-    let pdfDoc, totalPages;
-    try {
-      pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
-      totalPages = pdfDoc.getPageCount();
-      console.log(`総ページ数: ${totalPages}`);
-    } catch (parseError) {
-      console.error(`❌ PDFの解析に失敗しました。ファイルが破損しているか、非標準のフォーマットです: ${pdfPath}`);
-      console.error(`💡 Macのプレビューアプリで開いて「PDFとして書き出す」で別名保存すると直る場合があります。`);
-      continue;
-    }
-
-    const startPage = progress[pdfPath]?.last_processed_page || 0;
-
-    for (let currentStart = startPage + 1; currentStart <= totalPages; currentStart += chunkSize) {
-      const currentEnd = Math.min(currentStart + chunkSize - 1, totalPages);
-      console.log(`\n⏳ [${mfgName}] ページ ${currentStart} 〜 ${currentEnd} を処理中...`);
-
-      try {
-        const newPdf = await PDFDocument.create();
-        for (let i = currentStart - 1; i < currentEnd; i++) {
-          const [copiedPage] = await newPdf.copyPages(pdfDoc, [i]);
-          newPdf.addPage(copiedPage);
+async function uploadImageToDrive(fileName, localFilePath) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            const res = await driveService.files.create({
+                resource: { name: fileName, parents: [TARGET_FOLDER_ID] },
+                media: { mimeType: 'image/jpeg', body: fs.createReadStream(localFilePath) },
+                fields: 'id',
+                supportsAllDrives: true
+            });
+            // パーミッションは親フォルダが共有状態なら自動で継承されるため、個別のAPIコールを削除してレートリミットを回避
+            return res.data.id;
+        } catch (err) {
+            console.log(`  -> Drive Upload error. Attempt ${attempt}/3 : ${err.message}`);
+            await new Promise(r => setTimeout(r, 2000 * attempt));
         }
-        const chunkBytes = await newPdf.save();
-        const chunkBase64 = Buffer.from(chunkBytes).toString('base64');
+    }
+    throw new Error("Failed to upload after 3 attempts");
+}
 
-        const extractedData = await extractDataFromGemini(chunkBase64, mfgName);
-
-        if (extractedData && extractedData.length > 0) {
-          let sqlChunk = "";
-          for (const item of extractedData) {
-            const num = String(item.model_number).trim().replace(/'/g, "''");
-            const name = String(item.name).trim().replace(/'/g, "''") || '製品名なし';
-            const desc = item.description ? `'${String(item.description).replace(/'/g, "''")}'` : 'NULL';
-            const price = item.standard_price || 'NULL';
-            const img = 'NULL'; // 後から別スクリプトで自動補完するため初期値はNULL
-            const docUrl = `'${catalogUrl}'`;
-            const w = item.width_mm || 'NULL';
-            const h = item.height_mm || 'NULL';
-            const d = item.depth_mm || 'NULL';
-            const p = item.page_number || currentStart; // フォールバックは現在ページ番号
+function startPdfServer(pdfPath) {
+    return new Promise((resolve) => {
+        if (currentServer) {
+            currentServer.close();
+            currentServer = null;
+        }
+        currentServer = http.createServer((req, res) => {
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Range, Content-Length');
             
-            sqlChunk += `INSERT INTO materials (manufacturer_id, model_number, name, description, standard_price, image_url, catalog_url, width_mm, height_mm, depth_mm, page_number) ` +
-                        `VALUES ((SELECT id FROM manufacturers WHERE name = '${mfgName}' LIMIT 1), '${num}', '${name}', ${desc}, ${price}, ${img}, ${docUrl}, ${w}, ${h}, ${d}, ${p});\n`;
-          }
+            const stat = fs.statSync(pdfPath);
+            const total = stat.size;
+            
+            if (req.headers.range) {
+                const parts = req.headers.range.replace(/bytes=/, "").split("-");
+                const partialstart = parts[0];
+                const partialend = parts[1];
 
-          fs.appendFileSync(sqlOutputFile, sqlChunk);
-          console.log(`✅ ${extractedData.length} 件のSQLデータを生成しました！`);
-        } else {
-          console.log(`ℹ️ このページには有効な製品データがありませんでした。`);
-        }
+                const start = parseInt(partialstart, 10);
+                const end = partialend ? parseInt(partialend, 10) : total - 1;
+                const chunksize = (end - start) + 1;
+                
+                res.writeHead(206, {
+                    'Content-Range': 'bytes ' + start + '-' + end + '/' + total,
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': chunksize,
+                    'Content-Type': 'application/pdf'
+                });
+                fs.createReadStream(pdfPath, {start, end}).pipe(res);
+            } else {
+                res.writeHead(200, {
+                    'Content-Length': total,
+                    'Content-Type': 'application/pdf',
+                    'Accept-Ranges': 'bytes'
+                });
+                fs.createReadStream(pdfPath).pipe(res);
+            }
+        });
 
-        progress[pdfPath] = { last_processed_page: currentEnd, completed: currentEnd === totalPages };
-        fs.writeFileSync(progressFile, JSON.stringify(progress, null, 2));
+        currentServer.listen(9876, () => {
+            resolve();
+        });
+    });
+}
 
-      } catch (err) {
-        console.error(`💥 エラー発生: ページ ${currentStart} 〜 ${currentEnd}`);
-        console.error(err.message);
-        
-        // レートリミットエラーの場合は長く待機する
-        if (err.message.includes('Quota exceeded') || err.message.includes('429')) {
-          console.log("⚠️ APIの無料枠制限（レートリミット）に到達しました。65秒間スリープして再試行します...");
-          await new Promise(res => setTimeout(res, 65000));
-          // currentStart を戻して再試行させる
-          currentStart -= chunkSize; 
-          continue;
-        } else {
-          console.log("5秒待機して次のチャンクへ進みます...");
-          await new Promise(res => setTimeout(res, 5000));
-        }
-      }
-
-      await new Promise(res => setTimeout(res, 500)); // 制限解除のため待機時間を0.5秒（Turboモード）に短縮
+function stopPdfServer() {
+    if (currentServer) {
+        currentServer.close();
+        currentServer = null;
     }
-  }
-
-  console.log("\n🎉 🎉 全てのPDFの処理が完了しました！ 🎉 🎉");
-  console.log("👉 生成された `scripts/catalogs_insert.sql` をSupabaseで実行してください！");
 }
 
-async function extractDataFromGemini(base64Data, mfgName, pageNumber) {
-  const prompt = `
-あなたはこの電気工事会社の右腕AIです。
-添付された【カタログの ${pageNumber} ページ目】の ${mfgName} の製品カタログPDFから、掲載されているすべての電気製品情報を読み取り、必ず以下の形式のJSONの配列（Array）のみを出力してください。
-余計な解説文やマークダウンのバッククオート（\`\`\`json など）は一切出力しないでください。最初の文字は [ で始まり、最後の文字は ] となるようにパース可能な生文字列を返してください。
+async function renderPageToImage(browser, pageNum, outputPath) {
+    const page = await browser.newPage();
+    try {
+        const html = `
+        <html>
+          <head>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+            <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';</script>
+            <style>body, html { margin: 0; padding: 0; background: white; } canvas { display: block; }</style>
+          </head>
+          <body>
+            <canvas id="pdf-canvas"></canvas>
+            <script>
+                async function render() {
+                    try {
+                        const loadingTask = pdfjsLib.getDocument('http://127.0.0.1:9876/pdf');
+                        const pdf = await loadingTask.promise;
+                        const page = await pdf.getPage(${pageNum});
+                        
+                        const scale = 2.0; 
+                        const viewport = page.getViewport({ scale: scale });
+                        
+                        const canvas = document.getElementById('pdf-canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        
+                        await page.render({ canvasContext: context, viewport: viewport, background: 'white' }).promise;
+                        window.renderFinished = true;
+                    } catch(e) {
+                        window.renderError = e.message;
+                    }
+                }
+                render();
+            </script>
+          </body>
+        </html>
+        `;
 
-【抽出ルール】
-- ページ内に製品がない場合や、ただの説明文・目次ページ・施工方法ページの場合は空の配列 [] を返してください。
-- 出力するJSONの \`page_number\` には、必ず \`${pageNumber}\` （数値）をセットしてください。
-- 複数の製品がある場合は、すべて配列の要素として含めてください。
-- 「希望小売価格」や「定価」の記載があれば、カンマ等を抜いた数値として \`standard_price\` にいれてください（「円<税抜>」などは除外）。価格がない場合は null にしてください。
-- 小さな部品（カバーやジョイント）も型番があれば製品とみなします。
-- 【重要】カタログに外寸（タテ、ヨコ、フカサ等の寸法）が記載されていれば、数値を抽出して \`width_mm\`, \`height_mm\`, \`depth_mm\` に入れてください（単位はすべてmmで統一すること）。縦・横・高さなどの記載がある部分だけ取り出し、記載がない項目については null を設定してください。
+        await page.setContent(html, { waitUntil: 'load' });
+        await page.waitForFunction('window.renderFinished === true || window.renderError', { timeout: 45000 });
+        
+        const error = await page.evaluate(() => window.renderError);
+        if (error) throw new Error(error);
 
-【JSONフォーマット例】
-[
-  {
-    "model_number": "型番テキスト",
-    "name": "製品名テキスト",
-    "description": "仕様や色、特徴の説明",
-    "standard_price": 500,
-    "width_mm": 500,
-    "height_mm": 300,
-    "depth_mm": null,
-    "page_number": 42
-  }
-]
-`;
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [
-          { text: prompt },
-          { inlineData: { mimeType: "application/pdf", data: base64Data } }
-        ]
-      }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.1
-      }
-    })
-  });
-
-  const responseJson = await response.json();
-  if (responseJson.error) {
-    throw new Error(`Gemini API Error: ${responseJson.error.message}`);
-  }
-
-  if (!responseJson.candidates || responseJson.candidates.length === 0) {
-    return [];
-  }
-
-  const outputText = responseJson.candidates[0].content.parts[0].text;
-  try {
-    return JSON.parse(outputText);
-  } catch (e) {
-    console.error("JSON Parse Error on chunk:", outputText.substring(0, 50));
-    return [];
-  }
+        const canvasElement = await page.$('canvas');
+        await canvasElement.screenshot({ path: outputPath, type: 'jpeg', quality: 90 });
+    } finally {
+        await page.close();
+    }
 }
 
-runIngestion().catch(console.error);
+async function uploadFileToDrive(fileName, localFilePath, mimeType) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            const res = await driveService.files.create({
+                resource: { name: fileName, parents: [TARGET_FOLDER_ID] },
+                media: { mimeType: mimeType, body: fs.createReadStream(localFilePath) },
+                fields: 'id',
+                supportsAllDrives: true
+            });
+            // パーミッション自動継承により個別付与APIを省略（レートリミット回避）
+            return res.data.id;
+        } catch (err) {
+            console.log(`  -> Drive Upload error. Attempt ${attempt}/3 : ${err.message}`);
+            await new Promise(r => setTimeout(r, 2000 * attempt));
+        }
+    }
+    throw new Error("Failed to upload after 3 attempts");
+}
+
+async function processAll() {
+    console.log("🚀 完全画像化 + 1ページPDFハイブリッドバッチ処理を開始します...");
+    await initGoogleDrive();
+
+    let progress = {};
+    if (fs.existsSync(PROGRESS_FILE)) {
+        progress = JSON.parse(fs.readFileSync(PROGRESS_FILE, 'utf8'));
+    }
+
+    const browser = await puppeteer.launch({
+        executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+        headless: true
+    });
+
+    const files = fs.readdirSync(BASE_DIR).filter(f => f.toLowerCase().endsWith('.pdf'));
+
+    for (const file of files) {
+        const filePath = path.join(BASE_DIR, file);
+        const mapping = CATALOG_MAP[file] || { manufacturer: '不明', catalog_name: file.replace('.pdf', '') };
+        
+        await supabase.from('manufacturers').upsert({ name: mapping.manufacturer }, { onConflict: 'name', ignoreDuplicates: true });
+
+        console.log(`\n======================================`);
+        console.log(`📂 対象ファイル: ${file}`);
+        console.log(`🏭 メーカー: ${mapping.manufacturer} | カタログ: ${mapping.catalog_name}`);
+        
+        let totalPages = 0;
+        let pdfDoc;
+        try {
+            const pdfBytes = fs.readFileSync(filePath);
+            pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+            totalPages = pdfDoc.getPageCount();
+        } catch (e) {
+            console.error(`❌ PDF読み込みエラー ${file}:`, e.message);
+            continue;
+        }
+
+        console.log(`📄 総ページ数: ${totalPages}`);
+
+        await startPdfServer(filePath);
+
+        progress[file] = progress[file] || {};
+
+        for (let i = 1; i <= totalPages; i++) {
+            if (progress[file][i]) {
+                process.stdout.write(`⏭️ ${i} `);
+                continue;
+            }
+
+            console.log(`\n[${file}]⏳ ページ ${i}/${totalPages} 抽出中...`);
+            const localImgPath = `/tmp/render_${Date.now()}.jpg`;
+            const localPdfPath = `/tmp/render_${Date.now()}.pdf`;
+            
+            try {
+                // 1. JPEG抽出とアップロード
+                await renderPageToImage(browser, i, localImgPath);
+                const imgDriveFileId = await uploadFileToDrive(`${mapping.manufacturer}_${mapping.catalog_name}_p${i}.jpg`, localImgPath, 'image/jpeg');
+                
+                // 2. 単一PDF抽出とアップロード
+                const singlePageDoc = await PDFDocument.create();
+                const [copiedPage] = await singlePageDoc.copyPages(pdfDoc, [i - 1]);
+                singlePageDoc.addPage(copiedPage);
+                const singlePageBytes = await singlePageDoc.save();
+                fs.writeFileSync(localPdfPath, singlePageBytes);
+                const pdfDriveFileId = await uploadFileToDrive(`${mapping.manufacturer}_${mapping.catalog_name}_p${i}.pdf`, localPdfPath, 'application/pdf');
+
+                const imageUrl = `https://drive.google.com/uc?export=download&id=${imgDriveFileId}`;
+
+                // 2.5: pdf-parseでテキストを抽出
+                let pageText = "";
+                try {
+                    const parser = new PDFParse({ data: singlePageBytes });
+                    const result = await parser.getText();
+                    // 余分な改行や空白を除去
+                    pageText = result.text.replace(/\s+/g, ' ').trim();
+                } catch(pe) {
+                    console.log(`  -> Text extraction skipped/failed: ${pe.message}`);
+                }
+
+                // 3. Supabaseに登録 (画像とPDF両方のキー, 抽出したページテキストを保存)
+                const { error: dbErr } = await supabase.from('catalog_pages').upsert({
+                    manufacturer: mapping.manufacturer,
+                    catalog_name: mapping.catalog_name,
+                    page_number: i,
+                    drive_file_id: imgDriveFileId,
+                    page_image_url: imageUrl,
+                    pdf_drive_file_id: pdfDriveFileId,
+                    page_text: pageText
+                }, { onConflict: 'manufacturer,catalog_name,page_number' });
+
+                if (dbErr) {
+                    throw new Error(`DB Error: ${dbErr.message}`);
+                }
+
+                console.log(`  ✅ 成功: ImageDriveID=${imgDriveFileId}, PdfDriveID=${pdfDriveFileId}`);
+                
+                progress[file][i] = true;
+                fs.writeFileSync(PROGRESS_FILE, JSON.stringify(progress, null, 2));
+                
+                fs.unlinkSync(localImgPath);
+                fs.unlinkSync(localPdfPath);
+
+            } catch (err) {
+                console.error(`  ❌ 失敗 (ページ ${i}):`, err.message);
+                if (fs.existsSync(localImgPath)) fs.unlinkSync(localImgPath);
+                if (fs.existsSync(localPdfPath)) fs.unlinkSync(localPdfPath);
+            }
+        }
+        
+        stopPdfServer();
+    }
+
+    await browser.close();
+    console.log("\n🎉 すべての完了しました！");
+}
+
+processAll().catch(console.error);

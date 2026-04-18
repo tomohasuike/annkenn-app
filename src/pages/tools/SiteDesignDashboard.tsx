@@ -1,8 +1,11 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronRight, Trash2, Network, ChevronDown, ShieldCheck, Activity, AlertTriangle, ExternalLink, Link as LinkIcon, Printer, Zap } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useLocation, useOutletContext } from 'react-router-dom';
+import { ChevronRight, Trash2, Network, ChevronDown, ShieldCheck, Activity, AlertTriangle, ExternalLink, Link as LinkIcon, Printer, Zap, Upload, Bot, Undo2, Redo2, Loader2, CloudOff, CheckCircle2, Settings2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useBoardHistory } from '../../hooks/useBoardHistory';
 import { NumpadModal } from '../../components/ui/NumpadModal';
+import { GlobalAILoadImportModal } from '../../components/GlobalAILoadImportModal';
+import { processAiBatchImport } from '../../utils/aiBatchImport';
 
 type NodeType = 'root_cubicle' | 'root_main_lv' | 'power' | 'lighting';
 
@@ -26,7 +29,11 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 const BREAKER_SIZES = [20, 30, 40, 50, 60, 75, 100, 125, 150, 175, 200, 225, 250, 300, 400, 500, 600, 800, 1000];
 
 export default function SiteDesignDashboard() {
-  const { projectId } = useParams();
+  const { projectId: pathProjectId } = useParams();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const { selectedProjectId } = useOutletContext<{ selectedProjectId?: string }>() || {};
+  const projectId = pathProjectId || searchParams.get('projectId') || selectedProjectId;
   const navigate = useNavigate();
   
   const [siteTitle, setSiteTitle] = useState('〇〇工場 新築電気設備工事');
@@ -34,8 +41,15 @@ export default function SiteDesignDashboard() {
   const [linkedBoards, setLinkedBoards] = useState<any[]>([]);
   const [nodeToDelete, setNodeToDelete] = useState<{ id: string, name: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('saved');
+  const skipHistory = useRef(false);
+  const isDataLoaded = useRef(false);
+  const { initHistory, pushHistory, undo, redo, canUndo, canRedo } = useBoardHistory<{root: NodeData, siteDiversityFactor: number}>();
+  
   const [treeDbId, setTreeDbId] = useState<string | null>(null);
   const [showBasis, setShowBasis] = useState(false); // 圧縮根拠の表示トグル
+  
+  const [allTools, setAllTools] = useState<any[]>([]); // 全ての関連盤リスト
 
   // Numpad State
   const [numpad, setNumpad] = useState<{
@@ -51,6 +65,10 @@ export default function SiteDesignDashboard() {
     initialValue: 0,
     label: ''
   });
+
+  // AI一括取り込み機能用ステート
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const openNumpad = (id: string, field: 'totalKw' | 'demandFactor' | 'wireIw' | 'lengthM', initialValue: number, label: string) => {
     setNumpad({ isOpen: true, targetId: id, targetField: field, initialValue, label });
@@ -80,6 +98,7 @@ export default function SiteDesignDashboard() {
   });
 
   // Default hardcoded tree (Used if DB has no tree saved)
+  // 新規案件は空の状態で開始（サンプルノードは含めない）
   const defaultTree: NodeData = {
     id: 'root-1',
     name: '第1キュービクル (高圧受電)',
@@ -90,45 +109,7 @@ export default function SiteDesignDashboard() {
     wireIw: 0,
     lengthM: 0,
     isExpanded: true,
-    children: [
-      {
-        id: generateId(),
-        name: '第1動力盤 (屋上空調)',
-        type: 'power',
-        totalKw: 55.0,
-        demandFactor: 60,
-        mainBreakerA: 225,
-        wireIw: 150,
-        lengthM: 10,
-        isExpanded: true,
-        children: []
-      },
-      {
-        id: generateId(),
-        name: '1階 電灯分電盤-A',
-        type: 'lighting',
-        totalKw: 28.5,
-        demandFactor: 80,
-        mainBreakerA: 100,
-        wireIw: 110,
-        lengthM: 15,
-        isExpanded: true,
-        children: [
-          {
-            id: generateId(),
-            name: 'サーバー室 専用子盤',
-            type: 'power',
-            totalKw: 10.0,
-            demandFactor: 100,
-            mainBreakerA: 40,
-            wireIw: 45,
-            lengthM: 6,
-            isExpanded: true,
-            children: []
-          }
-        ]
-      }
-    ]
+    children: [] // 新規案件は常に空の状態
   };
 
   // --- Linked Boards Operations ---
@@ -138,6 +119,18 @@ export default function SiteDesignDashboard() {
       loadLinkedBoards();
       loadProjectInfo();
     }
+  }, [projectId]);
+
+  // 他タブ（動力/電灯計算）から戻ってきた時にポータルを自動更新
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && projectId) {
+        loadTreeData();
+        loadLinkedBoards();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [projectId]);
 
   const loadTreeData = async () => {
@@ -151,14 +144,58 @@ export default function SiteDesignDashboard() {
       setTreeDbId(data.id);
       if (data.data_payload.root) setRoot(data.data_payload.root);
       if (data.data_payload.siteDiversityFactor) setSiteDiversityFactor(data.data_payload.siteDiversityFactor);
+      
+      initHistory({ root: data.data_payload.root || defaultTree, siteDiversityFactor: data.data_payload.siteDiversityFactor || 100 });
+      isDataLoaded.current = true;
+      setSaveStatus('saved');
     } else {
       setRoot(defaultTree); // なければデフォルト構成をセット
+      initHistory({ root: defaultTree, siteDiversityFactor: 100 });
+      isDataLoaded.current = true;
+      setSaveStatus('saved');
     }
   };
 
-  const saveTreeData = async () => {
+  // --- Undo/Redo & AutoSave ---
+  const handleUndo = () => {
+    const prev = undo();
+    if (prev) {
+      skipHistory.current = true;
+      setRoot(prev.root);
+      setSiteDiversityFactor(prev.siteDiversityFactor);
+    }
+  };
+
+  const handleRedo = () => {
+    const next = redo();
+    if (next) {
+      skipHistory.current = true;
+      setRoot(next.root);
+      setSiteDiversityFactor(next.siteDiversityFactor);
+    }
+  };
+
+  useEffect(() => {
+    if (!isDataLoaded.current) return;
+    
+    setSaveStatus('idle');
+
+    const timeoutId = setTimeout(() => {
+      const currentState = { root, siteDiversityFactor };
+      if (!skipHistory.current) {
+         pushHistory(currentState);
+      }
+      skipHistory.current = false;
+      saveTreeData(true);
+    }, 1500);
+
+    return () => clearTimeout(timeoutId);
+  }, [root, siteDiversityFactor]);
+
+  const saveTreeData = async (isAutoSave = false) => {
     if (!projectId) return;
     setIsSaving(true);
+    setSaveStatus('saving');
     
     try {
       const payload = { root, siteDiversityFactor };
@@ -173,9 +210,11 @@ export default function SiteDesignDashboard() {
         }).select().single();
         if (data) setTreeDbId(data.id);
       }
+      setSaveStatus('saved');
     } catch (e) {
       console.error(e);
-      alert('保存に失敗しました');
+      // alert('保存に失敗しました');
+      setSaveStatus('error');
     } finally {
       setIsSaving(false);
     }
@@ -199,15 +238,45 @@ export default function SiteDesignDashboard() {
   };
 
   const loadLinkedBoards = async () => {
-    const { data } = await supabase.from('site_tools_data')
-      .select('id, name, data_payload, tool_type')
+    const { data } = await supabase.from('calc_panels')
+      .select('id, name, panel_type, tree_node_id')
       .eq('project_id', projectId)
-      .in('tool_type', ['POWER_CALC', 'LIGHTING_CALC']);
+      .in('panel_type', ['POWER', 'LIGHTING']);
     
     if (data) {
+      const mappedTools = data.map(dbRow => ({
+         id: dbRow.id,
+         name: dbRow.name,
+         tool_type: dbRow.panel_type === 'POWER' ? 'POWER_CALC' : 'LIGHTING_CALC',
+         data_payload: {
+           treeNodeId: dbRow.tree_node_id
+         }
+      }));
+      setAllTools(mappedTools);
       // ツリーと連携している盤のみ抽出
-      const linked = data.filter(d => d.data_payload?.treeNodeId);
+      const linked = mappedTools.filter(d => d.data_payload?.treeNodeId);
       setLinkedBoards(linked);
+    }
+  };
+
+  const linkExistingBoard = async (nodeId: string, boardId: string, nodeType: string) => {
+    const board = allTools.find(t => t.id === boardId);
+    if (!board) return;
+    
+    try {
+      const newPayload = { ...board.data_payload, treeNodeId: nodeId };
+      await supabase.from('calc_panels').update({ tree_node_id: nodeId }).eq('id', boardId);
+      
+      setAllTools(prev => prev.map(t => t.id === boardId ? { ...t, data_payload: newPayload } : t));
+      setLinkedBoards(prev => {
+        const remaining = prev.filter(t => t.id !== boardId);
+        return [...remaining, { ...board, data_payload: newPayload }];
+      });
+
+      handleUpdate(nodeId, { name: board.name });
+    } catch(e) {
+      console.error(e);
+      alert('リンクエラーが発生しました。');
     }
   };
 
@@ -249,13 +318,13 @@ export default function SiteDesignDashboard() {
     return { ...tree, children: tree.children.map(c => deleteNode(c, id)).filter(Boolean) as NodeData[] };
   };
 
-  const addChildNode = (tree: NodeData, parentId: string, nodeType: NodeType): NodeData => {
+  const addChildNode = (tree: NodeData, parentId: string, nodeType: NodeType, overrideId?: string, overrideName?: string): NodeData => {
     if (tree.id === parentId) {
       const newNode: NodeData = {
-        id: generateId(),
-        name: `新規${nodeType === 'power' ? '動力' : '電灯'}盤`,
+        id: overrideId || generateId(),
+        name: overrideName || `新規${nodeType === 'power' ? '動力' : '電灯'}盤`,
         type: nodeType,
-        totalKw: 10,
+        totalKw: 0,
         demandFactor: 100,
         mainBreakerA: 100,
         parentFeederBreakerA: tree.mainBreakerA,
@@ -269,8 +338,90 @@ export default function SiteDesignDashboard() {
     return { ...tree, children: tree.children.map(c => addChildNode(c, parentId, nodeType)) };
   };
 
+  // ノード追加 + calc_panels自動作成（空の盤）
+  const handleAddChildBoard = async (parentId: string, nodeType: 'power' | 'lighting') => {
+    const newNodeId = generateId();
+    const newNodeName = `新規${nodeType === 'power' ? '動力' : '電灯'}盤`;
+    // ツリーに追加
+    setRoot(prev => addChildNode(prev, parentId, nodeType, newNodeId, newNodeName));
+    // calc_panelsに空の盤を自動作成
+    if (projectId) {
+      const { error } = await supabase.from('calc_panels').insert([{
+        project_id: projectId,
+        name: newNodeName,
+        panel_type: nodeType === 'power' ? 'POWER' : 'LIGHTING',
+        voltage_system: nodeType === 'power' ? '3Φ3W 200V' : '1Φ3W 100/200V',
+        reduction_factor: 1.0,
+        tree_node_id: newNodeId,
+      }]);
+      if (!error) await loadLinkedBoards();
+    }
+  };
+
   const handleUpdate = (id: string, updates: Partial<NodeData>) => {
     setRoot(updateNode(root, id, updates));
+    
+    // ツリー上で名前が変更された時、もし紐付いている盤があればそのファイル名も同期する
+    if (updates.name !== undefined) {
+      const linkedBoard = getLinkedBoardForNode(id);
+      if (linkedBoard) {
+        supabase.from('site_tools_data')
+          .update({ name: updates.name })
+          .eq('id', linkedBoard.id)
+          .then(() => {
+            setAllTools(prev => prev.map(t => t.id === linkedBoard.id ? { ...t, name: updates.name as string } : t));
+            setLinkedBoards(prev => prev.map(t => t.id === linkedBoard.id ? { ...t, name: updates.name as string } : t));
+          })
+          .catch(err => console.error("名前の同期に失敗:", err));
+      }
+    }
+  };
+
+  // ================= AI 一括インポート処理 =================
+  const handleGlobalAiImport = async (jsonText: string, mode: 'overwrite' | 'append') => {
+    try {
+      if (!projectId) throw new Error('プロジェクトが選択されていません');
+      setIsImporting(true);
+
+      const parsed = JSON.parse(jsonText);
+      const nodesData = parsed.root_nodes || (parsed.type ? [parsed] : []);
+
+      if (nodesData.length === 0) throw new Error('JSON内にルートノードが見つかりません');
+
+      const newNodes = await processAiBatchImport(projectId, nodesData);
+
+      let updatedRoot = root;
+      if (mode === 'overwrite' || !root) {
+        updatedRoot = newNodes[0];
+      } else {
+        updatedRoot = {
+          ...root,
+          children: [...root.children, ...newNodes]
+        };
+      }
+
+      setRoot(updatedRoot);
+      setIsAiModalOpen(false);
+      
+      const payload = { root: updatedRoot, version: "2.0" };
+      
+      const { data: existingTree } = await supabase.from('site_tools_data')
+        .select('id').eq('project_id', projectId).eq('tool_type', 'SITE_TREE').single();
+
+      if (existingTree) {
+        await supabase.from('site_tools_data').update({ data_payload: payload, updated_at: new Date().toISOString() }).eq('id', existingTree.id);
+      } else {
+        await supabase.from('site_tools_data').insert({ project_id: projectId, tool_type: 'SITE_TREE', name: 'Site Distribution Tree', is_active: true, data_payload: payload });
+      }
+
+      alert('AI設計図面の取り込みが完了しました！');
+
+    } catch (e: any) {
+      console.error(e);
+      alert('インポート失敗: ' + (e.message || 'JSONの形式が正しくない可能性があります'));
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   // --- TEPCO Compliance Calculations ---
@@ -435,9 +586,29 @@ export default function SiteDesignDashboard() {
     const isRoot = node.type === 'root_cubicle' || node.type === 'root_main_lv';
     const vals = getNodeValues(node);
 
-    const handleOpenCalc = (type: 'power' | 'lighting') => {
-      const url = `/tools/${type}-calc?treeNodeId=${node.id}&name=${encodeURIComponent(node.name)}`;
-      navigate(url);
+    const handleOpenCalc = async (type: 'power' | 'lighting') => {
+      if (vals.isLinked && vals.boardId) {
+        // 構付済みは直接開く
+        navigate(`/tools/${type}-calc?load_id=${vals.boardId}`);
+      } else {
+        // 未構付の場合は自動でcalc_panelsを作成してから遷移
+        if (projectId) {
+          const { data, error } = await supabase.from('calc_panels').insert([{
+            project_id: projectId,
+            name: node.name,
+            panel_type: type === 'power' ? 'POWER' : 'LIGHTING',
+            voltage_system: type === 'power' ? '3Φ3W 200V' : '1Φ3W 100/200V',
+            reduction_factor: 1.0,
+            tree_node_id: node.id,
+          }]).select().single();
+          if (!error && data) {
+            await loadLinkedBoards();
+            navigate(`/tools/${type}-calc?load_id=${data.id}`);
+            return;
+          }
+        }
+        navigate(`/tools/${type}-calc?treeNodeId=${node.id}&name=${encodeURIComponent(node.name)}`);
+      }
     };
 
     return (
@@ -449,6 +620,66 @@ export default function SiteDesignDashboard() {
         )}
 
         <div className={`border rounded-lg shadow-sm transition-all overflow-hidden ${isRoot ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 hover:border-blue-300'}`}>
+          
+          {/* Branch Rules & Properties Area (Moved to top of child) */}
+          {!isRoot && parentNode && (
+            <div className="bg-amber-50/50 border-b border-slate-200 p-1.5 flex flex-wrap gap-3 items-center text-[10px]">
+              <span className="font-bold text-amber-700 bg-white px-1.5 py-0.5 rounded shadow-sm border border-amber-200" title="この子盤へ電気を送るために、親盤の中に設置されている遮断器・電線の情報です">
+                親盤（{parentNode.name}）内の送り
+              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-slate-500 font-bold">送りブレーカ(I<sub>B</sub>)</span>
+                <select 
+                  value={node.parentFeederBreakerA || parentNode.mainBreakerA} 
+                  onChange={e => handleUpdate(node.id, { parentFeederBreakerA: Number(e.target.value) })} 
+                  className="border border-amber-200 rounded px-1 py-0.5 text-center font-bold text-slate-700 text-[10px] appearance-none cursor-pointer bg-white" 
+                >
+                  {!BREAKER_SIZES.includes(node.parentFeederBreakerA || parentNode.mainBreakerA) && (
+                    <option value={node.parentFeederBreakerA || parentNode.mainBreakerA}>{node.parentFeederBreakerA || parentNode.mainBreakerA}</option>
+                  )}
+                  {BREAKER_SIZES.map(size => (
+                    <option key={size} value={size}>{size}</option>
+                  ))}
+                </select>
+                <span className="text-slate-500">A</span>
+              </div>
+              
+              <div className="text-slate-400">→ 分岐・配線 →</div>
+              
+              <div className="flex items-center gap-1">
+                <label className="text-slate-500 font-bold">送り電線 I<sub>w</sub></label>
+                <input 
+                  type="text" 
+                  inputMode="none" 
+                  readOnly 
+                  value={node.wireIw} 
+                  onClick={() => openNumpad(node.id, 'wireIw', node.wireIw, 'ケーブル許容電流(Iw)')} 
+                  className="w-10 h-5 text-[10px] border border-amber-200 rounded px-1 text-right font-mono hide-spinners cursor-pointer focus:ring-1 focus:ring-amber-500 bg-white" 
+                /> A
+              </div>
+              <div className="flex items-center gap-1">
+                <label className="text-slate-500 font-bold">距離 L</label>
+                <input 
+                  type="text" 
+                  inputMode="none" 
+                  readOnly 
+                  value={node.lengthM} 
+                  onClick={() => openNumpad(node.id, 'lengthM', node.lengthM, '距離 L(m)')} 
+                  className="w-10 h-5 text-[10px] border border-amber-200 rounded px-1 text-right font-mono hide-spinners cursor-pointer focus:ring-1 focus:ring-amber-500 bg-white" 
+                /> m
+              </div>
+
+              {/* Rule Validation Result Badge */}
+              {rule && (
+                <div className={`ml-auto flex items-center gap-1 px-1.5 py-0.5 rounded shadow-sm border ${rule.isValid ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                  {rule.isValid ? <Activity className="w-2.5 h-2.5" /> : <AlertTriangle className="w-2.5 h-2.5" />}
+                  <span className="font-bold">{rule.isValid ? '法規 適合' : '法規 違反'}</span>
+                  <span className="opacity-80 ml-1 truncate max-w-[120px]">({rule.msg})</span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className={`p-3 flex flex-wrap items-center gap-3 ${isRoot ? 'border-b border-slate-700' : 'border-b bg-slate-50'}`}>
             
             <button onClick={() => handleUpdate(node.id, { isExpanded: !node.isExpanded })} className={`${isRoot ? 'text-white hover:text-blue-300' : 'text-slate-500 hover:text-blue-600'}`}>
@@ -514,44 +745,42 @@ export default function SiteDesignDashboard() {
                 </div>
                 
                 {/* 連携ボタン */}
-                <div className="border-l border-slate-200 pl-2 ml-1">
+                <div className="border-l border-slate-200 pl-2 ml-1 flex items-center gap-1">
                   <button 
                     onClick={() => handleOpenCalc(node.type as 'power' | 'lighting')}
-                    className={`h-7 px-2 text-[10px] font-bold rounded flex items-center gap-1 transition-colors ${
-                      vals.isLinked 
-                        ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-200' 
-                        : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-100'
-                    }`}
+                    className="h-7 px-2 text-[10px] font-bold rounded flex items-center gap-1 transition-colors whitespace-nowrap bg-green-100 text-green-700 hover:bg-green-200 border border-green-200"
                   >
                     <ExternalLink className="w-3 h-3" />
-                    {vals.isLinked ? '計算書' : '計算作成'}
+                    {vals.isLinked ? '計算書を開く' : '計算書を開く(自動作成)'}
                   </button>
                 </div>
               </>
             )}
 
-            <div className="flex items-center gap-1 border-l border-slate-200 pl-3 ml-2">
-              <span className={`text-[10px] ${isRoot ? 'text-slate-400' : 'text-blue-500 font-bold'}`} title="この盤の主幹ブレーカー(A)。子へ送る配線の基準となります。">主幹 B</span>
-              <select 
-                value={node.mainBreakerA} 
-                onChange={e => handleUpdate(node.id, { mainBreakerA: Number(e.target.value) })}
-                className={`h-7 text-xs border rounded pl-1 pr-6 font-mono text-right appearance-none cursor-pointer ${isRoot ? 'bg-slate-700 border-slate-600 text-white' : 'border-blue-200 bg-blue-50 text-blue-800'}`}
-              >
-                {/* 既存の値がリストにない場合のフォールバック */}
-                {!BREAKER_SIZES.includes(node.mainBreakerA) && <option value={node.mainBreakerA}>{node.mainBreakerA}</option>}
-                {BREAKER_SIZES.map(size => (
-                  <option key={size} value={size}>{size}</option>
-                ))}
-              </select>
+            <div className="flex items-center gap-1 border-l border-slate-300 pl-3 ml-2">
+              {!(isRoot && node.type === 'root_cubicle') && (
+                <>
+                  <span className={`text-[10px] ${isRoot ? 'text-slate-400' : 'text-blue-500 font-bold'}`} title="この盤の主幹ブレーカー(A)。子へ送る配線の基準となります。">主幹 B</span>
+                  <select 
+                    value={node.mainBreakerA} 
+                    onChange={e => handleUpdate(node.id, { mainBreakerA: Number(e.target.value) })}
+                    className={`h-7 text-xs border rounded pl-1 pr-6 font-mono text-right appearance-none cursor-pointer ${isRoot ? 'bg-slate-700 border-slate-600 text-white' : 'border-blue-200 bg-blue-50 text-blue-800'}`}
+                  >
+                    {!BREAKER_SIZES.includes(node.mainBreakerA) && <option value={node.mainBreakerA}>{node.mainBreakerA}</option>}
+                    {BREAKER_SIZES.map(size => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
+                </>
+              )}
             </div>
 
-            {/* Add/Delete Buttons */}
+            {/* Delete Button only (盤作成は動力/電灯計算ツールから行う) */}
             <div className="flex items-center gap-1 ml-auto shrink-0 pl-2">
-              <button title="子（分岐先の盤）を追加" onClick={() => setRoot(addChildNode(root, node.id, 'power'))} className={`p-1 rounded text-xs transition-colors ${isRoot ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>+子盤</button>
               {!isRoot && (
                 <button 
                   onClick={() => setNodeToDelete({ id: node.id, name: node.name })} 
-                  className="p-1 rounded bg-red-50 text-red-500 hover:bg-red-100 ml-1"
+                  className="p-1 rounded bg-red-50 text-red-500 hover:bg-red-100"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -559,60 +788,7 @@ export default function SiteDesignDashboard() {
             </div>
           </div>
 
-          {/* Branch Rules & Properties Area (Only for non-root) */}
-          {!isRoot && parentNode && (
-            <div className="p-2 bg-slate-50 flex flex-wrap gap-4 items-center text-xs">
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-slate-400" title="親盤内にある、この盤への送り出しブレーカー">送りブレーカ(I<sub>B</sub>)</span>
-                <select 
-                  value={node.parentFeederBreakerA || parentNode.mainBreakerA} 
-                  onChange={e => handleUpdate(node.id, { parentFeederBreakerA: Number(e.target.value) })} 
-                  className="border rounded pl-1.5 pr-6 py-0.5 text-center font-bold text-slate-700 text-xs appearance-none cursor-pointer bg-white" 
-                >
-                  {/* リストにないカスタム値の保護 */}
-                  {!BREAKER_SIZES.includes(node.parentFeederBreakerA || parentNode.mainBreakerA) && (
-                    <option value={node.parentFeederBreakerA || parentNode.mainBreakerA}>{node.parentFeederBreakerA || parentNode.mainBreakerA}</option>
-                  )}
-                  {BREAKER_SIZES.map(size => (
-                    <option key={size} value={size}>{size}</option>
-                  ))}
-                </select>
-                <span className="text-[10px] text-slate-400">A</span>
-              </div>
-              <div className="font-bold text-slate-400">→分岐→</div>
-              <div className="flex items-center gap-1">
-                <label className="text-[10px] text-slate-600 font-bold">送り電線 I<sub>w</sub></label>
-                <input 
-                  type="text" 
-                  inputMode="none" 
-                  readOnly 
-                  value={node.wireIw} 
-                  onClick={() => openNumpad(node.id, 'wireIw', node.wireIw, 'ケーブル許容電流(Iw)')} 
-                  className="w-12 h-6 text-xs border rounded px-1 text-right font-mono hide-spinners cursor-pointer focus:ring-2 focus:ring-slate-400" 
-                /> A
-              </div>
-              <div className="flex items-center gap-1">
-                <label className="text-[10px] text-slate-600 font-bold">距離 L</label>
-                <input 
-                  type="text" 
-                  inputMode="none" 
-                  readOnly 
-                  value={node.lengthM} 
-                  onClick={() => openNumpad(node.id, 'lengthM', node.lengthM, '距離 L(m)')} 
-                  className="w-12 h-6 text-xs border rounded px-1 text-right font-mono hide-spinners cursor-pointer focus:ring-2 focus:ring-slate-400" 
-                /> m
-              </div>
-
-              {/* Rule Validation Result Badge */}
-              {rule && (
-                <div className={`ml-auto flex items-center gap-1 px-2 py-1 rounded-sm border ${rule.isValid ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
-                  {rule.isValid ? <Activity className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
-                  <span className="font-bold">{rule.isValid ? '法規 適合' : '法規 違反'}</span>
-                  <span className="opacity-80 text-[10px] ml-1">({rule.msg})</span>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Removed Branch Rules from bottom, they are now at the top of the node */}
         </div>
 
         {/* Render Children Recursively */}
@@ -635,13 +811,50 @@ export default function SiteDesignDashboard() {
           </h1>
           <p className="text-sm text-muted-foreground mt-1">「系統図」を作成し、3m/8m規程チェックから総合デマンド低圧判定まで一気通貫で設計します。</p>
         </div>
-        <button
-          onClick={saveTreeData}
-          disabled={isSaving}
-          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-bold rounded-full shadow-sm shadow-blue-500/30 transition-all flex items-center gap-2"
-        >
-          {isSaving ? '保存中...' : 'クラウド保存'}
-        </button>
+        
+        <div className="flex gap-2 flex-wrap justify-end">
+          {/* Undo / Redo */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+            <button
+              disabled={!canUndo}
+              onClick={handleUndo}
+              className="p-2 text-slate-500 hover:text-slate-800 disabled:opacity-30 rounded hover:bg-white transition-all shadow-sm"
+              title="元に戻す"
+            >
+              <Undo2 className="w-4 h-4" />
+            </button>
+            <div className="w-px h-4 bg-slate-300 mx-1"></div>
+            <button
+              disabled={!canRedo}
+              onClick={handleRedo}
+              className="p-2 text-slate-500 hover:text-slate-800 disabled:opacity-30 rounded hover:bg-white transition-all shadow-sm"
+              title="やり直す"
+            >
+              <Redo2 className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Save Status Indicator */}
+          <div className="flex items-center gap-2 px-3 py-2 min-w-[110px] justify-center bg-slate-50 border border-slate-200 rounded-lg text-sm shadow-sm print-hidden">
+            {saveStatus === 'saving' ? (
+              <><Loader2 className="w-4 h-4 text-blue-500 animate-spin" /><span className="text-slate-500 font-medium text-[11px]">保存中...</span></>
+            ) : saveStatus === 'saved' ? (
+              <><CheckCircle2 className="w-4 h-4 text-emerald-500" /><span className="text-emerald-700 font-bold text-[11px]">保存完了</span></>
+            ) : saveStatus === 'error' ? (
+              <><CloudOff className="w-4 h-4 text-red-500" /><span className="text-red-600 font-bold text-[11px]">エラー</span></>
+            ) : (
+              <><Settings2 className="w-4 h-4 text-slate-400" /><span className="text-slate-500 font-medium text-[11px]">編集中...</span></>
+            )}
+          </div>
+          
+          <button
+            onClick={() => setIsAiModalOpen(true)}
+            className="hidden sm:flex px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg shadow-sm transition-all items-center gap-2"
+          >
+            <Bot className="w-4 h-4" />
+            AI一括自動設計
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 print-hidden">

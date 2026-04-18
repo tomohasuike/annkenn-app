@@ -85,11 +85,6 @@ export default function SafetyDashboard() {
       
       const historyEvents = eventData || [];
       setEvents(historyEvents);
-      
-      // Auto-select latest event if available and none selected
-      if (selectedEventId === 'all' && historyEvents.length > 0) {
-        setSelectedEventId(historyEvents[0].id);
-      }
 
       // 3. Fetch All Reports
       const { data: reportData, error: reportErr } = await supabase
