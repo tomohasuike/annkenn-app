@@ -968,7 +968,7 @@ export const KensackEngine: React.FC = () => {
           {/* グリッドレイアウト */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {result.materials.map((m) => {
-              const isLowConfidence = m.confidence !== undefined && m.confidence < 70;
+
               const isSelected = cartItems.some(selected => selected.material?.id === m.id);
               const hasDimensions = m.width_mm || m.height_mm || m.depth_mm;
               
@@ -1529,12 +1529,6 @@ export const KensackEngine: React.FC = () => {
                              </div>
                              </>
                            ) : (() => {
-                              const rawUrl = page.catalog_url || pdfUrl || '';
-                              const fIdM = rawUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
-                              const fId = fIdM ? fIdM[1] : null;
-                              const downloadUrl = fId
-                                ? `https://drive.google.com/uc?export=download&id=${fId}`
-                                : rawUrl;
                               
                               return (
                                 <div className="w-full h-full flex flex-col items-center justify-center gap-5 p-8 text-center">

@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
 /** タイムアウト付きfetch */
-const fetchWithTimeout = (url: string, options: RequestInit, timeoutMs: number): Promise<Response> => {
+const fetchWithTimeout = (url: string, options: RequestInit, timeoutMs: number = 15000): Promise<Response> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   return fetch(url, { ...options, signal: controller.signal })
