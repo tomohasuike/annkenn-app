@@ -15,16 +15,24 @@ import { format } from 'date-fns';
 
 /**
  * タイムスタンプ → JST文字列変換ヘルパー
- * ブラウザのタイムゾーン設定に依存せず、UTC+9を直接計算して表示する。
- * Supabaseは常にUTC（+00:00付き）で返すため、+9h = +32400000ms を加算する。
+ * Intl.DateTimeFormat で timeZone: 'Asia/Tokyo' を明示指定することで、
+ * ブラウザのタイムゾーン設定に関わらず常に正確なJST時刻を表示する。
  */
 const formatJST = (ts: string, fmt: string): string => {
   if (!ts) return '-';
-  const utcMs = new Date(ts).getTime();
-  if (isNaN(utcMs)) return '-';
-  // UTC+9 のオフセットを直接加算してJST相当のDateオブジェクトを作成
-  const jstDate = new Date(utcMs + 9 * 60 * 60 * 1000);
-  return format(jstDate, fmt);
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '-';
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(d);
+  const p: Record<string, string> = {};
+  parts.forEach(x => { p[x.type] = x.value; });
+  if (fmt === 'yyyy/MM/dd HH:mm') return `${p.year}/${p.month}/${p.day} ${p.hour}:${p.minute}`;
+  if (fmt === 'MM/dd HH:mm')      return `${p.month}/${p.day} ${p.hour}:${p.minute}`;
+  if (fmt === 'yyyyMMdd_HHmm')    return `${p.year}${p.month}${p.day}_${p.hour}${p.minute}`;
+  return `${p.year}/${p.month}/${p.day} ${p.hour}:${p.minute}`;
 };
 
 /** タイムスタンプ → ミリ秒（UTC）。フィルタ比較用 */
