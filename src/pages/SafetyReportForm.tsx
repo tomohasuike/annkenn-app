@@ -44,13 +44,18 @@ export default function SafetyReportForm() {
           } else {
             setWorkerName(user.email.split('@')[0]);
           }
+        } else {
+          // セッション切れ・未ログインの場合はログイン画面へリダイレクト
+          // ログイン後に安否フォームに戻れるようreturnUrlを渡す
+          navigate('/login?redirectTo=/safety-report', { replace: true });
         }
       } catch (err) {
         console.error("Error fetching user worker:", err);
+        navigate('/login?returnUrl=/safety-report', { replace: true });
       }
     };
     fetchCurrentUserWorker();
-  }, []);
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
