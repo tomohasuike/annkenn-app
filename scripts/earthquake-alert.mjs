@@ -93,28 +93,37 @@ async function main() {
     process.exit(0);
   }
 
-  // 閾値チェック
-  if (maxScale < thresholdNum) {
-    console.log(`閾値未満 (${scaleToStr(maxScale)} < 震度${settings.earthquake_threshold}) - 送信しない`);
-    // 処理済みとしてIDを更新（次回の無駄なチェックを防ぐ）
+  // 栃木県（対象地域）の震度を取得
+  let localScale = 0;
+  let regionInfo = '';
+  if (targetRegion && latest.points && latest.points.length > 0) {
+    const regionPoints = latest.points.filter(p =>
+      p.pref?.includes(targetRegion) || p.addr?.includes(targetRegion)
+    );
+    if (regionPoints.length > 0) {
+      localScale = Math.max(...regionPoints.map(p => p.scale || 0));
+      regionInfo = `${targetRegion}の最大震度: 震度${scaleToStr(localScale)}`;
+      console.log(regionInfo);
+    } else {
+      console.log(`${targetRegion}の観測点なし（全国最大震度: ${scaleToStr(maxScale)}）`);
+    }
+  }
+
+  // 判定: 対象地域の震度 >= 閾値 OR 全国震度が極めて大きい(6強以上)場合
+  const localMeetsThreshold = localScale >= thresholdNum;
+  const nationwideExtreme = maxScale >= 60; // 全国震度6強以上は無条件でアラート
+
+  if (!localMeetsThreshold && !nationwideExtreme) {
+    console.log(`対象地域(${targetRegion})の震度が閾値未満 (${scaleToStr(localScale)} < 震度${settings.earthquake_threshold}) - 送信しない`);
+    // 処理済みとしてIDを更新
     await supabase.from('app_settings').update({ last_earthquake_event_id: latestId }).eq('id', settings.id);
     process.exit(0);
   }
 
-  // 震度が閾値以上 → 通知送信
-  console.log(`閾値超過! 震度${scaleToStr(maxScale)} >= 震度${settings.earthquake_threshold} → 通知送信`);
-
-  // 地域チェック（設定されている場合は該当地域の震度も表示）
-  let regionInfo = '';
-  if (targetRegion && latest.points) {
-    const regionPoints = latest.points.filter(p =>
-      p.addr?.includes(targetRegion) || p.pref?.includes(targetRegion)
-    );
-    if (regionPoints.length > 0) {
-      const maxRegionScale = Math.max(...regionPoints.map(p => p.scale || 0));
-      regionInfo = `\n${targetRegion}: 震度${scaleToStr(maxRegionScale)}`;
-    }
-  }
+  const reason = localMeetsThreshold
+    ? `${targetRegion}で震度${scaleToStr(localScale)}を観測`
+    : `全国最大震度${scaleToStr(maxScale)}（広域大地震）`;
+  console.log(`アラート条件成立: ${reason} → 通知送信`);
 
   // メッセージ作成
   const formUrl = settings.safety_app_url || 'https://annkenn-app.vercel.app/safety-report';
