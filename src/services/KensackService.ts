@@ -3,6 +3,14 @@ import { supabase } from '../lib/supabase';
 // Gemini API Key from Vite env
 const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
+/** タイムアウト付きfetch */
+const fetchWithTimeout = (url: string, options: RequestInit, timeoutMs: number): Promise<Response> => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal })
+    .finally(() => clearTimeout(timer));
+};
+
 export interface KensackMaterial {
   id: string;
   manufacturer_id: string;
@@ -42,10 +50,19 @@ export const normalizeQuery = (query: string): string => {
 /**
  * Groups KensackMaterial items by model_number to aggregate multiple catalog pages into a single item.
  */
+/** ページ番号型の型番かどうかを判定（例: 134P, 136P → 除外対象） */
+const isPageNumberModel = (modelNumber: string | null | undefined): boolean => {
+  if (!modelNumber) return false;
+  return /^\d+P$/i.test(modelNumber.trim());
+};
+
 export const groupMaterialsByModel = (items: KensackMaterial[]): KensackMaterial[] => {
+  // ページ番号型番（134P, 136Pなど）は検索ノイズなので除外
+  const filtered = items.filter(item => !isPageNumberModel(item.model_number));
+
   const grouped = new Map<string, KensackMaterial>();
   
-  for (const item of items) {
+  for (const item of filtered) {
     const mfgName = item.manufacturers?.name || '不明';
     const key = `${mfgName}_${item.model_number || item.name}`;
     
@@ -88,10 +105,50 @@ export const groupMaterialsByModel = (items: KensackMaterial[]): KensackMaterial
 
 export interface KensackSearchResult {
   materials: KensackMaterial[];
-  source: 'database' | 'ai-translated' | 'error';
+  source: 'database' | 'ai-translated' | 'error' | 'conversation' | 'clarification';
   message: string;
   aiProposal?: string;
+  clarifyOptions?: string[];
 }
+
+// ========== 会話・選択肢 ヘルパー ==========
+
+const CONVERSE_RE = /^(ありがとう|ありがとうございます|どうも|助かります?|助かった|なるほど|わかった|了解|オッケー|ok|ＯＫ|ｏｋ|おけ|おｋ|りょ|了|把握|へぇ|すごい|良かった|分かった|そっか|そうか|うん|はい|そうですね|だよね|いいね|最高)$/i;
+const isConversationalOnly = (q: string) => CONVERSE_RE.test(q.trim());
+
+const toHalf = (s: string) => s.replace(/[１-５]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+const isOptionSelection = (q: string): number | null => {
+  const m = toHalf(q.trim()).match(/^([1-5])[番号]?(目|番目)?[.。]?$/);
+  return m ? parseInt(m[1]) : null;
+};
+
+const extractOptionFromHistory = (n: number, history: ChatMessage[]): string | null => {
+  const lastAI = [...history].reverse().find(m => m.role === 'model');
+  if (!lastAI) return null;
+  const pat = new RegExp(`(?:^|\\n)\\s*${n}[.．、）)]\\s*([^\\n\\d（(「]{3,40})`, 'i');
+  const match = lastAI.content.match(pat);
+  if (!match) return null;
+  return match[1].split(/[（(「]/)[0].trim();
+};
+
+const generateConversationalReply = async (query: string, history?: ChatMessage[]): Promise<string> => {
+  if (!GEMINI_API_KEY) return 'どういたしまして！他に何かお手伝いできることはありますか？';
+  const sysPrompt = `あなたは電気工事現場の頼れる資材手配アシスタント（経験30年のベテラン）です。職人との短い会話に自然に応じてください。材料の検索や手配の話題なら積極的に次の一手を提案してください。簡潔で気さくなトーンで。`;
+  const contents = [
+    ...(history || []).map(m => ({ role: m.role, parts: [{ text: m.content }] })),
+    { role: 'user', parts: [{ text: query }] }
+  ];
+  try {
+    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: sysPrompt }] }, contents, generationConfig: { temperature: 0.4 } })
+    }, 8000);
+    if (!res.ok) return 'どういたしまして！';
+    const r = await res.json();
+    return r.candidates[0].content.parts[0].text;
+  } catch { return 'どういたしまして！他に何かありますか？'; }
+};
 
 export interface ChatMessage {
   role: 'user' | 'model';
@@ -129,7 +186,7 @@ export const parseVoiceToCartItems = async (transcript: string): Promise<CartIte
 ]
   `;
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+  const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -180,7 +237,7 @@ const searchDatabaseDirectly = async (query: string): Promise<KensackMaterial[]>
       *,
       manufacturers!inner(name)
     `)
-    .limit(30);
+    .limit(12);
 
   // Apply rudimentary ILIKE for each keyword (AND conditions between keywords)
   // Each keyword must appear in at least one of these columns (OR condition within keyword)
@@ -249,7 +306,7 @@ const extractParametersWithAI = async (query: string, history?: ChatMessage[]) =
     parts: [{ text: `システム指示に基づく抽出処理対象ユーザー入力:\n${query}` }]
   });
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+  const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -257,7 +314,7 @@ const extractParametersWithAI = async (query: string, history?: ChatMessage[]) =
       contents: contents,
       generationConfig: { temperature: 0.1 }
     })
-  });
+  }, 10000); // 10秒タイムアウト
 
   if (!response.ok) {
     throw new Error(`Gemini API Error: ${response.statusText}`);
@@ -279,7 +336,7 @@ const searchDatabaseWithAIParams = async (params: any): Promise<KensackMaterial[
   let dbQuery = supabase
     .from('materials')
     .select(`*, manufacturers!inner(name)`)
-    .limit(30);
+    .limit(12);
 
   if (params.manufacturer) {
     // Exact or partial match on manufacturer relation
@@ -322,14 +379,14 @@ const searchDatabaseSemantically = async (query: string, filterMfgs?: string[]):
   if (!GEMINI_API_KEY) throw new Error("Gemini API key is not configured.");
   
   // Generate meaning-based vector for the user's string query
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY}`, {
+  const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: "models/gemini-embedding-001",
       content: { parts: [{ text: query }] }
     })
-  });
+  }, 8000); // 8秒タイムアウト
   
   if (!response.ok) {
     console.warn("Gemini Embedding API error:", response.statusText);
@@ -342,9 +399,9 @@ const searchDatabaseSemantically = async (query: string, filterMfgs?: string[]):
   // Search Supabase using our pgvector RPC match_materials with exact manufacturer filtering
   const { data, error } = await supabase.rpc('match_materials', {
     query_embedding: queryEmbedding,
-    match_threshold: 0.1, // Adjust based on precision needs
-    match_count: 50,
-    filter_manufacturer_names: (filterMfgs && filterMfgs.length > 0) ? filterMfgs : null // Pass filtering criteria directly to database!
+    match_threshold: 0.72, // 高精度モード：関連性の高いもののみ
+    match_count: 8,
+    filter_manufacturer_names: (filterMfgs && filterMfgs.length > 0) ? filterMfgs : null
   });
   
   if (error) {
@@ -424,6 +481,18 @@ const generateVeteranAssistantProposal = async (query: string, results: KensackM
 
 # 出力スタイル
 * 職人に対して「〇〇ですね。それなら〇〇が定番です。一緒に〇〇も要りますか？」というように、押し付けがましくない、簡潔で気の利いた対話形式（テキスト）で出力してください。
+
+# 【重要】絞り込み質問モード（ClarifyMode）
+検索結果に全く異なる種類の部材が混在している、またはユーザーの意図が複数に解釈できる場合は、以下の厳密なフォーマットで絞り込み質問を出力してください。
+
+[CLARIFY]
+どのタイプをお探しですか？
+1. （品名1）（括弧内に用途や特徴）
+2. （品名2）（括弧内に用途や特徴）
+3. （品名3）（括弧内に用途や特徴）
+[/CLARIFY]
+
+ClarifyModeを使う条件：結果に3種類以上の異なる用途の部材が混在している場合のみ。それ以外は通常の提案テキストを出力。
 `;
 
   let contents: any[] = [];
@@ -451,7 +520,7 @@ ${JSON.stringify(topMaterials, null, 2)}
   });
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -459,7 +528,7 @@ ${JSON.stringify(topMaterials, null, 2)}
         contents: contents,
         generationConfig: { temperature: 0.3 }
       })
-    });
+    }, 15000); // 15秒タイムアウト
 
     if (!response.ok) return undefined;
     const result = await response.json();
@@ -474,68 +543,91 @@ ${JSON.stringify(topMaterials, null, 2)}
  * Executes a powerful hybrid search (AI Semantic First, fallback to exact DB match).
  */
 export const executeKensackSearch = async (query: string, filterMfgs: string[] = [], history?: ChatMessage[]): Promise<KensackSearchResult> => {
-  let searchResult: KensackSearchResult | null = null;
   const normQuery = normalizeQuery(query);
 
-  // 1. 短い記号（4文字以下）で英数字メインの場合は、的外れになりやすいAIベクトル検索を意図的にスキップする
-  const isShortSymbol = normQuery.length <= 4 && /^[a-z0-9\-]+$/.test(normQuery);
+  // --- 1. 純粋な会話（「ありがとう」等）→ DB検索せずAIが応答 ---
+  if (isConversationalOnly(normQuery)) {
+    const reply = await generateConversationalReply(query, history);
+    return { materials: [], source: 'conversation', message: reply };
+  }
 
-  if (!isShortSymbol) {
-    try {
-      // 1. AI意味検索（ベクトル検索）を最初に実行。メーカー絞り込みがあればバックエンドに渡す
-      const semanticResults = await searchDatabaseSemantically(query, filterMfgs);
-      
-      if (semanticResults && semanticResults.length > 0) {
-        searchResult = {
-          materials: groupMaterialsByModel(semanticResults),
-          source: 'ai-translated', // UI shows this as AI enhanced
-          message: `AI意味検索により、文脈に沿った ${semanticResults.length}件 の部材が見つかりました。（全カタログデータより抽出）`
-        };
-      }
-    } catch (err) {
-      console.warn("Semantic search failed or skipped, falling back to direct DB search.", err);
+  // --- 2. 選択肢選択（「1」「2」「3番」等）→ 履歴から該当テキストを復元して再検索 ---
+  const optionNum = isOptionSelection(normQuery);
+  if (optionNum !== null && history && history.length > 0) {
+    const optionText = extractOptionFromHistory(optionNum, history);
+    if (optionText) {
+      return executeKensackSearch(optionText, filterMfgs, history);
     }
   }
 
-  // 2. ベクトル側ヒットしなかった場合、または未エンベッドの残りのデータ対象にレガシーのDBを叩く
+  let searchResult: KensackSearchResult | null = null;
+
+  // --- 3. ベクトル意味検索（高精度モード）---
+  const isShortSymbol = normQuery.length <= 4 && /^[a-z0-9\-]+$/.test(normQuery);
+  if (!isShortSymbol) {
+    try {
+      const semanticResults = await searchDatabaseSemantically(query, filterMfgs);
+      if (semanticResults && semanticResults.length > 0) {
+        searchResult = {
+          materials: groupMaterialsByModel(semanticResults),
+          source: 'ai-translated',
+          message: `AI意味検索により ${semanticResults.length}件 の部材が見つかりました。`
+        };
+      }
+    } catch (err) {
+      console.warn('Semantic search failed, falling back.', err);
+    }
+  }
+
+  // --- 4. キーワード検索（フォールバック）---
   if (!searchResult) {
     const directResults = await searchDatabaseDirectly(query);
     if (directResults.length > 0) {
       searchResult = {
         materials: groupMaterialsByModel(directResults),
         source: 'database',
-        message: `キーワードに一致する ${directResults.length}件 の部材が見つかりました。(キーワード検索)`
+        message: `キーワード検索で ${directResults.length}件 見つかりました。`
       };
     }
   }
 
-  // 3. どちらも見つからない場合はAIによる推論フォールバック
+  // --- 5. AI推論検索（最終フォールバック）---
   if (!searchResult) {
     try {
       const aiParams = await extractParametersWithAI(query, history);
       const aiSearchData = await searchDatabaseWithAIParams(aiParams);
       if (!aiSearchData || aiSearchData.length === 0) {
-        return {
-          materials: [],
-          source: 'ai-translated',
-          message: '該当する材料は見つかりませんでした。'
-        };
+        const noResultReply = await generateConversationalReply(
+          `「${query}」で検索したが何も見つからなかった。申し訳なさそうに、別の言い方や条件を聞いてください。`, history
+        );
+        return { materials: [], source: 'conversation', message: noResultReply };
       }
       searchResult = {
         materials: groupMaterialsByModel(aiSearchData),
         source: 'ai-translated',
-        message: `AI推論による検索（推測: ${(aiParams as any).product_name || ''} ${(aiParams as any).model_prefix || ''}）`
+        message: `AI推論: ${(aiParams as any).product_name || ''} ${(aiParams as any).model_prefix || ''}`
       };
     } catch (error: any) {
-      console.error("AI Search Error:", error);
+      console.error('AI Search Error:', error);
       return { materials: [], source: 'error', message: '検索エラーが発生しました。時間を置いてやり直してください。' };
     }
   }
 
-  // 最終結果が得られた場合、AIのベテラン提案文を生成して付加する
+  // --- 6. ベテランAI提案文 + 絞り込みオプション生成 ---
   if (searchResult && searchResult.materials.length > 0) {
     const proposal = await generateVeteranAssistantProposal(query, searchResult.materials, history);
     if (proposal) {
+      // [CLARIFY]ブロックを検出して clarifyOptions に変換
+      const clarifyMatch = proposal.match(/\[CLARIFY\]([\s\S]*?)\[\/CLARIFY\]/i);
+      if (clarifyMatch) {
+        const inner = clarifyMatch[1].trim();
+        const lines = inner.split('\n').map(l => l.trim()).filter(l => l);
+        const options = lines.filter(l => /^[1-5][.）]/.test(l));
+        const message = lines.find(l => !/^[1-5][.）]/.test(l)) || 'どのタイプをお探しですか？';
+        if (options.length >= 2) {
+          return { ...searchResult, source: 'clarification', aiProposal: message, clarifyOptions: options };
+        }
+      }
       searchResult.aiProposal = proposal;
     }
     return searchResult;

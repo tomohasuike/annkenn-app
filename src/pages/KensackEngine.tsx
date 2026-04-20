@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Camera, Cpu, AlertTriangle, CheckCircle2, Loader2, ImagePlus, ShoppingCart, Trash2, Mail, FileText, ChevronUp, ChevronDown, Mic, Plus, GripVertical } from 'lucide-react';
+import { Search, Camera, Cpu, AlertTriangle, CheckCircle2, Loader2, ImagePlus, ShoppingCart, Trash2, Mail, FileText, ChevronUp, ChevronDown, Mic, Plus, GripVertical, ArrowUp, SlidersHorizontal } from 'lucide-react';
 import { executeKensackSearch, executeKensackVisionSearch, parseVoiceToCartItems } from '../services/KensackService';
 import type { KensackSearchResult, KensackMaterial, CartItem, ChatMessage } from '../services/KensackService';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -207,6 +207,14 @@ export const KensackEngine: React.FC = () => {
   const [catalogViewerPdfModeIndex, setCatalogViewerPdfModeIndex] = useState<number | null>(null);
   const [driveAccessToken, setDriveAccessToken] = useState<string | null>(null);
 
+  // Catalog Viewer Zoom/Pan
+  const [catalogZoom, setCatalogZoom] = useState(1);
+  const [catalogPan, setCatalogPan] = useState({ x: 0, y: 0 });
+  const catalogIsDragging = useRef(false);
+  const catalogDragStart = useRef({ mouseX: 0, mouseY: 0, panX: 0, panY: 0 });
+  const catalogTouchDist = useRef<number | null>(null);
+  const catalogViewerBodyRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
       // Preload Google Identity Services if needed
       if (!(window as any).google?.accounts) {
@@ -215,6 +223,62 @@ export const KensackEngine: React.FC = () => {
           document.body.appendChild(script);
       }
   }, []);
+
+  // Non-passive wheel event for catalog viewer zoom
+  useEffect(() => {
+    const el = catalogViewerBodyRef.current;
+    if (!el || !isCatalogViewerOpen) return;
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      setCatalogZoom(prev => Math.min(5, Math.max(0.5, prev * factor)));
+    };
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [isCatalogViewerOpen]);
+
+  // Catalog zoom/pan handlers
+  const handleCatalogMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    catalogIsDragging.current = true;
+    catalogDragStart.current = { mouseX: e.clientX, mouseY: e.clientY, panX: catalogPan.x, panY: catalogPan.y };
+  };
+  const handleCatalogMouseMove = (e: React.MouseEvent) => {
+    if (!catalogIsDragging.current) return;
+    setCatalogPan({
+      x: catalogDragStart.current.panX + (e.clientX - catalogDragStart.current.mouseX),
+      y: catalogDragStart.current.panY + (e.clientY - catalogDragStart.current.mouseY),
+    });
+  };
+  const handleCatalogMouseUp = () => { catalogIsDragging.current = false; };
+  const handleCatalogTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      catalogTouchDist.current = Math.sqrt(dx * dx + dy * dy);
+      catalogIsDragging.current = false;
+    } else {
+      catalogIsDragging.current = true;
+      catalogDragStart.current = { mouseX: e.touches[0].clientX, mouseY: e.touches[0].clientY, panX: catalogPan.x, panY: catalogPan.y };
+    }
+  };
+  const handleCatalogTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && catalogTouchDist.current !== null) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const newDist = Math.sqrt(dx * dx + dy * dy);
+      setCatalogZoom(prev => Math.min(5, Math.max(0.5, prev * (newDist / catalogTouchDist.current!))));
+      catalogTouchDist.current = newDist;
+    } else if (e.touches.length === 1 && catalogIsDragging.current) {
+      setCatalogPan({
+        x: catalogDragStart.current.panX + (e.touches[0].clientX - catalogDragStart.current.mouseX),
+        y: catalogDragStart.current.panY + (e.touches[0].clientY - catalogDragStart.current.mouseY),
+      });
+    }
+  };
+  const handleCatalogTouchEnd = () => { catalogIsDragging.current = false; catalogTouchDist.current = null; };
+  const resetCatalogView = () => { setCatalogZoom(1); setCatalogPan({ x: 0, y: 0 }); };
 
   // 検索窓専用の音声入力設定
   const [isVoiceSearching, setIsVoiceSearching] = useState(false);
@@ -265,25 +329,41 @@ export const KensackEngine: React.FC = () => {
     setIsSearching(true);
     setResult(null);
 
-    // メーカー選択を検索クエリにも付加しつつ、ハードフィルタリング(配列)としても裏側に渡す
     const finalQuery = [selectedMfgs.join(' '), actualQuery].filter(Boolean).join(' ');
+
+    // ユーザーメッセージを先に履歴に追加
+    setChatHistory(prev => [...prev.slice(-5), { role: 'user', content: actualQuery }]);
 
     try {
       const searchRes = await executeKensackSearch(finalQuery, selectedMfgs, chatHistory);
+
+      // 会話モード: 材料カードを出さず、AIの返事だけ履歴に追加
+      if (searchRes.source === 'conversation') {
+        setChatHistory(prev => [...prev, { role: 'model', content: searchRes.message }]);
+        setResult(null);
+        setQuery('');
+        return;
+      }
+
+      // 絞り込みモード: clarifyOptions を持つ場合
+      if (searchRes.source === 'clarification' && searchRes.clarifyOptions) {
+        const clarifyMsg = [
+          searchRes.aiProposal || 'どのタイプをお探しですか？',
+          ...searchRes.clarifyOptions
+        ].join('\n');
+        setChatHistory(prev => [...prev, { role: 'model', content: clarifyMsg }]);
+        setResult(searchRes); // 背景に結果は保持（選択後に使う）
+        setQuery('');
+        return;
+      }
+
+      // 通常検索モード
       setResult(searchRes);
-      
-      // Update chat history (keep last 3 turns = 6 messages)
-      setChatHistory(prev => {
-        const newHistory = [...prev];
-        newHistory.push({ role: 'user', content: finalQuery });
-        if (searchRes.aiProposal) {
-          newHistory.push({ role: 'model', content: searchRes.aiProposal });
-        } else if (searchRes.message) {
-          newHistory.push({ role: 'model', content: searchRes.message });
-        }
-        // Slice to keep at most the last 6 messages
-        return newHistory.slice(-6);
-      });
+      const aiMsg = searchRes.aiProposal || searchRes.message;
+      if (aiMsg) {
+        setChatHistory(prev => [...prev.slice(-5), { role: 'model', content: aiMsg }]);
+      }
+      setQuery('');
     } catch (error) {
       console.error(error);
     } finally {
@@ -291,18 +371,25 @@ export const KensackEngine: React.FC = () => {
     }
   };
 
+
   const handleOpenCatalogViewer = async (m: KensackMaterial, e: React.MouseEvent) => {
     e.stopPropagation();
     setIsCatalogViewerOpen(true);
+    setCatalogZoom(1);
+    setCatalogPan({ x: 0, y: 0 });
     setCatalogViewerMode('loading');
     setCatalogViewerMfg(m.manufacturers?.name || '');
     setCatalogViewerTitle(m.name || '');
     setCatalogViewerPdfModeIndex(null); // reset pdf mode
 
-    // Get the grouped pages, or if empty, just use the single page.
-    const pagesList = m.grouped_pages && m.grouped_pages.length > 0
+    // Get the grouped pages, or if empty, fall back to page 1.
+    // catalog_urlがなくてもpage 1にフォールバックして常に何かが表示されるようにする。
+    const pagesList = (m.grouped_pages && m.grouped_pages.length > 0)
       ? m.grouped_pages 
-      : (m.catalog_url ? [{ page_number: m.page_number || 1, catalog_url: m.catalog_url }] : []);
+      : [{ 
+          page_number: m.page_number || 1, 
+          catalog_url: m.catalog_url || ''
+        }];
       
     if (pagesList.length === 0) {
       setCatalogViewerMode('error');
@@ -339,23 +426,72 @@ export const KensackEngine: React.FC = () => {
 
     try {
       const { supabase } = await import('../lib/supabase');
-      // Fetch drive_file_ids for all these pages in parallel
-      const enrichedPages = await Promise.all(
-        pagesList.map(async (p) => {
-          if (!m.manufacturers?.name) return p;
-          const { data } = await supabase
-              .from('catalog_pages')
-              .select('drive_file_id')
-              .eq('manufacturer', m.manufacturers.name)
-              .eq('page_number', p.page_number)
-              .maybeSingle();
-              
-          if (data && data.drive_file_id) {
-            return { ...p, drive_file_id: data.drive_file_id };
+      const mfgName = m.manufacturers?.name;
+
+      // Collect all page numbers including page-1 (overview/advertisement page often comes right before the spec page)
+      const existingPageNums = new Set(pagesList.map(p => p.page_number));
+      const allPageNums = new Set<number>();
+      pagesList.forEach(p => {
+        if (p.page_number > 1) allPageNums.add(p.page_number - 1); // 1ページ前（概要・広告ページ）も追加
+        allPageNums.add(p.page_number);
+      });
+
+      // Fetch all relevant pages from catalog_pages in a single query
+      let catalogData: { page_number: number; drive_file_id: string | null; page_image_url: string | null }[] = [];
+      if (mfgName && allPageNums.size > 0) {
+        const { data } = await supabase
+          .from('catalog_pages')
+          .select('page_number, drive_file_id, page_image_url')
+          .eq('manufacturer', mfgName)
+          .in('page_number', [...allPageNums]);
+        catalogData = data || [];
+      }
+
+      // Build merged pages list: include adjacent pages that exist in catalog_pages
+      const catalogPageNums = new Set(catalogData.map(d => d.page_number));
+      const mergedPagesList = [
+        // Adjacent pages (page-1) that exist in catalog_pages but not already in pagesList
+        ...Array.from(allPageNums)
+          .filter(n => catalogPageNums.has(n) && !existingPageNums.has(n))
+          .map(n => ({ page_number: n, catalog_url: '' })),
+        ...pagesList
+      ].sort((a, b) => a.page_number - b.page_number);
+
+      // Enrich all pages with image URLs
+      const enrichedPages = mergedPagesList.map(p => {
+        const dbPage = catalogData.find(d => d.page_number === p.page_number);
+        if (!dbPage) return p;
+
+        let pageImgUrl: string | undefined = dbPage.page_image_url || undefined;
+        if (pageImgUrl) {
+          if (pageImgUrl.includes('lh3.googleusercontent.com')) {
+            // lh3 URL: =s0 でオリジナルサイズ（最高画質）を要求。=w1600 などのリサイズパラメータを除去。
+            pageImgUrl = pageImgUrl.replace(/=[wsphcefrd]\d+(-[wsphcefrd]\d+)*$/i, '=s0');
+            if (!pageImgUrl.includes('=')) pageImgUrl += '=s0';
+          } else {
+            // その他 Drive URL: file IDを抽出してlh3形式に変換
+            let fileId: string | null = null;
+            const ucMatch = pageImgUrl.match(/[?&]id=([^&]+)/);
+            if (ucMatch && ucMatch[1] && pageImgUrl.includes('drive.google.com/uc')) {
+              fileId = ucMatch[1];
+            }
+            if (!fileId) {
+              const fileMatch = pageImgUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+              if (fileMatch && fileMatch[1]) fileId = fileMatch[1];
+            }
+            if (fileId) {
+              // lh3形式でオリジナルサイズを直接リクエスト（uc?export=viewより高画質）
+              pageImgUrl = `https://lh3.googleusercontent.com/d/${fileId}=s0`;
+            }
           }
-          return p;
-        })
-      );
+        }
+        return {
+          ...p,
+          ...(dbPage.drive_file_id ? { drive_file_id: dbPage.drive_file_id } : {}),
+          ...(pageImgUrl ? { page_image_url: pageImgUrl } : {})
+        };
+      });
+
       setCatalogViewerPages(enrichedPages);
       setCatalogViewerMode('ready');
     } catch (err) {
@@ -363,6 +499,7 @@ export const KensackEngine: React.FC = () => {
        setCatalogViewerPages(pagesList as any);
        setCatalogViewerMode('ready'); // Try to proceed even without proxy ids
     }
+
   };
 
   const handlePhotoClick = () => {
@@ -583,21 +720,73 @@ export const KensackEngine: React.FC = () => {
     ]);
   };
 
+  const [isMfgExpanded, setIsMfgExpanded] = useState(false);
+  const conversationEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (result || isSearching) {
+      setTimeout(() => conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    }
+  }, [result, isSearching]);
+
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center pt-8 md:pt-16 pb-24 px-4 sm:px-6">
-      
-      {/* 検索ヘッダー部分 */}
-      <div className="w-full max-w-4xl text-center mb-8 md:mb-12">
-        <h1 className="text-3xl md:text-5xl font-black text-slate-800 tracking-tight shadow-sm-text">
-          Kensack <span className="text-blue-600">Engine</span>
-        </h1>
-        <p className="mt-3 text-sm md:text-base text-slate-600 font-bold bg-slate-200/50 inline-block px-4 py-1 rounded-full">
-          現場材料・自動提案インフラ
-        </p>
+    <div className="h-screen flex flex-col bg-slate-100 overflow-hidden">
+
+      {/* コンパクトヘッダー */}
+      <div className="shrink-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center shadow">
+            <Search className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg font-black text-slate-800 tracking-tight leading-none">
+              Kensack <span className="text-blue-600">Engine</span>
+            </h1>
+            <p className="text-[10px] text-slate-500 font-bold">現場材料・自動提案インフラ</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {chatHistory.length > 0 && (
+            <button
+              onClick={clearChatHistory}
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-red-500 bg-slate-100 hover:bg-red-50 px-3 py-1.5 rounded-full transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              リセット
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* 検索バー＆カメラボタン (ハイブリッド・スマートUI) */}
-      <div className="w-full max-w-4xl flex flex-col sm:flex-row items-stretch gap-3 mb-6">
+      {/* 会話エリア（スクロール可能） */}
+      <div className="flex-1 overflow-y-auto min-h-0 px-4 py-4 pb-[200px]">
+        {/* 初期ウェルカム状態 */}
+        {!result && chatHistory.length === 0 && !isSearching && (
+          <div className="flex flex-col items-center justify-center min-h-[55vh] select-none">
+            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-700 rounded-3xl flex items-center justify-center shadow-xl mb-6">
+              <Search className="w-10 h-10 text-white" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-700 mb-2">何を探していますか？</h2>
+            <p className="text-slate-400 font-bold text-center max-w-xs leading-relaxed">
+              材料名・型番・寸法を入力するか<br />
+              カメラで写真を撮って提案を受けてください
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-2">
+              {['支持金具', 'パイラック', 'ノーバー', '配管クリップ', 'H鋼クリップ'].map(hint => (
+                <button
+                  key={hint}
+                  onClick={() => { setQuery(hint); handleTextSearch(undefined, hint); }}
+                  className="text-sm font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-4 py-2 rounded-full transition-colors active:scale-95"
+                >
+                  {hint}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+      {/* (検索バー・メーカーチップは下部に移動) */}
+      <div className="hidden">
         <form onSubmit={(e) => handleTextSearch(e)} className="relative flex-1 flex shadow-lg rounded-2xl md:rounded-[2rem] overflow-hidden group border-2 border-transparent transition-all focus-within:border-blue-300">
           <div className="absolute inset-y-0 left-0 pl-5 md:pl-6 flex items-center pointer-events-none">
             <Search className="h-6 w-6 md:h-8 md:w-8 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
@@ -655,40 +844,11 @@ export const KensackEngine: React.FC = () => {
         />
       </div>
 
-      {/* メーカー絞り込みチップ (Chips) */}
-      <div className="w-full max-w-4xl flex flex-wrap justify-center gap-2 md:gap-3 mb-10 text-sm font-bold">
-        <span className="text-slate-500 py-1.5 px-2 mr-1">絞り込むメーカー:</span>
-        {['未来工業', 'パナソニック', 'ネグロス電工', '古河電工', '日東工業', '三菱電機', '富士電機', 'IDEC', '内外電機'].map((mfg) => {
-          const isSelected = selectedMfgs.includes(mfg);
-          return (
-            <button
-              key={mfg}
-              onClick={() => toggleManufacturer(mfg)}
-              className={
-                isSelected
-                  ? "bg-blue-600 border-2 border-blue-600 text-white px-4 py-1.5 rounded-full transition-colors active:scale-95 shadow-md shadow-blue-600/20"
-                  : "bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-600 hover:bg-slate-50 px-4 py-1.5 rounded-full transition-colors active:scale-95"
-              }
-            >
-              {mfg}
-            </button>
-          );
-        })}
-      </div>
+      {/* メーカー絞り込みチップは下部に移動済み */}
 
       {/* 会話履歴 (チャットUI) */}
       {chatHistory.length > 0 && (
-        <div className="w-full max-w-4xl flex flex-col gap-4 mb-4">
-          <div className="flex justify-between items-center px-2 mb-2">
-            <span className="text-sm font-bold text-slate-400">会話の文脈を引き継いで検索中...</span>
-            <button 
-              onClick={clearChatHistory}
-              className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-red-500 bg-white hover:bg-red-50 px-3 py-1.5 rounded-full transition-colors border border-slate-200 hover:border-red-200"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              リセットして新しく探す
-            </button>
-          </div>
+        <div className="max-w-3xl mx-auto w-full flex flex-col gap-4 mb-4">
           {chatHistory.map((msg, idx) => (
             <div key={idx} className={`flex items-start gap-3 animate-fade-in-up md:gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               
@@ -700,15 +860,41 @@ export const KensackEngine: React.FC = () => {
               )}
               
               {/* 吹き出し */}
-              <div 
-                className={`max-w-[85%] md:max-w-[75%] p-4 rounded-2xl md:rounded-3xl shadow-sm text-sm md:text-base font-bold leading-relaxed whitespace-pre-wrap ${
-                  msg.role === 'user' 
-                    ? 'bg-slate-900 text-white rounded-tr-none' 
-                    : 'bg-white text-slate-800 border-2 border-blue-50 rounded-tl-none'
-                }`}
-              >
-                {msg.content}
-              </div>
+              {msg.role === 'user' ? (
+                <div className="max-w-[85%] md:max-w-[75%] p-4 rounded-2xl rounded-tr-none shadow-sm text-sm md:text-base font-bold leading-relaxed bg-slate-900 text-white">
+                  {msg.content}
+                </div>
+              ) : (() => {
+                // AIメッセージ：番号付き選択肢を検出してボタン表示
+                const lines = msg.content.split('\n').map(l => l.trim()).filter(l => l);
+                const optionLines = lines.filter(l => /^[1-5][.）]/.test(l));
+                const hasOptions = optionLines.length >= 2;
+                const headerLines = lines.filter(l => !/^[1-5][.）]/.test(l));
+
+                return (
+                  <div className="max-w-[85%] md:max-w-[75%] bg-white border-2 border-blue-50 rounded-2xl rounded-tl-none shadow-sm p-4 space-y-3">
+                    {headerLines.length > 0 && (
+                      <p className="text-sm md:text-base font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">
+                        {headerLines.join('\n')}
+                      </p>
+                    )}
+                    {hasOptions && (
+                      <div className="flex flex-col gap-2 pt-1">
+                        {optionLines.map((opt, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handleTextSearch(undefined, opt.replace(/^[1-5][.）]\s*/, '').split('（')[0].trim())}
+                            className="text-left text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 hover:border-blue-400 px-4 py-2.5 rounded-xl transition-all active:scale-95"
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
 
             </div>
           ))}
@@ -726,7 +912,7 @@ export const KensackEngine: React.FC = () => {
 
       {/* 検索結果（カード型グリッド） */}
       {result && !isSearching && (
-        <div className="w-full max-w-7xl animate-fade-in-up">
+        <div className="max-w-4xl mx-auto w-full animate-fade-in-up">
 
           {/* AI推論エラーまたは通常メッセージ等 (AI提案がなかった場合のフォールバック表示) */}
           {result.source === 'ai-translated' && !result.aiProposal && (
@@ -746,10 +932,43 @@ export const KensackEngine: React.FC = () => {
           )}
 
 
-          {/* グリッドレイアウト（モバイルで見やすく、タップ領域大） */}
+          {/* ========== AIベテランアシスタントの提案（最上部・目立つデザイン） ========== */}
+          {result.aiProposal && (
+            <div className="mb-8 rounded-2xl bg-gradient-to-br from-slate-800 via-slate-900 to-blue-950 text-white shadow-2xl relative overflow-hidden">
+              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, #3b82f6 0%, transparent 50%), radial-gradient(circle at 80% 20%, #8b5cf6 0%, transparent 50%)' }} />
+              <div className="relative z-10 p-5 md:p-7">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-blue-500/20 rounded-xl border border-blue-400/30">
+                    <Cpu className="w-5 h-5 text-blue-300" />
+                  </div>
+                  <div>
+                    <span className="font-black text-sm text-blue-300 tracking-wider uppercase">ベテランAIアシスタント</span>
+                    <p className="text-white/50 text-xs">電気工事現場の資材選定をサポートします</p>
+                  </div>
+                </div>
+                <p className="text-white/90 font-bold text-base md:text-lg leading-relaxed whitespace-pre-wrap">{result.aiProposal}</p>
+              </div>
+            </div>
+          )}
+
+          {/* AI実行したが提案なしの場合 */}
+          {result.source === 'ai-translated' && !result.aiProposal && result.message && (
+            <div className="mb-5 px-5 py-3 rounded-xl bg-slate-100 border border-slate-200">
+              <p className="text-slate-600 font-bold text-sm">{result.message}</p>
+            </div>
+          )}
+
+          {/* 検索件数表示 */}
+          {result.materials.length > 0 && (
+            <div className="mb-4 flex items-center gap-2">
+              <span className="text-xs font-black text-slate-500">「{query}」に一致する資材 {result.materials.length}件</span>
+            </div>
+          )}
+
+          {/* グリッドレイアウト */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {result.materials.map((m) => {
-              const isLowConfidence = m.confidence !== undefined && m.confidence < 80;
+              const isLowConfidence = m.confidence !== undefined && m.confidence < 70;
               const isSelected = cartItems.some(selected => selected.material?.id === m.id);
               const hasDimensions = m.width_mm || m.height_mm || m.depth_mm;
               
@@ -767,40 +986,58 @@ export const KensackEngine: React.FC = () => {
                     </div>
                   )}
 
-                  {/* 確信度バッジ */}
-                  {isLowConfidence && (
+                  {/* 確信度バッジ（confidence >= 70 のみ AI高適合表示） */}
+                  {m.confidence !== undefined && m.confidence < 70 && (
                     <div className="absolute top-3 left-3 bg-red-100 text-red-800 text-sm font-black px-4 py-2 rounded-full flex items-center border-2 border-red-200 z-10 shadow-sm">
                       <AlertTriangle className="w-4 h-4 mr-1.5" />
                       要現物確認
                     </div>
                   )}
-                  {m.confidence !== undefined && !isLowConfidence && (
+                  {m.confidence !== undefined && m.confidence >= 70 && (
                     <div className="absolute top-3 left-3 bg-emerald-100 text-emerald-800 text-sm font-black px-4 py-2 rounded-full flex items-center z-10 shadow-sm">
                       <CheckCircle2 className="w-4 h-4 mr-1.5" />
                       AI高適合
                     </div>
                   )}
 
-                  {/* 商品画像プレビュー（無ければプレースホルダー） */}
-                  <div className="h-40 bg-slate-50 flex items-center justify-center p-4 border-b-2 border-slate-100">
-                    {m.image_url ? (
-                      <img 
-                        src={m.image_url} 
-                        alt={m.name} 
-                        className="max-h-full max-w-full object-contain mix-blend-multiply drop-shadow-sm" 
-                        onError={(e) => {
-                          e.currentTarget.onerror = null; // Prevent infinite loops
-                          e.currentTarget.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'%3E%3C/circle%3E%3Cpolyline points='21 15 16 10 5 21'%3E%3C/polyline%3E%3C/svg%3E`;
-                          e.currentTarget.className = "w-12 h-12 opacity-50";
-                        }}
-                      />
-                    ) : (
-                      <div className="text-slate-300 flex flex-col items-center">
-                        <ImagePlus className="w-10 h-10 mb-2 opacity-50" />
-                        <span className="font-bold text-xs">画像なし</span>
+                  {/* 商品画像プレビュー（実商品写真があれば表示、なければ型番カード） */}
+                  {(() => {
+                    // 実際の商品写真かどうか判定（Driveのカタログページ・dummyimageは除外）
+                    const isRealProductImage = m.image_url 
+                      && !m.image_url.includes('drive.google.com')
+                      && !m.image_url.includes('dummyimage.com')
+                      && !m.image_url.includes('no_catalog_page');
+                    
+                    return isRealProductImage ? (
+                      <div className="h-40 bg-slate-50 flex items-center justify-center p-4 border-b-2 border-slate-100">
+                        <img 
+                          src={m.image_url} 
+                          alt={m.name} 
+                          className="max-h-full max-w-full object-contain mix-blend-multiply drop-shadow-sm" 
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
                       </div>
-                    )}
-                  </div>
+                    ) : (
+                      <div className="h-40 border-b-2 border-slate-100 relative overflow-hidden flex items-center justify-center"
+                        style={{ background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)' }}
+                      >
+                        {/* メーカーカラーアクセント */}
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 via-indigo-400 to-blue-600 opacity-60" />
+                        <div className="flex flex-col items-center gap-1.5 px-4 w-full">
+                          <div className="font-mono font-black text-slate-700 text-lg tracking-wider text-center break-all leading-tight line-clamp-2 max-w-full">
+                            {m.model_number || '—'}
+                          </div>
+                          <div className="text-xs text-slate-400 font-bold">{m.manufacturers?.name}</div>
+                          {!m.image_url && (
+                            <div className="text-[10px] text-slate-300 mt-1">画像未登録</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* 情報エリア */}
                   <div className="p-4 flex-1 flex flex-col">
@@ -811,9 +1048,24 @@ export const KensackEngine: React.FC = () => {
                       <HighlightText text={m.name || ''} splitQuery={query} />
                     </h4>
                     
-                    {/* 型番ラベル */}
-                    <div className="bg-slate-800 text-white font-mono font-bold px-2.5 py-1 rounded-md w-fit mb-3 text-sm shadow-inner">
-                      <HighlightText text={m.model_number || ''} splitQuery={query} />
+                    {/* 型番ラベル + コピーボタン */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="bg-slate-800 text-white font-mono font-bold px-2.5 py-1 rounded-md text-sm shadow-inner">
+                        <HighlightText text={m.model_number || ''} splitQuery={query} />
+                      </div>
+                      {m.model_number && (
+                        <button
+                          type="button"
+                          title="型番をコピー"
+                          onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(m.model_number || ''); }}
+                          className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                     
                     {/* 寸法・価格情報 */}
@@ -840,7 +1092,7 @@ export const KensackEngine: React.FC = () => {
                           {m.standard_price ? `¥${m.standard_price.toLocaleString()}` : 'ASK'}
                         </span>
                       </div>
-                      {/* カタログ原版リンク (ページ番号付加) */}
+                      {/* カタログビューア（保存済みページ画像を表示） */}
                       {m.catalog_url && (
                         <div className="mt-2 pt-2 border-t border-slate-200 border-dashed">
                           <button
@@ -848,7 +1100,7 @@ export const KensackEngine: React.FC = () => {
                             onClick={(e) => handleOpenCatalogViewer(m, e)}
                             className="w-full flex justify-center items-center gap-1.5 bg-white border-2 border-blue-600 text-blue-700 hover:bg-blue-50 py-1.5 rounded-lg font-black text-xs transition-colors"
                           >
-                            📘 カタログビューアを開く {m.grouped_pages && m.grouped_pages.length > 1 ? <span className="opacity-70 text-[10px]">({m.grouped_pages.length}P抜粋)</span> : (m.page_number && <span className="opacity-70 text-[10px]">({m.page_number}P)</span>)}
+                            📘 カタログビューアを開く {m.page_number && <span className="opacity-70 text-[10px]">({m.page_number}P)</span>}
                           </button>
                         </div>
                       )}
@@ -869,6 +1121,87 @@ export const KensackEngine: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* オートスクロールアンカー */}
+      <div ref={conversationEndRef} className="h-4" />
+      </div> {/* end 会話エリア */}
+
+      {/* 下部入力エリア（固定） */}
+      <div className="fixed bottom-20 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-2xl">
+        {/* メーカーフィルター（折りたたみ式） */}
+        {isMfgExpanded && (
+          <div className="px-4 pt-3 pb-2 flex flex-wrap gap-2 border-b border-slate-100">
+            <span className="text-xs font-black text-slate-400 py-1.5 mr-1">絞り込むメーカー:</span>
+            {['未来工業', 'パナソニック', 'ネグロス電工', '古河電工', '日東工業', '三菱電機', '富士電機', 'IDEC', '内外電機'].map((mfg) => {
+              const isSelected = selectedMfgs.includes(mfg);
+              return (
+                <button
+                  key={mfg}
+                  onClick={() => toggleManufacturer(mfg)}
+                  className={isSelected
+                    ? 'bg-blue-600 border-2 border-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold transition-colors'
+                    : 'bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-600 px-3 py-1 rounded-full text-sm font-bold transition-colors'
+                  }
+                >
+                  {mfg}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div className="px-4 pt-2 pb-1 flex items-center gap-2 h-9">
+          <button
+            onClick={() => setIsMfgExpanded(!isMfgExpanded)}
+            className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-colors border flex-none ${
+              selectedMfgs.length > 0 || isMfgExpanded
+                ? 'bg-blue-50 text-blue-600 border-blue-200'
+                : 'bg-slate-100 text-slate-500 border-transparent hover:bg-slate-200'
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            絞り込み{selectedMfgs.length > 0 ? ` (${selectedMfgs.length})` : ''}
+          </button>
+          <div className="flex flex-wrap gap-1 flex-1 overflow-hidden">
+            {selectedMfgs.map(mfg => (
+              <span key={mfg} className="flex items-center gap-1 text-xs font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full">
+                {mfg}
+                <button onClick={() => toggleManufacturer(mfg)} className="text-white/70 hover:text-white leading-none">×</button>
+              </span>
+            ))}
+          </div>
+        </div>
+        <form onSubmit={(e) => handleTextSearch(e)} className="flex items-center gap-2 px-4 pb-3 pt-1">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              className="block w-full pl-4 pr-12 py-3.5 text-base font-bold text-slate-900 bg-slate-100 rounded-2xl placeholder-slate-400 outline-none focus:bg-white focus:ring-2 focus:ring-blue-300 transition-all"
+              placeholder="材料名、型番、寸法を入力..."
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); latestSearchQueryRef.current = e.target.value; }}
+              disabled={isSearching}
+            />
+            <button
+              type="button"
+              onClick={handleSearchVoiceInput}
+              disabled={isSearching}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all duration-300 ${
+                isVoiceSearching
+                  ? 'bg-red-500 text-white shadow-lg animate-pulse'
+                  : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <Mic className={`w-5 h-5 ${isVoiceSearching ? 'animate-bounce' : ''}`} />
+            </button>
+          </div>
+          <button type="button" onClick={handlePhotoClick} className="flex-none bg-blue-600 hover:bg-blue-700 text-white p-3.5 rounded-2xl shadow-lg shadow-blue-600/30 transition-all active:scale-95 border-2 border-white/20">
+            <Camera className="w-5 h-5" />
+          </button>
+          <button type="submit" disabled={isSearching || isVoiceSearching} className="flex-none bg-slate-900 hover:bg-black text-white p-3.5 rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50">
+            {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowUp className="w-5 h-5" />}
+          </button>
+        </form>
+        <input type="file" accept="image/*" capture="environment" ref={fileInputRef} style={{ display: 'none' }} onChange={handlePhotoUpload} />
+      </div> {/* end 下部入力エリア */}
 
       {/* 音声入力中のオーバーレイ */}
       {isListening && (
@@ -1058,7 +1391,6 @@ export const KensackEngine: React.FC = () => {
           </div>
         </div>
       {/* サブモーダル: テンキー入力 */}
-      {/* サブモーダル: テンキー入力 */}
       <NumpadModal 
         isOpen={numpadItemId !== null}
         initialValue={numpadInitialValue}
@@ -1074,7 +1406,7 @@ export const KensackEngine: React.FC = () => {
       {/* サブモーダル: カタログビューア */}
       {isCatalogViewerOpen && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-4xl h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/50">
               <div>
@@ -1090,7 +1422,7 @@ export const KensackEngine: React.FC = () => {
             </div>
             
             {/* Body */}
-            <div className="flex-1 overflow-x-auto overflow-y-hidden snap-x snap-mandatory flex bg-slate-100/50">
+            <div ref={catalogViewerBodyRef} className="flex-1 overflow-x-auto overflow-y-hidden snap-x snap-mandatory flex bg-slate-100/50">
               {catalogViewerMode === 'loading' && (
                 <div className="m-auto flex flex-col items-center justify-center text-slate-400 gap-3 w-full">
                   <Loader2 className="w-8 h-8 animate-spin" />
@@ -1109,9 +1441,25 @@ export const KensackEngine: React.FC = () => {
                 let imgUrl = '';
                 
                 if (page.page_image_url) {
-                   imgUrl = page.page_image_url;
+                   // Drive URL から File ID を抽出して thumbnail URL に変換
+                   let fileId: string | null = null;
+                   // 形式1: drive.google.com/uc?id=FILE_ID
+                   const ucMatch = page.page_image_url.match(/[?&]id=([^&]+)/);
+                   if (ucMatch && ucMatch[1] && page.page_image_url.includes('drive.google.com/uc')) {
+                     fileId = ucMatch[1];
+                   }
+                   // 形式2: drive.google.com/file/d/FILE_ID/view (ネグロス電工 webViewLink形式)
+                   if (!fileId) {
+                     const fileMatch = page.page_image_url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+                     if (fileMatch && fileMatch[1]) fileId = fileMatch[1];
+                   }
+                   // フル解像で読み込む（uc?export=view はサーバーサイドで動作確認済み）
+                   imgUrl = fileId
+                     ? `https://drive.google.com/uc?export=view&id=${fileId}`
+                     : page.page_image_url;
                 } else if (page.drive_file_id) {
-                   imgUrl = `https://drive.google.com/thumbnail?id=${page.drive_file_id}&sz=w800`;
+                   imgUrl = `https://drive.google.com/uc?export=view&id=${page.drive_file_id}`;
+
                 }
 
                 const pdfUrl = page.pdf_drive_file_id 
@@ -1122,36 +1470,85 @@ export const KensackEngine: React.FC = () => {
 
                 return (
                   <div key={idx} className="shrink-0 w-full snap-center h-full flex flex-col items-center relative p-4 pb-20">
-                    <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
+                    <div className="w-full max-w-4xl bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
                       <div className="bg-slate-800 text-white px-4 py-2 text-sm font-bold flex justify-between items-center shrink-0">
                         <span>PAGE {page.page_number}</span>
+                        {page.catalog_url && (
+                          <a href={page.catalog_url} target="_blank" rel="noreferrer" className="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded">別タブで開く</a>
+                        )}
                       </div>
-                      <div className="p-0 flex-1 flex justify-center bg-slate-50 relative overflow-auto">
+                      
+                      {/* 画像エリア: flexで全体を縮小表示（PDFビューアのようにページ全体を一画面で表示） */}
+                      <div
+                        className="flex-1 min-h-0 overflow-hidden bg-slate-100 relative select-none"
+                        style={{ cursor: catalogZoom > 1 ? 'grab' : 'zoom-in', touchAction: 'none' }}
+                        onMouseDown={handleCatalogMouseDown}
+                        onMouseMove={handleCatalogMouseMove}
+                        onMouseUp={handleCatalogMouseUp}
+                        onMouseLeave={handleCatalogMouseUp}
+                        onTouchStart={handleCatalogTouchStart}
+                        onTouchMove={handleCatalogTouchMove}
+                        onTouchEnd={handleCatalogTouchEnd}
+                        onDoubleClick={resetCatalogView}
+                      >
                         
+                        <div className="absolute top-2 right-2 flex flex-col gap-1.5 z-20">
+                          <button onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setCatalogZoom(prev => Math.min(5, prev * 1.35)); }} className="w-9 h-9 bg-white/90 backdrop-blur rounded-full shadow-md border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-white font-black text-xl">+</button>
+                          <button onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); resetCatalogView(); }} className="w-9 h-9 bg-white/90 backdrop-blur rounded-full shadow-md border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-white text-xs font-bold">FIT</button>
+                          <button onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setCatalogZoom(prev => Math.max(0.5, prev / 1.35)); }} className="w-9 h-9 bg-white/90 backdrop-blur rounded-full shadow-md border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-white font-black text-xl">-</button>
+                        </div>
+                        {Math.abs(catalogZoom - 1) > 0.05 && (
+                          <div className="absolute top-2 left-2 z-20 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded-full pointer-events-none">
+                            {Math.round(catalogZoom * 100)}%
+                          </div>
+                        )}
+                        <div className="w-full h-full flex items-center justify-center" style={{ transform: `translate(${catalogPan.x}px, ${catalogPan.y}px) scale(${catalogZoom})`, transformOrigin: 'center center', willChange: 'transform' }}>
                         {!isPdfMode ? (
                           imgUrl ? (
+                             <>
                              <img 
                                 src={imgUrl} 
                                 alt={`カタログ ページ ${page.page_number}`}
-                                className="w-full h-auto object-contain shadow-sm border border-slate-200 mx-auto"
+                                className="w-full h-full object-contain shadow-sm border border-slate-200 pointer-events-none"
+                                draggable={false}
                                 loading="lazy"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = document.getElementById(`catalog-fallback-${idx}`);
+                                  if (fallback) fallback.style.display = 'flex';
+                                }}
                              />
-                          ) : (
-                             <div className="flex flex-col items-center justify-center text-slate-400 py-10 gap-3 w-full h-full absolute inset-0">
-                                <ImagePlus className="w-8 h-8 opacity-50" />
-                                <span className="text-sm font-bold">画像準備中</span>
-                                {page.catalog_url && (
-                                    <a 
-                                      href={page.catalog_url} 
-                                      target="_blank" 
-                                      rel="noreferrer" 
-                                      className="mt-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-bold hover:bg-blue-100 transition-colors pointer-events-auto"
-                                    >
-                                      PDF原本を開く
-                                    </a>
-                                )}
+                             <div 
+                               id={`catalog-fallback-${idx}`}
+                               style={{ display: 'none' }}
+                               className="flex-col items-center justify-center text-slate-400 py-10 gap-3 w-full h-64"
+                             >
+                               <ImagePlus className="w-8 h-8 opacity-50 mx-auto" />
+                               <span className="text-sm font-bold text-center block">画像を読み込めませんでした</span>
+                               <p className="text-xs text-slate-400 mt-2">右上の「別タブで開く」からカタログ原本を確認できます</p>
                              </div>
-                          )
+                             </>
+                           ) : (() => {
+                              const rawUrl = page.catalog_url || pdfUrl || '';
+                              const fIdM = rawUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                              const fId = fIdM ? fIdM[1] : null;
+                              const downloadUrl = fId
+                                ? `https://drive.google.com/uc?export=download&id=${fId}`
+                                : rawUrl;
+                              
+                              return (
+                                <div className="w-full h-full flex flex-col items-center justify-center gap-5 p-8 text-center">
+                                  <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center">
+                                    <span className="text-3xl">📄</span>
+                                  </div>
+                                  <div>
+                                     <p className="font-black text-slate-600 text-sm mb-1">このページの画像は準備中です</p>
+                                     <p className="text-xs text-slate-400">{page.page_number && page.page_number > 1 ? `カタログ PAGE ${page.page_number} に掲載されています` : 'ページ情報なし'}</p>
+                                  </div>
+                                  <p className="text-xs text-slate-400 mt-2">右上の「別タブで開く」からカタログを確認できます</p>
+                                </div>
+                              );
+                           })()
                         ) : (
                           // PDF Mode
                           <div className="w-full h-full flex flex-col items-center p-2">
@@ -1177,6 +1574,7 @@ export const KensackEngine: React.FC = () => {
                       </div>
                     </div>
                     
+                        </div>
                     {/* Floating Action Button for Copying Text */}
                     <div className="absolute bottom-6 left-0 right-0 flex justify-center z-10">
                        <button

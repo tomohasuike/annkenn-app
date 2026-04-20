@@ -12,6 +12,23 @@ import {
   Mail
 } from 'lucide-react';
 import { format } from 'date-fns';
+
+/**
+ * タイムスタンプ → JST文字列変換ヘルパー
+ * ブラウザのタイムゾーン設定に依存せず、UTC+9を直接計算して表示する。
+ * Supabaseは常にUTC（+00:00付き）で返すため、+9h = +32400000ms を加算する。
+ */
+const formatJST = (ts: string, fmt: string): string => {
+  if (!ts) return '-';
+  const utcMs = new Date(ts).getTime();
+  if (isNaN(utcMs)) return '-';
+  // UTC+9 のオフセットを直接加算してJST相当のDateオブジェクトを作成
+  const jstDate = new Date(utcMs + 9 * 60 * 60 * 1000);
+  return format(jstDate, fmt);
+};
+
+/** タイムスタンプ → ミリ秒（UTC）。フィルタ比較用 */
+const toMs = (ts: string): number => new Date(ts).getTime();
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import generatePDF, { Resolution, Margin } from 'react-to-pdf';
 
@@ -130,21 +147,28 @@ export default function SafetyDashboard() {
   const computeAggregatedData = () => {
     let targetReports = rawReports;
 
-    if (selectedEventId !== 'all') {
+      if (selectedEventId !== 'all') {
       const selectedEventIndex = events.findIndex(e => e.id === selectedEventId);
       if (selectedEventIndex !== -1) {
         const selectedEvent = events[selectedEventIndex];
-        const startTime = new Date(selectedEvent.sent_at).getTime();
-        // The end time is the sent_at of the NEXT event (which is at index - 1 because array is DESC)
-        let endTime = new Date('2099-12-31').getTime(); 
-        if (selectedEventIndex > 0) {
-          endTime = new Date(events[selectedEventIndex - 1].sent_at).getTime();
-        }
+        // events は DESC 順（最新が index 0）
+        // startTime: 選択した通知の送信時刻
+        // endTime:   1つ前（配列では index-1 = より新しい通知）の送信時刻
+        const startTime = toMs(selectedEvent.sent_at);
+        const endTime = selectedEventIndex > 0
+          ? toMs(events[selectedEventIndex - 1].sent_at)
+          : new Date('2099-12-31').getTime();
 
         targetReports = rawReports.filter(r => {
-          const t = new Date(r.created_at).getTime();
+          const t = toMs(r.created_at);
           return t >= startTime && t < endTime;
         });
+      }
+    } else {
+      // 「全期間」= 最新の通知以降の回答のみ表示（全混在を防ぐ）
+      if (events.length > 0) {
+        const latestStartTime = toMs(events[0].sent_at);
+        targetReports = rawReports.filter(r => toMs(r.created_at) >= latestStartTime);
       }
     }
 
@@ -365,9 +389,9 @@ export default function SafetyDashboard() {
                 className="bg-transparent text-sm font-bold text-slate-800 outline-none w-full sm:w-auto cursor-pointer"
               >
                 <option value="all">最新の回答状況（全期間）</option>
-                {events.map(ev => (
+                {events.sort((a, b) => toMs(b.sent_at) - toMs(a.sent_at)).map(ev => (
                   <option key={ev.id} value={ev.id}>
-                    {format(new Date(ev.sent_at), 'yyyy/MM/dd HH:mm')} ({ev.type.includes('テスト') ? 'テスト' : '緊急'})
+                    {formatJST(ev.sent_at, 'yyyy/MM/dd HH:mm')} ({ev.type.includes('テスト') ? 'テスト' : '緊急'})
                   </option>
                 ))}
               </select>
@@ -550,7 +574,7 @@ export default function SafetyDashboard() {
                          {report.memo || '-'}
                        </td>
                        <td className="px-5 py-3 text-right text-slate-400 text-xs whitespace-nowrap">
-                         {format(new Date(report.created_at), 'MM/dd HH:mm')}
+                         {formatJST(report.created_at, 'MM/dd HH:mm')}
                        </td>
                      </tr>
                    )) : (
