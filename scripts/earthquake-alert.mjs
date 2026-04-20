@@ -93,19 +93,24 @@ async function main() {
     process.exit(0);
   }
 
-  // 栃木県（対象地域）の震度を取得
+  // 対象地域（カンマ区切り複数対応）の震度を取得
+  // 例: '那須塩原,大田原,那須町'
+  const targetRegions = targetRegion ? targetRegion.split(',').map(r => r.trim()).filter(Boolean) : [];
   let localScale = 0;
   let regionInfo = '';
-  if (targetRegion && latest.points && latest.points.length > 0) {
+  if (targetRegions.length > 0 && latest.points && latest.points.length > 0) {
     const regionPoints = latest.points.filter(p =>
-      p.pref?.includes(targetRegion) || p.addr?.includes(targetRegion)
+      targetRegions.some(r => p.pref?.includes(r) || p.addr?.includes(r))
     );
     if (regionPoints.length > 0) {
       localScale = Math.max(...regionPoints.map(p => p.scale || 0));
-      regionInfo = `${targetRegion}の最大震度: 震度${scaleToStr(localScale)}`;
+      const matchedRegions = targetRegions.filter(r =>
+        latest.points.some(p => p.pref?.includes(r) || p.addr?.includes(r))
+      );
+      regionInfo = `${matchedRegions.join('・')}の最大震度: 震度${scaleToStr(localScale)}`;
       console.log(regionInfo);
     } else {
-      console.log(`${targetRegion}の観測点なし（全国最大震度: ${scaleToStr(maxScale)}）`);
+      console.log(`対象地域(${targetRegions.join('・')})の観測点なし（全国最大震度: ${scaleToStr(maxScale)}）`);
     }
   }
 
@@ -114,7 +119,7 @@ async function main() {
   const nationwideExtreme = maxScale >= 60; // 全国震度6強以上は無条件でアラート
 
   if (!localMeetsThreshold && !nationwideExtreme) {
-    console.log(`対象地域(${targetRegion})の震度が閾値未満 (${scaleToStr(localScale)} < 震度${settings.earthquake_threshold}) - 送信しない`);
+    console.log(`対象地域(${targetRegions.join('・')})の震度が閾値未満 (${scaleToStr(localScale)} < 震度${settings.earthquake_threshold}) - 送信しない`);
     // 処理済みとしてIDを更新
     await supabase.from('app_settings').update({ last_earthquake_event_id: latestId }).eq('id', settings.id);
     process.exit(0);
