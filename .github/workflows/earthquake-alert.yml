@@ -1,0 +1,29 @@
+name: 地震アラート 自動検知
+
+on:
+  schedule:
+    # 5分おきに実行
+    - cron: '*/5 * * * *'
+  # 手動テスト用
+  workflow_dispatch:
+
+jobs:
+  earthquake-alert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 依存パッケージインストール
+        run: npm install @supabase/supabase-js
+
+      - name: 地震アラートチェック
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node scripts/earthquake-alert.mjs
