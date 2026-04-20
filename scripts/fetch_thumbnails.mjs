@@ -114,7 +114,8 @@ async function uploadToGoogleDrive(filename, buffer, mimeType) {
       },
     });
 
-    return res.data.webViewLink; // 表示用共有リンク
+    // webViewLink は <img> では使えないため、thumbnail URL 形式で返す
+    return `https://drive.google.com/thumbnail?id=${res.data.id}&sz=w400`;
   } catch (error) {
     console.error("❌ Google Drive Upload Error:", error.message);
     return null;

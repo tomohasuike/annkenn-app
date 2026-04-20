@@ -1,0 +1,61 @@
+-- =========================================
+-- GAS安否確認データ → Supabase 移行SQL
+-- 生成日時: 2026/4/18 17:11:09
+-- Supabase SQL Editorに貼り付けて実行してください
+-- =========================================
+
+-- 通知履歴の移行
+INSERT INTO safety_notification_history (type, sent_at) VALUES ('テスト', '2026-03-06T18:42:11.711000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_notification_history (type, sent_at) VALUES ('テスト', '2026-03-09T09:05:43.354000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_notification_history (type, sent_at) VALUES ('テスト', '2026-04-10T12:59:30.204000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_notification_history (type, sent_at) VALUES ('テスト', '2026-04-17T20:59:30.558000') ON CONFLICT DO NOTHING;
+
+-- 回答データの移行
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('a2549392-18eb-484b-a73d-4883d3e2c619', '無事', '全員無事', '被害なし', '自宅', '特になし', '2026-03-06T16:39:14.207000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('a2549392-18eb-484b-a73d-4883d3e2c619', '無事', '全員無事', '被害なし', '自宅', '問題なし', '2026-03-06T18:42:35.042000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('d27ccfa8-f82a-4eeb-a8a9-c0030b75ad8f', '無事', '全員無事', '被害なし', '自宅', '', '2026-03-09T09:06:23.827000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('a2549392-18eb-484b-a73d-4883d3e2c619', '無事', '全員無事', '被害なし', '会社', '', '2026-03-09T09:07:16.054000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('7f238f8b-8863-471e-98d0-deaec88895ed', '無事', '連絡待ち', '被害なし', '会社', '', '2026-03-09T09:08:57.614000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('53e5bc3c-99b3-4ac3-93b9-1ba8789bce0c', '無事', '全員無事', '被害なし', '現場', '鳥野目浄水場にいます。', '2026-03-09T09:15:37.854000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('d0a30928-6ac2-47fe-afee-c3b39e0d1f53', '無事', '全員無事', '被害なし', '自宅', '', '2026-03-09T10:35:33.761000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('4d786a70-6d8c-4c5a-a1b8-80a3d8131837', '無事', '全員無事', '被害なし', '現場', '', '2026-03-09T10:46:15.865000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('a41c20a4-231a-418b-aa02-973dc29447f0', '無事', '全員無事', '被害なし', '自宅', '', '2026-03-09T11:44:42.376000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('0399224a-582b-494f-a8cd-8ee6889d16f2', '無事', '全員無事', '被害なし', '会社', '', '2026-03-09T11:51:25.590000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('80446a9f-1d11-4902-8c57-7b9143b7e43e', '無事', '全員無事', '被害なし', '自宅', '', '2026-03-09T12:13:38.294000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('be5744b7-98ed-4a74-aef5-4ab7eda95851', '無事', '全員無事', '被害なし', '現場', 'ケータイからは使用できませんでした。', '2026-03-09T12:17:35.806000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('21d3ea01-3d52-411d-be2f-db01f3359bd8', '無事', '全員無事', '被害なし', '現場', '', '2026-03-09T12:21:21.757000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('0d06f0b6-4c3b-42a7-b56f-f358464d3fad', '無事', '全員無事', '被害なし', '会社', '', '2026-03-09T13:14:58.452000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('8a4d96c6-38a3-439c-a908-25fc7e03d497', '無事', '全員無事', '被害なし', '会社', '', '2026-03-09T17:19:44.109000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('56ff2556-4992-4a60-b426-fae4eda8e406', '無事', '全員無事', '被害なし', '会社', '', '2026-03-09T17:42:14.122000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('1e102ca5-647d-49b1-9a88-f2970cbdd4c4', '無事', '全員無事', '被害なし', '自宅', '', '2026-03-09T17:56:49.073000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('5702fa85-59e4-43fb-b519-e55ca6b6a297', '無事', '全員無事', '被害なし', '自宅', '', '2026-03-09T21:32:59.526000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('53e5bc3c-99b3-4ac3-93b9-1ba8789bce0c', '無事', '全員無事', '被害なし', '会社', '', '2026-03-19T18:42:58.984000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('53e5bc3c-99b3-4ac3-93b9-1ba8789bce0c', '無事', '全員無事', '被害なし', '現場', '', '2026-04-10T13:00:16.537000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('7f238f8b-8863-471e-98d0-deaec88895ed', '無事', '連絡待ち', '被害なし', '会社', '', '2026-04-10T13:00:43.563000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('be5744b7-98ed-4a74-aef5-4ab7eda95851', '無事', '全員無事', '被害なし', '自宅', '特になし', '2026-04-10T13:01:23.349000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('d27ccfa8-f82a-4eeb-a8a9-c0030b75ad8f', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-10T13:04:25.449000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('a2549392-18eb-484b-a73d-4883d3e2c619', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-10T13:17:23.665000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('4d786a70-6d8c-4c5a-a1b8-80a3d8131837', '無事', '全員無事', '被害なし', '現場', '鳥野目にいます。', '2026-04-10T13:27:20.940000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('8a4d96c6-38a3-439c-a908-25fc7e03d497', '無事', '全員無事', '被害なし', '会社', '', '2026-04-10T13:34:18.536000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('21d3ea01-3d52-411d-be2f-db01f3359bd8', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-10T14:05:00.421000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('0d06f0b6-4c3b-42a7-b56f-f358464d3fad', '無事', '全員無事', '被害なし', '会社', '', '2026-04-10T15:12:43.159000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('1e102ca5-647d-49b1-9a88-f2970cbdd4c4', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-10T15:27:08.664000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('d0a30928-6ac2-47fe-afee-c3b39e0d1f53', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-10T16:52:51.233000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('56ff2556-4992-4a60-b426-fae4eda8e406', '無事', '全員無事', '被害なし', '会社', '', '2026-04-10T17:09:45.862000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('a41c20a4-231a-418b-aa02-973dc29447f0', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-10T18:42:43.417000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('80446a9f-1d11-4902-8c57-7b9143b7e43e', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-10T19:08:01.113000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('0399224a-582b-494f-a8cd-8ee6889d16f2', '無事', '全員無事', '被害なし', '会社', '', '2026-04-10T19:08:21.967000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('5702fa85-59e4-43fb-b519-e55ca6b6a297', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-10T21:46:28.661000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('a2549392-18eb-484b-a73d-4883d3e2c619', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-17T21:00:28.278000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('53e5bc3c-99b3-4ac3-93b9-1ba8789bce0c', '無事', '全員無事', '被害なし', 'その他（しきこう）', '', '2026-04-17T21:00:35.908000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('1e102ca5-647d-49b1-9a88-f2970cbdd4c4', '無事', '全員無事', '被害なし', 'その他', '', '2026-04-17T21:03:05.287000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('80446a9f-1d11-4902-8c57-7b9143b7e43e', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-17T21:03:14.620000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('d0a30928-6ac2-47fe-afee-c3b39e0d1f53', '無事', '全員無事', '被害なし', 'その他（鍋掛）', '', '2026-04-17T21:04:49.235000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('a41c20a4-231a-418b-aa02-973dc29447f0', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-17T21:08:17.362000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('7f238f8b-8863-471e-98d0-deaec88895ed', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-17T21:16:57.126000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('56ff2556-4992-4a60-b426-fae4eda8e406', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-17T21:57:25.704000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('4d786a70-6d8c-4c5a-a1b8-80a3d8131837', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-17T22:32:50.314000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('21d3ea01-3d52-411d-be2f-db01f3359bd8', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-17T23:47:51.773000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('5702fa85-59e4-43fb-b519-e55ca6b6a297', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-18T05:44:22.111000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('0d06f0b6-4c3b-42a7-b56f-f358464d3fad', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-18T09:35:47.618000') ON CONFLICT DO NOTHING;
+INSERT INTO safety_reports (worker_id, status, family_status, house_status, location, memo, created_at) VALUES ('d27ccfa8-f82a-4eeb-a8a9-c0030b75ad8f', '無事', '全員無事', '被害なし', '自宅', '', '2026-04-18T11:35:58.506000') ON CONFLICT DO NOTHING;
