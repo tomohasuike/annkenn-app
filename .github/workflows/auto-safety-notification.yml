@@ -1,0 +1,37 @@
+name: 安否確認 自動送信
+
+on:
+  schedule:
+    # JST 03:00 = UTC 18:00 前日  
+    # JST 06:00 = UTC 21:00 前日
+    # JST 09:00 = UTC 00:00
+    # JST 12:00 = UTC 03:00
+    # JST 15:00 = UTC 06:00
+    # JST 18:00 = UTC 09:00
+    # JST 20:00 = UTC 11:00
+    # JST 21:00 = UTC 12:00
+    # 毎時00分に実行してスクリプト側でJST照合
+    - cron: '0 * * * *'
+  # 手動テスト用
+  workflow_dispatch:
+
+jobs:
+  auto-safety-notification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 依存パッケージインストール
+        run: npm install @supabase/supabase-js
+
+      - name: 安否確認 自動送信チェック
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node scripts/auto-safety-notification.mjs
