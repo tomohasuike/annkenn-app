@@ -330,9 +330,10 @@ export default function WorkerAttendance() {
                return; // 現場入と現場出が同じ場合は「完了報告用」なので表示しない
            }
 
-           // 遅延提出対応: start_timeの日付を実作業日として使用（report_dateは提出日）
-           const rawStart = r.start_time || _r.start_time;
-           const date = rawStart ? getLocalDateString(rawStart) : reportDateStr;
+           // 遅延提出対応: daily_reports.start_time（日時付き）から実作業日を導出
+           // report_personnel.start_time は時刻のみ(HH:MM:SS)のため日付導出に使えない
+           const rawDateStart = _r.start_time; // daily_reports側は日時付き
+           const date = rawDateStart ? getLocalDateString(rawDateStart) : reportDateStr;
            if (!date) return;
 
            if (!projectsByDate[date]) projectsByDate[date] = [];

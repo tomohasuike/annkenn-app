@@ -426,8 +426,10 @@ export default function AttendanceAdmin() {
                return; // 現場入と現場出が同じ場合は「完了報告用」なので表示しない
            }
            
-           // 実際の作業日(start_timeの日付)を使用。遅延提出時はreport_dateではなく実作業日が正しい
-           const actualDate = workerStart ? toJSTDateString(workerStart) : d;
+           // 実際の作業日はdaily_reports.start_time（日時付き）から導出。
+           // report_personnel.start_time は時刻のみ(HH:MM:SS)のため日付導出に使えない
+           const dateRawStart = _r?.start_time; // daily_reports側は日時付き
+           const actualDate = dateRawStart ? toJSTDateString(dateRawStart) : d;
 
            if (actualDate && p) {
              if (!projMap[actualDate]) projMap[actualDate] = [];
