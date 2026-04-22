@@ -1161,7 +1161,8 @@ export default function AttendanceAdmin() {
                       </td>
                       <td colSpan={2} className="p-3 border-r text-left text-slate-700 flex-col gap-1 text-xs sm:flex">
                          <span>出勤: {records.length} 日</span>
-                         <span>職長: {records.reduce((acc, r) => acc + (r.site_declarations ? r.site_declarations.filter(sd => sd.role === '職長').length : 0), 0)} 回</span>
+                         <span>職長: {records.filter(r => r.role === '職長' || (r.site_declarations && r.site_declarations.some((sd: any) => sd.role === '職長'))).length} 回</span>
+
                       </td>
                       <td colSpan={2} className="p-3 bg-red-50/50"></td>
                    </tr>
