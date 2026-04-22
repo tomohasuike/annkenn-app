@@ -311,8 +311,8 @@ export default function WorkerAttendance() {
         const _r = Array.isArray(r.daily_reports) ? r.daily_reports[0] : r.daily_reports;
         if (!_r) return;
         
-        const date = getLocalDateString(_r.report_date);
-        if (!date) return;
+        const reportDateStr = getLocalDateString(_r.report_date);
+        if (!reportDateStr) return;
         
         const p_obj = _r.projects;
         const p_obj_first = Array.isArray(p_obj) ? p_obj[0] : p_obj;
@@ -323,8 +323,6 @@ export default function WorkerAttendance() {
         const category = p_obj_first?.category;
         
         if (pName) {
-           if (!projectsByDate[date]) projectsByDate[date] = [];
-           
            const rStart = formatTimeSafe(r.start_time || _r.start_time);
            const rEnd = formatTimeSafe(r.end_time || _r.end_time);
 
@@ -332,6 +330,12 @@ export default function WorkerAttendance() {
                return; // 現場入と現場出が同じ場合は「完了報告用」なので表示しない
            }
 
+           // 遅延提出対応: start_timeの日付を実作業日として使用（report_dateは提出日）
+           const rawStart = r.start_time || _r.start_time;
+           const date = rawStart ? getLocalDateString(rawStart) : reportDateStr;
+           if (!date) return;
+
+           if (!projectsByDate[date]) projectsByDate[date] = [];
            const existingIdx = projectsByDate[date].findIndex(p => p.project_id === _r.project_id);
            if (existingIdx >= 0) {
               projectsByDate[date][existingIdx].foreman_start = rStart;

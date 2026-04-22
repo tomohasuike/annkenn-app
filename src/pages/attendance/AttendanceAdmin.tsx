@@ -426,11 +426,14 @@ export default function AttendanceAdmin() {
                return; // 現場入と現場出が同じ場合は「完了報告用」なので表示しない
            }
            
-           if (d && p) {
-             if (!projMap[d]) projMap[d] = [];
+           // 実際の作業日(start_timeの日付)を使用。遅延提出時はreport_dateではなく実作業日が正しい
+           const actualDate = workerStart ? toJSTDateString(workerStart) : d;
+
+           if (actualDate && p) {
+             if (!projMap[actualDate]) projMap[actualDate] = [];
              // Check for duplicate by name
-             if (!projMap[d].find(x => x.name === p)) {
-                projMap[d].push({ name: p, sStr, eStr, reportId, projectId, cn, pName, ord, siteName, category });
+             if (!projMap[actualDate].find(x => x.name === p)) {
+                projMap[actualDate].push({ name: p, sStr, eStr, reportId, projectId, cn, pName, ord, siteName, category });
              }
            }
         });
