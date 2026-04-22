@@ -77,7 +77,7 @@ export default function TomorrowScheduleForm() {
       const fetched = await fetchProjects()
 
       if (id) {
-        await fetchScheduleData(id)
+        await fetchScheduleData(id, fetched?.workerNames || [])
       } else {
         const { data: { session } } = await supabase.auth.getSession()
         const user = session?.user;
@@ -198,14 +198,14 @@ export default function TomorrowScheduleForm() {
         })))
       }
       
-      return { finalVehiclesList };
+      return { finalVehiclesList, workerNames: wData ? wData.map(w => w.name) : [] };
     } catch (e) {
       console.error("Error fetching projects:", e)
       return null;
     }
   }
 
-  async function fetchScheduleData(scheduleId: string) {
+  async function fetchScheduleData(scheduleId: string, validWorkerNames: string[] = []) {
     try {
       const { data, error } = await supabase
         .from('tomorrow_schedules')
@@ -267,9 +267,17 @@ export default function TomorrowScheduleForm() {
         }
         
         if (data.workers) {
-            // Split by comma, zenkaku comma, space, zenkaku space, or '、'
-            const parsedWorkers = data.workers.split(/[,、\s　]+/).map((w: string) => w.trim()).filter((w: string) => w !== '');
-            setSelectedWorkers(parsedWorkers);
+            // カンマ・読点のみで分割（スペースでは分割しない → 「鈴木 拓也」が壊れるのを防ぐ）
+            const rawParsed = data.workers
+                .split(/[,、]+/)
+                .map((w: string) => w.trim())
+                .filter((w: string) => w !== '');
+            // 重複除去 + 有効な名前のみに絞り込む（過去に壊れて保存されたフラグメントを除外）
+            const deduped = [...new Set(rawParsed)];
+            const cleanWorkers = validWorkerNames.length > 0
+                ? deduped.filter(w => validWorkerNames.includes(w))
+                : deduped;
+            setSelectedWorkers(cleanWorkers);
         }
       }
 

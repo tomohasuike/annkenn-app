@@ -236,12 +236,19 @@ export default function TomorrowSchedules() {
                             {schedule.work_content || <span className="text-muted-foreground italic">記載なし</span>}
                           </p>
                           <div className="flex flex-col gap-1.5 mt-2">
-                            {schedule.workers && (
-                              <div className="flex flex-wrap gap-1 items-start mt-1">
-                                <Users className="w-3.5 h-3.5 text-blue-500 mr-1 mt-0.5 shrink-0" />
-                                <div className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-sm ring-1 ring-inset ring-blue-700/10 whitespace-pre-wrap">{schedule.workers}</div>
-                              </div>
-                            )}
+                            {schedule.workers && (() => {
+                                // 重複除去 + フラグメント除外（過去の不具合で保存された「斎藤」「敦士」等を除去）
+                                const cleaned = [...new Set(
+                                  schedule.workers!.split(/[,、]+/).map(w => w.trim()).filter(w => w.length > 1)
+                                )].join('、');
+                                return (
+                                  <div className="flex flex-wrap gap-1 items-start mt-1">
+                                    <Users className="w-3.5 h-3.5 text-blue-500 mr-1 mt-0.5 shrink-0" />
+                                    <div className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-sm ring-1 ring-inset ring-blue-700/10 whitespace-pre-wrap">{cleaned}</div>
+                                  </div>
+                                );
+                              })()}
+
                             {(schedule.tomorrow_subcontractors || []).length > 0 && (
                               <div className="flex flex-wrap gap-1 items-center mt-1">
                                 <Building className="w-3.5 h-3.5 text-indigo-500 mr-1 shrink-0" />
