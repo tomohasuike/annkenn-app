@@ -1074,15 +1074,10 @@ export default function WorkerAttendance() {
                           </div>
                        </td>
 
-                       {/* 移動、準備、雑務、私用外出、備考 Column */}
+                       {/* 移動 Column */}
                        <td className="p-2 border-r text-center align-top pt-2">
                            <div className="h-full flex items-center justify-center text-blue-600 font-medium text-xs">
                               {record?.travel_time_minutes ? `${record.travel_time_minutes} 分` : <span className="text-slate-300 font-normal">-</span>}
-                           </div>
-                       </td>
-                       <td className="p-2 border-r text-center align-top pt-2">
-                           <div className="h-full flex items-center justify-center text-emerald-600 font-medium text-xs">
-                              {record?.prep_time_minutes ? `${record.prep_time_minutes} 分` : <span className="text-slate-300 font-normal">-</span>}
                            </div>
                        </td>
                        <td className="p-2 border-r text-center align-top pt-2">
