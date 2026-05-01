@@ -37,10 +37,8 @@ serve(async (req: Request) => {
        return new Response(JSON.stringify({ message: "Transition between active states, no move needed" }), { status: 200 })
     }
 
-    const folderMapping = PARENT_FOLDERS[category]
-    if (!folderMapping) {
-      return new Response(JSON.stringify({ error: "Invalid category mapping" }), { status: 500 })
-    }
+    // カテゴリが未マップの場合は「一般」にフォールバック（例: null, "電気" など）
+    const folderMapping = PARENT_FOLDERS[category] ?? PARENT_FOLDERS["一般"]
 
     const newParentId = isCompleted ? folderMapping.completed : folderMapping.active
 

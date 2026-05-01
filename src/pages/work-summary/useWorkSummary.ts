@@ -148,8 +148,8 @@ export function useWorkSummary() {
           id, project_id, report_date, work_category, start_time, end_time, site_photos,
           projects (id, project_name, project_number, category),
           report_personnel (worker_name, worker_master(name), start_time, end_time),
-          report_vehicles (vehicle_name),
-          report_machinery (machinery_name),
+          report_vehicles (vehicle_name, vehicle_master(vehicle_name)),
+          report_machinery (machinery_name, vehicle_master(vehicle_name)),
           report_materials (material_name, quantity, photo, documentation),
           report_subcontractors (subcontractor_name, worker_count, start_time, end_time)
         `);
@@ -246,8 +246,22 @@ export function useWorkSummary() {
         const staffsData = Array.from(staffMap.values());
         
         // Parse Equipment and Deduplicate
-        const cars = [...new Set(Array.isArray(row.report_vehicles) ? row.report_vehicles.map((v:any) => v.vehicle_name).filter(Boolean) : [])];
-        const machines = [...new Set(Array.isArray(row.report_machinery) ? row.report_machinery.map((m:any) => m.machinery_name).filter(Boolean) : [])];
+        const cars = [...new Set(Array.isArray(row.report_vehicles)
+          ? row.report_vehicles.map((v: any) => {
+              const masterName = Array.isArray(v.vehicle_master)
+                ? v.vehicle_master[0]?.vehicle_name
+                : v.vehicle_master?.vehicle_name;
+              return v.vehicle_name || masterName;
+            }).filter(Boolean)
+          : [])];
+        const machines = [...new Set(Array.isArray(row.report_machinery)
+          ? row.report_machinery.map((m: any) => {
+              const masterName = Array.isArray(m.vehicle_master)
+                ? m.vehicle_master[0]?.vehicle_name
+                : m.vehicle_master?.vehicle_name;
+              return m.machinery_name || masterName;
+            }).filter(Boolean)
+          : [])];
         const eqList = [...cars, ...machines];
         
         // Parse Subcontractors and Deduplicate
