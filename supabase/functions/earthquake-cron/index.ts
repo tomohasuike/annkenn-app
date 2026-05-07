@@ -1,9 +1,9 @@
-import "https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const b64Decode = (str: string) => new TextDecoder().decode(Uint8Array.from(atob(str), c => c.charCodeAt(0)));
 
-Deno.cron("earthquake-auto-alert", "* * * * *", async () => {
+async function runEarthquakeCheck() {
     console.log("Earthquake Cron started...");
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -50,7 +50,7 @@ Deno.cron("earthquake-auto-alert", "* * * * *", async () => {
         }
 
         const latestEvent = events[0];
-        
+
         // Ensure it's a valid event with an ID
         const eventId = latestEvent.earthquake?.time || latestEvent.id || latestEvent.time;
         if (!eventId) {
@@ -90,30 +90,35 @@ Deno.cron("earthquake-auto-alert", "* * * * *", async () => {
         // Condition 1: Overall max Scale is >= Threshold
         if (maxScale >= targetMinScale) {
             // Condition 2: Is the threshold met in the target region?
-            // "points" contains {"addr":"東京都", "scale": 45} etc.
             const points = latestEvent.points || [];
-            
-            // "本社周辺" is generic, if user types anything we do a loose check.
-            // If they type a specific pref like "東京" or city "新宿", we check points.
-            // If the query is "本社周辺", we might fallback to checking just the overall maxScale,
-            // OR doing a rudimentary substring check.
+
             for (const pt of points) {
-                if (pt.scale >= targetMinScale && (regionQuery === "本社周辺" || regionQuery === "全域" || pt.addr.includes(regionQuery) || pt.pref.includes(regionQuery))) {
+                // null/undefined safety for addr and pref
+                const addr = pt.addr ?? '';
+                const pref = pt.pref ?? '';
+
+                if (
+                    pt.scale >= targetMinScale &&
+                    (
+                        regionQuery === "本社周辺" ||
+                        regionQuery === "全域" ||
+                        addr.includes(regionQuery) ||
+                        pref.includes(regionQuery)
+                    )
+                ) {
                     isMatch = true;
                     break;
                 }
             }
 
-            // Fallback: If regionQuery is "本社周辺" and maxScale is met globally, trigger it.
+            // Fallback: If regionQuery is generic and maxScale is met globally, trigger.
             if (!isMatch && (regionQuery === "本社周辺" || regionQuery === "全域")) {
-                isMatch = true; // For '本社周辺' without specific prefecture, trigger if ANY point matches threshold!
+                isMatch = true;
             }
         }
 
         if (!isMatch) {
             console.log("Earthquake event did not meet criteria. EventId:", eventId);
-            // Even if it didn't match, we SHOULD NOT record it as processed yet?
-            // Actually we should record it as processed so we don't re-check it 100 times.
             await supabase.from('app_settings').update({ last_earthquake_event_id: eventId }).eq('id', settings.id);
             return;
         }
@@ -127,9 +132,9 @@ Deno.cron("earthquake-auto-alert", "* * * * *", async () => {
         }
 
         // Send Webhook to Google Chat
-        const msgHeader = b64Decode("PHVzZXJzL2FsbD4g44CQ57eK5oCl44CR5a6J5ZCm56K66KqN44Gu44GK6aGY44GE"); // <users/all> 【緊急】安否確認のお願い
-        const msgBody1 = b64Decode("5aSn6KaP5qih44Gq5Zyw6ZyH44GM55m655Sf44GX44G+44GX44Gf44CC55u044Gh44Gr5Lul5LiL44GuVVJM44KI44KK5a6J5ZCm54q25rOB44KS5aCx5ZGK44GX44Gm44GP44Gg44GV44GE44CC"); // 大規模な地震が発生しました。直ちに以下のURLより安否状況を報告してください。
-        
+        const msgHeader = b64Decode("PHVzZXJzL2FsbD4g44CQ57eK5oCl44CR5a6J5ZCm56K66KqN44Gu44GK6aGY44GE");
+        const msgBody1 = b64Decode("5aSn6KaP5qih44Gq5Zyw6ZyH44GM55m655Sf44GX44G+44GX44Gf44CC55u044Gh44Gr5Lul5LiL44GuVVJM44KI44KK5a6J5ZCm54q25rOB44KS5aCx5ZGK44GX44Gm44GP44Gg44GV44GE44CC");
+
         const messageText = `${msgHeader}\n${msgBody1}\n\n${settings.safety_app_url || ''}`;
 
         const hookRes = await fetch(settings.safety_webhook_url, {
@@ -143,17 +148,46 @@ Deno.cron("earthquake-auto-alert", "* * * * *", async () => {
         }
 
         // Create notification history
-        const typeEmergency = b64Decode("57eK5oCl6Ieq5YuV5LiA5paJ6YCB5L+h77yI5Zyw6ZyH6YCj5YuV77yJ"); // 緊急自動一斉送信（地震連動）
+        const typeEmergency = b64Decode("57eK5oCl6Ieq5YuV5LiA5paJ6YCB5L+h77yI5Zyw6ZyH6YCj5YuV77yJ");
         await supabase
             .from('safety_notification_history')
             .insert([{ type: typeEmergency }]);
 
         // Finally, save processing state so we don't fire again
         await supabase.from('app_settings').update({ last_earthquake_event_id: eventId }).eq('id', settings.id);
-        
+
         console.log("Earthquake dispatch complete.");
 
     } catch (err) {
         console.error("Unhandled error in earthquake cron:", err);
+    }
+}
+
+// Cron: every minute
+Deno.cron("earthquake-auto-alert", "* * * * *", runEarthquakeCheck);
+
+// HTTP handler (required for Supabase Edge Function deployment)
+Deno.serve(async (req) => {
+    if (req.method === 'OPTIONS') {
+        return new Response('ok', {
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+            }
+        });
+    }
+
+    try {
+        await runEarthquakeCheck();
+        return new Response(JSON.stringify({ success: true, message: "Earthquake check executed." }), {
+            headers: { 'Content-Type': 'application/json' },
+            status: 200,
+        });
+    } catch (err: any) {
+        console.error("HTTP trigger error:", err);
+        return new Response(JSON.stringify({ error: err.message }), {
+            headers: { 'Content-Type': 'application/json' },
+            status: 500,
+        });
     }
 });
