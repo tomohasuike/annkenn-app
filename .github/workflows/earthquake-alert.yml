@@ -17,7 +17,22 @@ jobs:
       - name: Node.js セットアップ
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+
+      - name: シークレット確認
+        run: |
+          if [ -z "$SUPABASE_URL" ]; then
+            echo "::error::SUPABASE_URL が GitHub Secrets に設定されていません"
+            exit 1
+          fi
+          if [ -z "$SUPABASE_SERVICE_KEY" ]; then
+            echo "::error::SUPABASE_SERVICE_KEY が GitHub Secrets に設定されていません"
+            exit 1
+          fi
+          echo "シークレット確認OK"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
 
       - name: 依存パッケージインストール
         run: npm install @supabase/supabase-js
