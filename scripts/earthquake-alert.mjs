@@ -130,10 +130,24 @@ async function main() {
     : `全国最大震度${scaleToStr(maxScale)}（広域大地震）`;
   console.log(`アラート条件成立: ${reason} → 通知送信`);
 
+  // Webhook URL チェック
+  if (!settings.safety_webhook_url) {
+    console.error('Google ChatのWebhook URLが未設定です。app_settings.safety_webhook_urlを設定してください。');
+    // 同じ地震を御度橋り返さないようIDだけ更新して終了
+    await supabase.from('app_settings').update({ last_earthquake_event_id: latestId }).eq('id', settings.id);
+    process.exit(0);
+  }
+
+  // まずIDを更新してからWebhook送信（送信失敗しても同じ地震を再試行しないため）
+  await supabase.from('app_settings')
+    .update({ last_earthquake_event_id: latestId })
+    .eq('id', settings.id);
+  console.log(`処理済みイベントIDを登録: ${latestId}`);
+
   // メッセージ作成
   const formUrl = settings.safety_app_url || 'https://annkenn-app.vercel.app/safety-report';
   const messageText = [
-    `<users/all> 【緊急】大地震発生 - 安否確認のお願い`,
+    `<users/all> 「第一報」大地震発生 - 安否確認のお願い`,
     ``,
     `震源: ${hypocenterName}`,
     `規模: M${magnitude}`,
@@ -156,7 +170,8 @@ async function main() {
   if (!chatRes.ok) {
     const errText = await chatRes.text();
     console.error('Google Chat 送信失敗:', chatRes.status, errText);
-    process.exit(1);
+    // 送信失敗でもexit(0)—IDは履歴済みなので再試行しない
+    process.exit(0);
   }
 
   console.log('Google Chat 送信成功');
@@ -165,11 +180,6 @@ async function main() {
   await supabase.from('safety_notification_history').insert([{
     type: `緊急（地震自動検知）震度${scaleToStr(maxScale)} ${hypocenterName}`
   }]);
-
-  // last_earthquake_event_id を更新
-  await supabase.from('app_settings')
-    .update({ last_earthquake_event_id: latestId })
-    .eq('id', settings.id);
 
   console.log(`完了: 地震アラート送信 - ${hypocenterName} M${magnitude} 最大震度${scaleToStr(maxScale)}`);
 }
