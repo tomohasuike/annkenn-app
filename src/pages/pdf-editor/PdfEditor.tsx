@@ -305,34 +305,27 @@ export default function PdfEditor() {
           }
           
           try {
-              // 「ファイルを結合中...」というローディング（元々はダウンロード処理）を発生させるが、実際は一瞬で終わる
               setIsMerging(true);
+              // まずメタデータ（ファイル名・親フォルダ）を取得
               const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileIdToLoad}?fields=id,name,parents&supportsAllDrives=true`, {
                   headers: { Authorization: `Bearer ${response.access_token}` }
               });
               if (!res.ok) throw new Error('Failed to fetch file metadata');
               const metadata = await res.json();
               const parentId = metadata.parents && metadata.parents.length > 0 ? metadata.parents[0] : null;
-              
-              // プロキシオブジェクト：保存・エクスポート時にのみ実体（全データ）をフェッチさせる
-              const remoteFile: any = {
-                  url: `https://www.googleapis.com/drive/v3/files/${fileIdToLoad}?alt=media&supportsAllDrives=true`,
-                  httpHeaders: { Authorization: `Bearer ${response.access_token}` },
-                  name: metadata.name,
-                  fileId: fileIdToLoad,
-                  parentId: parentId,
-                  type: 'application/pdf',
-                  arrayBuffer: async () => {
-                      // エクスポートなど実体が必要な時に初めてストリームではなく一括ダウンロードする
-                      const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileIdToLoad}?alt=media&supportsAllDrives=true`, {
-                          headers: { Authorization: `Bearer ${response.access_token}` }
-                      });
-                      if (!fileRes.ok) throw new Error('Failed to download file data');
-                      return await fileRes.arrayBuffer();
-                  }
-              };
-              
-              setFiles([remoteFile]);
+
+              // ファイル実体をダウンロードしてFileオブジェクトを作成（Pickerと同じ方式）
+              // ※ Proxyオブジェクト方式だとreact-pdfがarrayBuffer関数をBlobと誤認して"Failed to load PDF file."エラーになる
+              const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileIdToLoad}?alt=media&supportsAllDrives=true`, {
+                  headers: { Authorization: `Bearer ${response.access_token}` }
+              });
+              if (!fileRes.ok) throw new Error('Failed to download file data');
+              const blob = await fileRes.blob();
+              const downloadedFile = new File([blob], metadata.name, { type: 'application/pdf' });
+              (downloadedFile as any).fileId = fileIdToLoad;
+              (downloadedFile as any).parentId = parentId;
+
+              setFiles([downloadedFile]);
               setDriveFileId(fileIdToLoad);
               setPageAnnotations({});
               setFilePageCounts([]);
@@ -346,15 +339,9 @@ export default function PdfEditor() {
               
               if (jumpToPage) {
                 const targetId = `0-${jumpToPage}`;
-                
-                // カタログから飛んできた場合はサイドバーは重いので明示的に閉じる
                 setShowSidebar(false);
-                
-                // 今すぐ対象ページ状態に書き換えておかないと単一ページモードのレンダリングから除外されてしまう
                 setPageNumber(targetId);
                 setSelectedPages([targetId]);
-
-                // 少し待ってからページ指定とスクロールを行う（Reactレンダリング完了を確実にするため）
                 let attempts = 0;
                 const scrollInterval = setInterval(() => {
                   if (mainPageRefs.current && mainPageRefs.current[targetId]) {
