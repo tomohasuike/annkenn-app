@@ -109,7 +109,7 @@ const MainPage = React.memo(({
     // これによりズーム操作中もreact-pdfの再レンダリング（Canvasの一瞬の消去）が一切発生せず、
     // CSSのscaleのみで瞬時かつ完全に滑らかに（チラつきゼロで）拡大縮小できるようになります。
     const baseDpr = Math.max(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2);
-    const dpr = baseDpr * 3; // 常に最大ズーム相当の超高画質を最初から確保しておく
+    const dpr = baseDpr; // 大容量PDF対応のため等倍DPRに変更（*3はメモリ不足でクラッシュの原因）
 
     return (
         <div ref={setRefs} className="relative shadow-md bg-white mb-6 flex flex-col items-center shrink-0 transition-transform duration-200 scroll-mt-8" style={{ width: 800, minHeight: currentMinHeight }}>
