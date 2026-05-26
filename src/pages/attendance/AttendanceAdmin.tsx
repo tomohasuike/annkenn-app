@@ -188,7 +188,10 @@ export default function AttendanceAdmin() {
 
          const { error: declsError } = await supabase
              .from('daily_attendance')
-             .update({ site_declarations: validDecls.length > 0 ? validDecls.map(({reportId, ...rest}) => rest) : [] })
+             .update({ 
+                site_declarations: validDecls.length > 0 ? validDecls.map(({reportId, ...rest}) => rest) : [],
+                role: validDecls.some(d => d.role === '職長') ? '職長' : '一般'
+              })
              .eq('id', recId);
          if (declsError) throw declsError;
 
