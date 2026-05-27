@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Camera, Cpu, AlertTriangle, CheckCircle2, Loader2, ImagePlus, ShoppingCart, Trash2, Mail, FileText, ChevronUp, ChevronDown, Mic, Plus, GripVertical, ArrowUp, SlidersHorizontal } from 'lucide-react';
 import { executeKensackSearch, executeKensackVisionSearch, parseVoiceToCartItems } from '../services/KensackService';
+import imageCompression from 'browser-image-compression';
 import type { KensackSearchResult, KensackMaterial, CartItem, ChatMessage } from '../services/KensackService';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -205,6 +206,7 @@ export const KensackEngine: React.FC = () => {
   const [catalogViewerMfg, setCatalogViewerMfg] = useState('');
   const [catalogViewerTitle, setCatalogViewerTitle] = useState('');
   const [catalogViewerPdfModeIndex, setCatalogViewerPdfModeIndex] = useState<number | null>(null);
+  const [catalogViewerCurrentIndex, setCatalogViewerCurrentIndex] = useState(0); // 現在表示中のページindex
   const [driveAccessToken, setDriveAccessToken] = useState<string | null>(null);
 
   // Catalog Viewer Zoom/Pan
@@ -381,6 +383,7 @@ export const KensackEngine: React.FC = () => {
     setCatalogViewerMfg(m.manufacturers?.name || '');
     setCatalogViewerTitle(m.name || '');
     setCatalogViewerPdfModeIndex(null); // reset pdf mode
+    setCatalogViewerCurrentIndex(0); // reset page index
 
     // Get the grouped pages, or if empty, fall back to page 1.
     // catalog_urlがなくてもpage 1にフォールバックして常に何かが表示されるようにする。
@@ -428,29 +431,98 @@ export const KensackEngine: React.FC = () => {
       const { supabase } = await import('../lib/supabase');
       const mfgName = m.manufacturers?.name;
 
-      // Collect all page numbers including page-1 (overview/advertisement page often comes right before the spec page)
-      const existingPageNums = new Set(pagesList.map(p => p.page_number));
-      const allPageNums = new Set<number>();
-      pagesList.forEach(p => {
-        if (p.page_number > 1) allPageNums.add(p.page_number - 1); // 1ページ前（概要・広告ページ）も追加
-        allPageNums.add(p.page_number);
-      });
+      // =====================================================
+      // catalog_name の特定（製品名キーワード判定）
+      // fileIdベースの判定は materials.catalog_url が古いfileIdを持つため
+      // re-ingest後も永続的に失敗する → 製品名から直接判定する方式に変更
+      // =====================================================
+      let catalogName: string | null = null;
 
-      // Fetch all relevant pages from catalog_pages in a single query
+      if (mfgName) {
+        const productName = m.name || '';
+        // メーカー別・カタログ判定ルール
+        if (mfgName === 'ネグロス電工') {
+          // タフロック系製品（防火・耐火）か汎用電設資材かを名前で判定
+          const isTaflocks = /タフロック|TAF|taf|防火|耐火/.test(productName);
+          catalogName = isTaflocks ? 'タフロックス' : '電設一般カタログ';
+          console.log(`[CatalogViewer] catalog_name判定(名前): "${productName}" → "${catalogName}"`);
+        }
+        // 他メーカーは catalog_name を null のまま（絞り込みなし）
+      }
+
+      // =====================================================
+      // 同名商品が出てくる全ページを収集
+      // relatedMatsの各fileIdをcatalog_pagesで検証し、同じcatalog_nameのものだけ追加
+      // =====================================================
+      const allPageNums = new Set<number>();
+      pagesList.forEach(p => { if (p.page_number) allPageNums.add(p.page_number); });
+
+      const rawName = m.name || '';
+      const baseKeyword = rawName.split(/[\s（(「]/)[0].substring(0, 6) || rawName;
+      if (baseKeyword && m.manufacturer_id && mfgName) {
+        const { data: relatedMats } = await supabase
+          .from('materials')
+          .select('page_number, catalog_url')
+          .eq('manufacturer_id', m.manufacturer_id)
+          .ilike('name', `%${baseKeyword}%`)
+          .not('page_number', 'is', null)
+          .not('model_number', 'is', null)   // 型番なしはカタログ索引・案内ページのため除外
+          .neq('model_number', 'UNKNOWN')    // UNKNOWN型番（索引ページ言及）も除外
+          .limit(500);
+
+        // 関連材料のfileIdをまとめて収集してbatch lookup
+        const relatedFileIds = new Map<string, number>(); // fileId → page_number
+        for (const mat of relatedMats || []) {
+          if (!mat.page_number || !mat.catalog_url) continue;
+          const fid = mat.catalog_url.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1] ||
+                      mat.catalog_url.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1];
+          if (fid) relatedFileIds.set(fid, mat.page_number);
+        }
+
+        if (relatedFileIds.size > 0) {
+          if (catalogName) {
+            // 確定済み catalog_name のページだけ追加（異カタログを除外）
+            const { data: relatedCatPages } = await supabase
+              .from('catalog_pages')
+              .select('drive_file_id, page_number')
+              .eq('manufacturer', mfgName)
+              .eq('catalog_name', catalogName)
+              .in('drive_file_id', [...relatedFileIds.keys()]);
+            for (const cp of relatedCatPages || []) {
+              if (cp.page_number) allPageNums.add(cp.page_number);
+            }
+          } else {
+            for (const pageNum of relatedFileIds.values()) {
+              allPageNums.add(pageNum);
+            }
+          }
+        }
+      }
+
+      const existingPageNums = new Set(pagesList.map(p => p.page_number));
+      console.log(`[CatalogViewer] 確定catalog: "${catalogName}", 収集ページ数: ${allPageNums.size}ページ`);
+
+
+      // catalog_pages から該当ページをまとめて取得
       let catalogData: { page_number: number; drive_file_id: string | null; page_image_url: string | null }[] = [];
       if (mfgName && allPageNums.size > 0) {
-        const { data } = await supabase
+        let catQ = supabase
           .from('catalog_pages')
           .select('page_number, drive_file_id, page_image_url')
           .eq('manufacturer', mfgName)
           .in('page_number', [...allPageNums]);
+        // catalog_nameが特定できた場合は絞り込む（タフロックスと電設一般カタログの混在防止）
+        if (catalogName) {
+          catQ = catQ.eq('catalog_name', catalogName);
+        }
+        const { data } = await catQ;
         catalogData = data || [];
       }
 
-      // Build merged pages list: include adjacent pages that exist in catalog_pages
+
+      // 登録ページ＋周辺ページをマージしてソート
       const catalogPageNums = new Set(catalogData.map(d => d.page_number));
       const mergedPagesList = [
-        // Adjacent pages (page-1) that exist in catalog_pages but not already in pagesList
         ...Array.from(allPageNums)
           .filter(n => catalogPageNums.has(n) && !existingPageNums.has(n))
           .map(n => ({ page_number: n, catalog_url: '' })),
@@ -462,38 +534,54 @@ export const KensackEngine: React.FC = () => {
         const dbPage = catalogData.find(d => d.page_number === p.page_number);
         if (!dbPage) return p;
 
+        // =====================================
+        // 画像URL: page_image_url のファイルID を使いつつ解像度を w800→w2000 に上げる
+        // drive_file_id はサムネイル非対応のため使用不可
+        // =====================================
         let pageImgUrl: string | undefined = dbPage.page_image_url || undefined;
         if (pageImgUrl) {
-          if (pageImgUrl.includes('lh3.googleusercontent.com')) {
-            // lh3 URL: =s0 でオリジナルサイズ（最高画質）を要求。=w1600 などのリサイズパラメータを除去。
-            pageImgUrl = pageImgUrl.replace(/=[wsphcefrd]\d+(-[wsphcefrd]\d+)*$/i, '=s0');
-            if (!pageImgUrl.includes('=')) pageImgUrl += '=s0';
-          } else {
-            // その他 Drive URL: file IDを抽出してlh3形式に変換
-            let fileId: string | null = null;
-            const ucMatch = pageImgUrl.match(/[?&]id=([^&]+)/);
-            if (ucMatch && ucMatch[1] && pageImgUrl.includes('drive.google.com/uc')) {
-              fileId = ucMatch[1];
-            }
-            if (!fileId) {
-              const fileMatch = pageImgUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-              if (fileMatch && fileMatch[1]) fileId = fileMatch[1];
-            }
-            if (fileId) {
-              // lh3形式でオリジナルサイズを直接リクエスト（uc?export=viewより高画質）
-              pageImgUrl = `https://lh3.googleusercontent.com/d/${fileId}=s0`;
-            }
+          // sz=w800 を sz=w2000 に上げる（最大解像度へ）
+          pageImgUrl = pageImgUrl.replace(/sz=w\d+/i, 'sz=w2000');
+          // sz= が含まれない場合は追加
+          if (!pageImgUrl.includes('sz=')) {
+            pageImgUrl += pageImgUrl.includes('?') ? '&sz=w2000' : '?sz=w2000';
           }
         }
+
+        // 別タブで開くURL: drive_file_id の Drive ビューア（画像を大きく表示可能）
+        const driveViewUrl = dbPage.drive_file_id
+          ? `https://drive.google.com/file/d/${dbPage.drive_file_id}/view`
+          : undefined;
+
         return {
           ...p,
           ...(dbPage.drive_file_id ? { drive_file_id: dbPage.drive_file_id } : {}),
-          ...(pageImgUrl ? { page_image_url: pageImgUrl } : {})
+          ...(pageImgUrl ? { page_image_url: pageImgUrl } : {}),
+          ...(driveViewUrl ? { drive_view_url: driveViewUrl } : {}),
         };
+
       });
 
       setCatalogViewerPages(enrichedPages);
+      // 表示開始ページ: 型番が確定している最初の製品ページを優先
+      // (model_number=UNKNOWNは索引ページ言及なので除外し、実際の製品ページから開始)
+      const firstKnownVariant = (m.grouped_variants || [])
+        .find(v => v.model_number && v.model_number !== 'UNKNOWN' && v.page_number);
+      const targetPageNum = firstKnownVariant?.page_number
+        ?? pagesList.find(p => p.page_number && p.page_number > 30)?.page_number
+        ?? pagesList[0]?.page_number
+        ?? 1;
+      const startIdx = Math.max(0, enrichedPages.findIndex(p => p.page_number >= targetPageNum));
+      console.log(`[CatalogViewer] 開始ページ: ${targetPageNum} (idx=${startIdx})`);
+      setCatalogViewerCurrentIndex(startIdx);
       setCatalogViewerMode('ready');
+      // 該当ページにスクロール
+      setTimeout(() => {
+        if (catalogViewerBodyRef.current) {
+          const container = catalogViewerBodyRef.current;
+          container.scrollLeft = startIdx * container.clientWidth;
+        }
+      }, 100);
     } catch (err) {
        console.error("Failed to load catalog pages:", err);
        setCatalogViewerPages(pagesList as any);
@@ -509,8 +597,8 @@ export const KensackEngine: React.FC = () => {
   };
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const rawFile = event.target.files?.[0];
+    if (!rawFile) return;
 
     setIsSearching(true);
     setResult(null);
@@ -518,6 +606,16 @@ export const KensackEngine: React.FC = () => {
     setSelectedMfgs([]);
 
     try {
+      // Android端末等の高画質カメラ写真（大容量）によるメモリクラッシュと送信失敗（OOM・タイムアウト）を防止するため、
+      // クライアント側で瞬時に最大500KB、縦横最大1024pxに圧縮・リサイズを実施。
+      // これにより、EXIF回転情報も自動的に修正され、AIの画像認識率が劇的に向上します。
+      const options = {
+        maxSizeMB: 0.5,
+        maxWidthOrHeight: 1024,
+        useWebWorker: true,
+      };
+      const file = await imageCompression(rawFile, options);
+
       const reader = new FileReader();
       reader.onload = async (e) => {
         const resultBase64 = e.target?.result as string;
@@ -537,7 +635,8 @@ export const KensackEngine: React.FC = () => {
       };
       reader.readAsDataURL(file);
     } catch (error) {
-      console.error(error);
+      console.error("Image compression or upload error:", error);
+      setResult({ materials: [], source: 'error', message: '画像の圧縮または読み込みに失敗しました。' });
       setIsSearching(false);
     }
     
@@ -837,7 +936,6 @@ export const KensackEngine: React.FC = () => {
         <input 
           type="file" 
           accept="image/*" 
-          capture="environment" 
           ref={fileInputRef} 
           style={{ display: 'none' }} 
           onChange={handlePhotoUpload} 
@@ -960,149 +1058,110 @@ export const KensackEngine: React.FC = () => {
 
           {/* 検索件数表示 */}
           {result.materials.length > 0 && (
-            <div className="mb-4 flex items-center gap-2">
+            <div className="mb-3 flex items-center gap-2">
               <span className="text-xs font-black text-slate-500">「{query}」に一致する資材 {result.materials.length}件</span>
             </div>
           )}
 
-          {/* グリッドレイアウト */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+          {/* リスト表示（品名グルーピング） */}
+          <div className="flex flex-col gap-2">
             {result.materials.map((m) => {
-
               const isSelected = cartItems.some(selected => selected.material?.id === m.id);
-              const hasDimensions = m.width_mm || m.height_mm || m.depth_mm;
-              
+              const variants = m.grouped_variants || [];
+              const hasVariants = variants.length > 0;
+              // 価格レンジを計算
+              const prices = variants.map(v => v.standard_price).filter((p): p is number => p !== null && p !== undefined);
+              const minPrice = prices.length > 0 ? Math.min(...prices) : m.standard_price;
+              const maxPrice = prices.length > 0 ? Math.max(...prices) : m.standard_price;
+              const priceLabel = minPrice !== null && maxPrice !== null
+                ? minPrice === maxPrice
+                  ? `¥${minPrice.toLocaleString()}`
+                  : `¥${minPrice.toLocaleString()}〜¥${maxPrice.toLocaleString()}`
+                : 'ASK';
+
               return (
-                <div 
-                  key={m.id} 
+                <div
+                  key={m.id}
                   onClick={() => toggleMaterialSelection(m)}
-                  className={`bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col relative group cursor-pointer border-4 ${isSelected ? 'border-blue-500' : 'border-transparent'}`}
+                  className={`bg-white rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer border-2 ${isSelected ? 'border-blue-500' : 'border-transparent hover:border-slate-200'}`}
                 >
-                  
-                  {/* 選択済みチェックマーク */}
-                  {isSelected && (
-                    <div className="absolute top-2 right-2 bg-blue-600 text-white rounded-full p-1 z-20 shadow-md">
-                      <CheckCircle2 className="w-5 h-5" />
-                    </div>
-                  )}
+                  <div className="px-4 py-3 flex items-start gap-3">
 
-                  {/* 確信度バッジ（confidence >= 70 のみ AI高適合表示） */}
-                  {m.confidence !== undefined && m.confidence < 70 && (
-                    <div className="absolute top-3 left-3 bg-red-100 text-red-800 text-sm font-black px-4 py-2 rounded-full flex items-center border-2 border-red-200 z-10 shadow-sm">
-                      <AlertTriangle className="w-4 h-4 mr-1.5" />
-                      要現物確認
-                    </div>
-                  )}
-                  {m.confidence !== undefined && m.confidence >= 70 && (
-                    <div className="absolute top-3 left-3 bg-emerald-100 text-emerald-800 text-sm font-black px-4 py-2 rounded-full flex items-center z-10 shadow-sm">
-                      <CheckCircle2 className="w-4 h-4 mr-1.5" />
-                      AI高適合
-                    </div>
-                  )}
-
-                  {/* 商品画像プレビュー（実商品写真があれば表示、なければ型番カード） */}
-                  {(() => {
-                    // 実際の商品写真かどうか判定（Driveのカタログページ・dummyimageは除外）
-                    const isRealProductImage = m.image_url 
-                      && !m.image_url.includes('drive.google.com')
-                      && !m.image_url.includes('dummyimage.com')
-                      && !m.image_url.includes('no_catalog_page');
-                    
-                    return isRealProductImage ? (
-                      <div className="h-40 bg-slate-50 flex items-center justify-center p-4 border-b-2 border-slate-100">
-                        <img 
-                          src={m.image_url} 
-                          alt={m.name} 
-                          className="max-h-full max-w-full object-contain mix-blend-multiply drop-shadow-sm" 
-                          onError={(e) => {
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
+                    {/* 左: メーカー + 品名 + 説明 */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-[10px] font-black text-blue-600 shrink-0">
+                          {m.manufacturers?.name || '不明'}
+                        </span>
+                        {m.confidence !== undefined && m.confidence < 70 && (
+                          <span className="text-[10px] font-black bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full shrink-0">要確認</span>
+                        )}
                       </div>
-                    ) : (
-                      <div className="h-40 border-b-2 border-slate-100 relative overflow-hidden flex items-center justify-center"
-                        style={{ background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)' }}
-                      >
-                        {/* メーカーカラーアクセント */}
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 via-indigo-400 to-blue-600 opacity-60" />
-                        <div className="flex flex-col items-center gap-1.5 px-4 w-full">
-                          <div className="font-mono font-black text-slate-700 text-lg tracking-wider text-center break-all leading-tight line-clamp-2 max-w-full">
-                            {m.model_number || '—'}
-                          </div>
-                          <div className="text-xs text-slate-400 font-bold">{m.manufacturers?.name}</div>
-                          {!m.image_url && (
-                            <div className="text-[10px] text-slate-300 mt-1">画像未登録</div>
+
+                      {/* 品名 */}
+                      <h4 className="text-sm font-black text-slate-900 leading-tight mb-1.5">
+                        <HighlightText text={m.name || ''} splitQuery={query} />
+                      </h4>
+
+                      {/* 型番チップ一覧（サイズバリエーション） */}
+                      {hasVariants ? (
+                        <div className="flex flex-wrap gap-1">
+                          {variants.slice(0, 8).map(v => (
+                            <button
+                              key={v.id}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // このバリアントのページでカタログを開く
+                                const variantMaterial = { ...m, model_number: v.model_number, page_number: v.page_number ?? m.page_number, catalog_url: v.catalog_url || m.catalog_url };
+                                handleOpenCatalogViewer(variantMaterial, e);
+                              }}
+                              className="bg-slate-800 text-white font-mono font-bold px-2 py-0.5 rounded text-xs hover:bg-blue-700 transition-colors"
+                              title={v.standard_price ? `¥${v.standard_price.toLocaleString()}` : ''}
+                            >
+                              {v.model_number}
+                            </button>
+                          ))}
+                          {variants.length > 8 && (
+                            <span className="text-[10px] font-bold text-slate-400 self-center">+{variants.length - 8}件</span>
                           )}
                         </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* 情報エリア */}
-                  <div className="p-4 flex-1 flex flex-col">
-                    <span className="text-xs font-black text-blue-600 mb-1 truncate">
-                      {m.manufacturers?.name || '不明なメーカー'}
-                    </span>
-                    <h4 className="text-lg font-black text-slate-900 mb-2 leading-tight line-clamp-2">
-                      <HighlightText text={m.name || ''} splitQuery={query} />
-                    </h4>
-                    
-                    {/* 型番ラベル + コピーボタン */}
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="bg-slate-800 text-white font-mono font-bold px-2.5 py-1 rounded-md text-sm shadow-inner">
-                        <HighlightText text={m.model_number || ''} splitQuery={query} />
-                      </div>
-                      {m.model_number && (
-                        <button
-                          type="button"
-                          title="型番をコピー"
-                          onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(m.model_number || ''); }}
-                          className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                    
-                    {/* 寸法・価格情報 */}
-                    <div className="bg-slate-50 rounded-xl p-3 mt-auto border border-slate-100">
-                      {hasDimensions && (
-                        <div className="grid grid-cols-3 gap-2 mb-2 items-end">
-                          <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-slate-400">幅 (W)</span>
-                            <span className="text-sm font-bold text-slate-700">{m.width_mm || '-'} <span className="text-[10px]">mm</span></span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-slate-400">高さ (H)</span>
-                            <span className="text-sm font-bold text-slate-700">{m.height_mm || '-'} <span className="text-[10px]">mm</span></span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-slate-400">奥行 (D)</span>
-                            <span className="text-sm font-bold text-slate-700">{m.depth_mm || '-'} <span className="text-[10px]">mm</span></span>
-                          </div>
-                        </div>
-                      )}
-                      <div className={`${hasDimensions ? 'pt-2 border-t border-slate-200 border-dashed' : ''} flex justify-between items-center`}>
-                        <span className="text-xs font-black text-slate-400">標準単価</span>
-                        <span className="text-lg font-black text-slate-900">
-                          {m.standard_price ? `¥${m.standard_price.toLocaleString()}` : 'ASK'}
-                        </span>
-                      </div>
-                      {/* カタログビューア（保存済みページ画像を表示） */}
-                      {m.catalog_url && (
-                        <div className="mt-2 pt-2 border-t border-slate-200 border-dashed">
+                      ) : m.model_number && m.model_number !== 'UNKNOWN' ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="bg-slate-800 text-white font-mono font-bold px-2 py-0.5 rounded text-xs">
+                            <HighlightText text={m.model_number} splitQuery={query} />
+                          </span>
                           <button
                             type="button"
-                            onClick={(e) => handleOpenCatalogViewer(m, e)}
-                            className="w-full flex justify-center items-center gap-1.5 bg-white border-2 border-blue-600 text-blue-700 hover:bg-blue-50 py-1.5 rounded-lg font-black text-xs transition-colors"
+                            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(m.model_number || ''); }}
+                            className="p-0.5 rounded text-slate-400 hover:text-slate-700"
                           >
-                            📘 カタログビューアを開く {m.page_number && <span className="opacity-70 text-[10px]">({m.page_number}P)</span>}
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                           </button>
                         </div>
+                      ) : null}
+
+                      {/* 説明（1行のみ） */}
+                      {m.description && (
+                        <p className="text-[10px] text-slate-400 mt-1 line-clamp-1">{m.description}</p>
+                      )}
+                    </div>
+
+                    {/* 右: 価格 + カタログボタン */}
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <span className="text-sm font-black text-slate-900 whitespace-nowrap">{priceLabel}</span>
+                      {m.catalog_url && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleOpenCatalogViewer(m, e)}
+                          className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl font-black text-xs transition-colors shadow-sm whitespace-nowrap"
+                        >
+                          📘 カタログ
+                          {m.grouped_pages && m.grouped_pages.length > 1
+                            ? <span className="opacity-80 text-[10px]">({m.grouped_pages.length}P)</span>
+                            : m.page_number && <span className="opacity-80 text-[10px]">({m.page_number}P)</span>
+                          }
+                        </button>
                       )}
                     </div>
                   </div>
@@ -1110,6 +1169,7 @@ export const KensackEngine: React.FC = () => {
               );
             })}
           </div>
+
           
           {/* 検索結果がゼロだった場合 */}
           {result.materials.length === 0 && result.source !== 'error' && (
@@ -1200,7 +1260,7 @@ export const KensackEngine: React.FC = () => {
             {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowUp className="w-5 h-5" />}
           </button>
         </form>
-        <input type="file" accept="image/*" capture="environment" ref={fileInputRef} style={{ display: 'none' }} onChange={handlePhotoUpload} />
+        <input type="file" accept="image/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handlePhotoUpload} />
       </div> {/* end 下部入力エリア */}
 
       {/* 音声入力中のオーバーレイ */}
@@ -1413,12 +1473,49 @@ export const KensackEngine: React.FC = () => {
                 <div className="text-xs font-bold text-blue-600 mb-0.5">{catalogViewerMfg}</div>
                 <h3 className="text-lg font-black text-slate-800">{catalogViewerTitle}</h3>
               </div>
-              <button
-                onClick={() => setIsCatalogViewerOpen(false)}
-                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors"
-              >
-                <Plus className="w-6 h-6 rotate-45" />
-              </button>
+              {/* ページナビゲーションボタン + カウンター */}
+              <div className="flex items-center gap-2">
+                {catalogViewerMode === 'ready' && catalogViewerPages.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => {
+                        const newIdx = Math.max(0, catalogViewerCurrentIndex - 1);
+                        setCatalogViewerCurrentIndex(newIdx);
+                        if (catalogViewerBodyRef.current) {
+                          catalogViewerBodyRef.current.scrollLeft = newIdx * catalogViewerBodyRef.current.clientWidth;
+                        }
+                      }}
+                      disabled={catalogViewerCurrentIndex === 0}
+                      className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-bold text-lg"
+                    >
+                      ‹
+                    </button>
+                    <span className="text-xs font-bold text-slate-500 min-w-[60px] text-center">
+                      PAGE {catalogViewerPages[catalogViewerCurrentIndex]?.page_number ?? '?'}<br/>
+                      <span className="text-slate-400">{catalogViewerCurrentIndex + 1}/{catalogViewerPages.length}ページ</span>
+                    </span>
+                    <button
+                      onClick={() => {
+                        const newIdx = Math.min(catalogViewerPages.length - 1, catalogViewerCurrentIndex + 1);
+                        setCatalogViewerCurrentIndex(newIdx);
+                        if (catalogViewerBodyRef.current) {
+                          catalogViewerBodyRef.current.scrollLeft = newIdx * catalogViewerBodyRef.current.clientWidth;
+                        }
+                      }}
+                      disabled={catalogViewerCurrentIndex === catalogViewerPages.length - 1}
+                      className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-bold text-lg"
+                    >
+                      ›
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => setIsCatalogViewerOpen(false)}
+                  className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors ml-1"
+                >
+                  <Plus className="w-6 h-6 rotate-45" />
+                </button>
+              </div>
             </div>
             
             {/* Body */}
@@ -1473,9 +1570,15 @@ export const KensackEngine: React.FC = () => {
                     <div className="w-full max-w-4xl bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
                       <div className="bg-slate-800 text-white px-4 py-2 text-sm font-bold flex justify-between items-center shrink-0">
                         <span>PAGE {page.page_number}</span>
-                        {page.catalog_url && (
-                          <a href={page.catalog_url} target="_blank" rel="noreferrer" className="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded">別タブで開く</a>
-                        )}
+                        {(page as any).drive_view_url ? (
+                          <a href={(page as any).drive_view_url} target="_blank" rel="noreferrer" className="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded">
+                            別タブで開く
+                          </a>
+                        ) : page.catalog_url ? (
+                          <a href={page.catalog_url} target="_blank" rel="noreferrer" className="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded">
+                            別タブで開く
+                          </a>
+                        ) : null}
                       </div>
                       
                       {/* 画像エリア: flexで全体を縮小表示（PDFビューアのようにページ全体を一画面で表示） */}

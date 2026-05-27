@@ -458,7 +458,6 @@ export default function VehicleInspection() {
                               <input 
                                   type="file" 
                                   accept="image/*" 
-                                  capture="environment"
                                   onChange={e => setPhotoFile(e.target.files?.[0] || null)}
                                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                               />
