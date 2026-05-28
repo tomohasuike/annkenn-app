@@ -35,6 +35,8 @@ export type ProjectSummary = {
   no: string;
   name: string;
   kubun: string;
+  clientName?: string;
+  siteName?: string;
   staffCount: number;
   partnerCount: number;
   normalHours: number;
@@ -146,7 +148,7 @@ export function useWorkSummary() {
         .from('daily_reports')
         .select(`
           id, project_id, report_date, work_category, start_time, end_time, site_photos,
-          projects (id, project_name, project_number, category),
+          projects (id, project_name, project_number, category, client_name, site_name),
           report_personnel (worker_name, worker_master(name), start_time, end_time),
           report_vehicles (vehicle_name, vehicle_master(vehicle_name)),
           report_machinery (machinery_name, vehicle_master(vehicle_name)),
@@ -197,6 +199,8 @@ export function useWorkSummary() {
         const pName = Array.isArray(pInfo) ? pInfo[0]?.project_name : pInfo?.project_name || `不明(${pId})`;
         const pNo = Array.isArray(pInfo) ? pInfo[0]?.project_number : pInfo?.project_number || '-';
         const pKubun = Array.isArray(pInfo) ? pInfo[0]?.category : pInfo?.category || '一般';
+        const pClientName = Array.isArray(pInfo) ? pInfo[0]?.client_name : pInfo?.client_name || '';
+        const pSiteName = Array.isArray(pInfo) ? pInfo[0]?.site_name : pInfo?.site_name || '';
         
         const wKubun = row.work_category || '';
         let cat: WorkCategory = 'mitsumori';
@@ -206,6 +210,7 @@ export function useWorkSummary() {
         if (!results.projects[pId]) {
           results.projects[pId] = {
             id: pId, no: pNo, name: pName, kubun: pKubun,
+            clientName: pClientName, siteName: pSiteName,
             staffCount: 0, partnerCount: 0,
             normalHours: 0, overtimeHours: 0, totalHours: 0,
             breakdown: { kouji: 0, kanri: 0, mitsumori: 0 },

@@ -250,7 +250,14 @@ export default function WorkSummary() {
                     <tr key={p.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-5 py-5 border-b">
                         <div className="text-[11px] text-primary font-bold mb-1 uppercase tracking-wider">{p.no || "-"}</div>
-                        <div className="font-bold text-base leading-snug">{p.name}</div>
+                        <div className="font-bold text-base leading-snug">
+                          {/* 区分に応じて表示名を動的切り替え（川北・BPEなら現場名、一般・役所なら発注者、未設定なら案件名を表示） */}
+                          {(p.kubun === '川北' || p.kubun === 'BPE') 
+                            ? (p.siteName || p.name) 
+                            : (p.kubun === '一般' || p.kubun === '役所') 
+                              ? (p.clientName || p.name) 
+                              : p.name}
+                        </div>
                         <div className="mt-2 flex items-center gap-2">
                            <span className="text-[10px] bg-muted px-2 py-0.5 rounded border font-bold uppercase">{p.kubun}</span>
                            {p.dailyLogs.length > 0 && <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold">{p.dailyLogs.length} 日の記録</span>}
