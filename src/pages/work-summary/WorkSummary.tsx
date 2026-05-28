@@ -5,6 +5,18 @@ import { PieChart, Hammer, Briefcase, FileSignature, List, Truck, Building2, Use
 import ReportDetailsModal from '../../components/reports/ReportDetailsModal';
 import ProjectDetailsModal from '../../components/work-summary/ProjectDetailsModal';
 
+// Google Driveの画像用直接リンク(lh3.googleusercontent.com/d/ID)を、正規プレビューURL(drive.google.com/file/d/ID/view)へ自動コンバートする
+function fixDriveDocUrl(url: string): string {
+  if (!url) return '';
+  if (url.includes('lh3.googleusercontent.com/d/')) {
+    const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (match && match[1]) {
+      return `https://drive.google.com/file/d/${match[1]}/view?usp=drivesdk`;
+    }
+  }
+  return url;
+}
+
 export default function WorkSummary() {
   const { data, loading, error, fetchData, projectsList } = useWorkSummary();
   
@@ -62,7 +74,17 @@ export default function WorkSummary() {
   const docLinksMap = new Map<string, { projectName: string, url: string, fileName: string }>();
 
   if (data) {
-    displayedProjects.forEach(p => {
+    // 期間や作業員絞り込みの影響を避けるため、全案件 (projects) から材料を集約します
+    // ただし、案件名検索 (searchQuery) がある場合はそれに合致した案件に、
+    // または案件選択 (projectId) がある場合はその特定の案件に絞り込みます
+    const searchLower = searchQuery.toLowerCase();
+    const sourceProjects = Object.values(data.projects).filter(p => {
+      const matchesSearch = !searchLower || p.name.toLowerCase().includes(searchLower) || (p.no && p.no.toLowerCase().includes(searchLower));
+      const matchesId = !projectId || p.id === projectId;
+      return matchesSearch && matchesId;
+    });
+
+    sourceProjects.forEach(p => {
       p.materials.forEach(m => { if (m) materialsSet.add(m.trim()); });
       p.photos.forEach(obj => { if (obj && obj.url && !photoLinksMap.has(obj.url)) photoLinksMap.set(obj.url, obj); });
       p.docs.forEach(obj => { if (obj && obj.url && !docLinksMap.has(obj.url)) docLinksMap.set(obj.url, obj); });
@@ -511,9 +533,10 @@ export default function WorkSummary() {
              <div className="space-y-3 overflow-y-auto pr-2 flex-1">
                {docLinksMap.size > 0 
                  ? Array.from(docLinksMap.values()).map((item, idx) => {
-                     const isPdf = item.fileName.toLowerCase().includes('.pdf') || item.url.includes('drive.google.com') || item.url.toLowerCase().includes('.pdf');
+                     const fixedUrl = fixDriveDocUrl(item.url);
+                     const isPdf = item.fileName.toLowerCase().includes('.pdf') || fixedUrl.includes('drive.google.com') || fixedUrl.toLowerCase().includes('.pdf');
                      return (
-                       <a key={idx} href={item.url} target="_blank" rel="noreferrer" className="flex items-center p-3 rounded-lg border shadow-sm mb-3 transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-500/30 group">
+                       <a key={idx} href={fixedUrl} target="_blank" rel="noreferrer" className="flex items-center p-3 rounded-lg border shadow-sm mb-3 transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-500/30 group">
                          <div className={`w-12 h-12 ${isPdf ? 'bg-red-50' : 'bg-indigo-50'} rounded flex items-center justify-center shrink-0 mr-4`}>
                            <FileText className={`w-6 h-6 ${isPdf ? 'text-red-400' : 'text-indigo-400'} group-hover:scale-110 transition-transform`} />
                          </div>

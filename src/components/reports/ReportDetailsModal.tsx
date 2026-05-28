@@ -10,6 +10,18 @@ type ReportDetailsModalProps = {
   onClose: () => void;
 };
 
+// Google Driveの画像用直接リンク(lh3.googleusercontent.com/d/ID)を、正規プレビューURL(drive.google.com/file/d/ID/view)へ自動コンバートする
+function fixDriveDocUrl(url: string): string {
+  if (!url) return '';
+  if (url.includes('lh3.googleusercontent.com/d/')) {
+    const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (match && match[1]) {
+      return `https://drive.google.com/file/d/${match[1]}/view?usp=drivesdk`;
+    }
+  }
+  return url;
+}
+
 export default function ReportDetailsModal({ reportId, onClose }: ReportDetailsModalProps) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
@@ -344,12 +356,12 @@ export default function ReportDetailsModal({ reportId, onClose }: ReportDetailsM
                          </div>
                          <div className="flex gap-2">
                             {m.parsedDocs.length > 0 && (
-                              <a href={m.parsedDocs[0]} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
+                              <a href={fixDriveDocUrl(m.parsedDocs[0])} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
                                 <FileText className="w-3.5 h-3.5" /> 資料・図面 ({m.parsedDocs.length})
                               </a>
                             )}
                             {m.parsedPhotos.length > 0 && (
-                              <a href={m.parsedPhotos[0]} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                              <a href={fixDriveDocUrl(m.parsedPhotos[0])} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-100">
                                 <ImageIcon className="w-3.5 h-3.5" /> 写真 ({m.parsedPhotos.length})
                               </a>
                             )}
@@ -368,7 +380,7 @@ export default function ReportDetailsModal({ reportId, onClose }: ReportDetailsM
                    </h3>
                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                      {data.photos.map((url: string, i: number) => (
-                       <a key={i} href={url} target="_blank" rel="noreferrer" className="aspect-square bg-muted rounded-lg overflow-hidden border hover:opacity-90 transition-opacity block shadow-sm group relative">
+                       <a key={i} href={fixDriveDocUrl(url)} target="_blank" rel="noreferrer" className="aspect-square bg-muted rounded-lg overflow-hidden border hover:opacity-90 transition-opacity block shadow-sm group relative">
                          <img src={url} alt={`現場写真 ${i+1}`} className="w-full h-full object-cover" />
                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
                             <ImageIcon className="text-white opacity-0 group-hover:opacity-100 drop-shadow-md w-8 h-8 transition-opacity" />
