@@ -838,6 +838,34 @@ export default function HeatstrokeChecker() {
     setFormWorkers(updated)
   }
 
+  // 応援等、作業員をリストに動的に追加
+  const handleAddWorker = (workerId: string) => {
+    const master = workerMasterList.find(w => w.id === workerId)
+    if (!master) return
+    
+    // すでにリストにある場合はスキップ
+    if (formWorkers.some(w => w.worker_id === workerId)) return
+    
+    const newWorker: WorkerCheck = {
+      worker_id: master.id,
+      worker_name: master.name,
+      sleep_hours: 0,       // 0 = 未選択
+      breakfast: null as any, // null = 未選択
+      hangover: null as any,  // null = 未選択
+      symptoms: "なし",
+      risk_score: "低",
+      water_checked: false,   // 未チェック
+      urine_checked: false,   // 未チェック
+      comment: ""
+    }
+    setFormWorkers(prev => [...prev, newWorker])
+  }
+
+  // 欠勤等、作業員をリストから削除（除外）
+  const handleRemoveWorker = (workerId: string) => {
+    setFormWorkers(prev => prev.filter(w => w.worker_id !== workerId))
+  }
+
   // 現場プロ名と現場名の連結表示
   const getProjectDisplayName = (pId: string) => {
     const p = projects.find(proj => proj.id === pId)
@@ -1296,16 +1324,41 @@ export default function HeatstrokeChecker() {
                 安全アサインメンバー健康状態チェック表
               </h3>
               
-              {formWorkers.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleBulkCheckOK}
-                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-1.5 bg-green-500 text-white hover:bg-green-600 rounded-lg text-xs font-extrabold transition-all shadow-sm shadow-green-500/20 active:scale-[0.98]"
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  全員一括健康OK
-                </button>
-              )}
+              <div className="w-full sm:w-auto flex flex-wrap items-center gap-2">
+                {/* メンバー動的追加ドロップダウン */}
+                <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1">
+                  <span className="text-[10px] font-extrabold text-slate-400">応援追加:</span>
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleAddWorker(e.target.value)
+                        e.target.value = "" // 選択完了後にクリア
+                      }
+                    }}
+                    className="bg-transparent border-none text-xs font-black text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-0 max-w-[130px]"
+                  >
+                    <option value="">-- 作業員選択 --</option>
+                    {workerMasterList
+                      .filter(w => !formWorkers.some(fw => fw.worker_id === w.id)) // すでにリストにある人を除外
+                      .map(w => (
+                        <option key={w.id} value={w.id}>{w.name} ({w.type})</option>
+                      ))
+                    }
+                  </select>
+                </div>
+
+                {formWorkers.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleBulkCheckOK}
+                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-green-500 text-white hover:bg-green-600 rounded-lg text-xs font-extrabold transition-all shadow-sm shadow-green-500/20 active:scale-[0.98]"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    全員一括健康OK
+                  </button>
+                )}
+              </div>
             </div>
 
             {formWorkers.length === 0 ? (
@@ -1331,16 +1384,28 @@ export default function HeatstrokeChecker() {
                         </span>
                       </div>
                       
-                      {/* 総合自己診断アラート */}
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide border shadow-sm ${
-                        worker.risk_score === "低"
-                          ? "bg-green-100 text-green-700 border-green-200"
-                          : worker.risk_score === "中"
-                          ? "bg-yellow-100 text-yellow-800 border-yellow-200 animate-pulse"
-                          : "bg-red-100 text-red-700 border-red-200 animate-pulse"
-                      }`}>
-                        健康リスク: {worker.risk_score}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {/* 総合自己診断アラート */}
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide border shadow-sm ${
+                          worker.risk_score === "低"
+                            ? "bg-green-100 text-green-700 border-green-200"
+                            : worker.risk_score === "中"
+                            ? "bg-yellow-100 text-yellow-800 border-yellow-200 animate-pulse"
+                            : "bg-red-100 text-red-700 border-red-200 animate-pulse"
+                        }`}>
+                          健康リスク: {worker.risk_score}
+                        </span>
+
+                        {/* 除外ボタン */}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveWorker(worker.worker_id)}
+                          className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors border border-transparent hover:border-red-200/40"
+                          title="この作業員を今回のチェックから除外"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* 各種安全項目 */}
