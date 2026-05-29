@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Outlet, NavLink } from "react-router-dom"
-import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature, Wrench, Bot } from "lucide-react"
+import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature, Wrench, Bot, Zap, BookOpen, Thermometer } from "lucide-react"
 import { ThemeSwitcher } from "../ui/ThemeSwitcher"
 import logoImg from "../../assets/logo.png"
 import { supabase } from "../../lib/supabase"
@@ -35,10 +35,10 @@ export default function AppLayout() {
             .then(({ data, error }) => {
                 if (!error && data) {
                     setIsAdmin(data.is_admin || false);
-                    setAllowedApps(data.allowed_apps || ['dashboard', 'projects', 'reports', 'tomorrow-schedules', 'schedule-management', 'work-summary', 'completion-reports', 'workers']);
+                    setAllowedApps(data.allowed_apps || ['dashboard', 'projects', 'reports', 'tomorrow-schedules', 'schedule-management', 'work-summary', 'completion-reports', 'workers', 'heatstroke-checker']);
                 } else {
                     // Default fallback if no record found yet
-                    setAllowedApps(['dashboard', 'projects', 'reports', 'tomorrow-schedules', 'schedule-management', 'work-summary', 'completion-reports', 'workers']);
+                    setAllowedApps(['dashboard', 'projects', 'reports', 'tomorrow-schedules', 'schedule-management', 'work-summary', 'completion-reports', 'workers', 'heatstroke-checker']);
                 }
             });
       }
@@ -57,7 +57,7 @@ export default function AppLayout() {
   return (
     <div className="h-screen w-full bg-background text-foreground flex flex-col overflow-hidden">
       {/* Full-width Top Header */}
-      <header className="h-14 sm:h-16 shrink-0 flex items-center justify-between px-2 sm:px-6 border-b bg-card z-40 relative">
+      <header className="h-14 sm:h-16 shrink-0 flex items-center justify-between px-2 sm:px-6 border-b bg-card z-[110] relative">
         <div className="flex items-center gap-1 sm:gap-4 overflow-hidden">
           <div className="flex items-center gap-1.5 sm:gap-2 mr-1 sm:mr-2 shrink-0">
             <img src={logoImg} alt="HITEC Logo" className="h-6 sm:h-8 w-auto object-contain drop-shadow-sm" />
@@ -95,13 +95,13 @@ export default function AppLayout() {
         {/* Overlay for mobile/tablet when sidebar is open */}
         {isSidebarOpen && (
           <div 
-            className="fixed inset-0 bg-black/50 z-20 lg:hidden" 
+            className="fixed inset-0 bg-black/50 z-[120] lg:hidden" 
             onClick={() => setIsSidebarOpen(false)}
           />
         )}
         
         {/* Sidebar */}
-        <aside className={`border-r bg-card flex flex-col transition-all duration-300 ease-in-out z-30 ${
+        <aside className={`border-r bg-card flex flex-col transition-all duration-300 ease-in-out z-[130] ${
           isSidebarOpen 
             ? 'w-64 fixed inset-y-0 left-0 top-14 sm:top-16 lg:relative lg:top-0 lg:translate-x-0 translate-x-0' 
             : 'w-0 overflow-hidden lg:w-0 lg:border-r-0 fixed inset-y-0 left-0 top-14 sm:top-16 lg:relative lg:top-0 -translate-x-full lg:translate-x-0'
@@ -150,6 +150,28 @@ export default function AppLayout() {
                   )}
                 </NavLink>
                 )}
+
+                {/* 東京電力申込（独立ページ） */}
+                <NavLink to="/tepco-form" className={getNavClass}>
+                  {({ isActive }) => (
+                    <>
+                      <Zap className={`w-5 h-5 ${isActive ? 'text-yellow-500' : 'text-yellow-400 group-hover:text-yellow-500'}`} />
+                      東電 申込フォーム
+                      {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-500 rounded-r-md"></span>}
+                    </>
+                  )}
+                </NavLink>
+
+                {/* デジタル本棚 */}
+                <NavLink to="/bookshelf" className={getNavClass}>
+                  {({ isActive }) => (
+                    <>
+                      <BookOpen className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
+                      デジタル本棚
+                      {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
+                    </>
+                  )}
+                </NavLink>
               </>
             )}
 
@@ -289,6 +311,18 @@ export default function AppLayout() {
               )}
             </NavLink>
             )}
+            {hasAccess('heatstroke-checker') && (
+            <NavLink to="/heatstroke-checker" className={getNavClass}>
+              {({ isActive }) => (
+                <>
+                  <Thermometer className={`w-5 h-5 ${isActive ? 'text-orange-500' : 'text-orange-400 group-hover:text-orange-500'}`} />
+                  日常・熱中症アラート
+                  {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-500 rounded-r-md"></span>}
+                </>
+              )}
+            </NavLink>
+            )}
+
             {hasAccess('safety-dashboard') && (
             <NavLink to="/safety-dashboard" className={getNavClass}>
               {({ isActive }) => (
@@ -318,7 +352,7 @@ export default function AppLayout() {
 
         {/* Page Content */}
         <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto flex flex-col min-w-0">
-          <Outlet />
+          <Outlet context={{ isSidebarOpen, setIsSidebarOpen }} />
         </main>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { Toaster } from 'sonner'
 import AppLayout from "./components/layout/AppLayout"
 import Dashboard from "./pages/Dashboard"
@@ -21,6 +21,10 @@ import VehicleInspection from "./pages/VehicleInspection"
 import PdfEditor from "./pages/pdf-editor/PdfEditor"
 import AttendanceAdmin from "./pages/attendance/AttendanceAdmin"
 import WorkerAttendance from "./pages/attendance/WorkerAttendance"
+import Bookshelf from "./pages/bookshelf/Bookshelf"
+import BookViewer from "./pages/bookshelf/BookViewer"
+import HeatstrokeChecker from "./pages/tools/HeatstrokeChecker"
+
 
 import Login from "./pages/Login"
 import ProtectedRoute from "./components/auth/ProtectedRoute"
@@ -31,6 +35,7 @@ import SiteDesignDashboard from "./pages/tools/SiteDesignDashboard"
 import PowerCalc from "./pages/tools/PowerCalc"
 import LightingCalc from "./pages/tools/LightingCalc"
 import { KensackEngine } from "./pages/KensackEngine"
+import TepcoForm from "./pages/tools/TepcoForm"
 
 function WorkersPlaceholder() {
   return <div className="p-8"><h2 className="text-xl font-bold">作業員マスター</h2></div>
@@ -74,8 +79,11 @@ function App() {
               <Route path="attendance-admin" element={<AttendanceAdmin />} />
               <Route path="workers" element={<WorkersPlaceholder />} />
               <Route path="safety-dashboard" element={<SafetyDashboard />} />
+              <Route path="heatstroke-checker" element={<HeatstrokeChecker />} />
               <Route path="vehicle-inspection" element={<VehicleInspection />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="bookshelf" element={<Bookshelf />} />
+              <Route path="bookshelf/:bookId" element={<BookViewer />} />
               
               {/* AI材料提案（独立したグローバルツール） */}
               <Route path="kensack-engine" element={<KensackEngine />} />
@@ -86,7 +94,12 @@ function App() {
                 <Route path="site-design" element={<SiteDesignDashboard />} />
                 <Route path="power-calc" element={<PowerCalc />} />
                 <Route path="lighting-calc" element={<LightingCalc />} />
+                {/* 旧URLからのリダイレクト */}
+                <Route path="tepco-form" element={<Navigate to="/tepco-form" replace />} />
               </Route>
+
+              {/* 東電申込フォーム（独立ページ） */}
+              <Route path="tepco-form" element={<TepcoForm />} />
             </Route>
           </Route>
         </Routes>

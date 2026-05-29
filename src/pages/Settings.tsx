@@ -45,6 +45,7 @@ const MANAGEMENT_APPS = [
   { id: 'work-summary', name: '作業集計管理' },
   { id: 'attendance-admin', name: '勤怠管理' },
   { id: 'billing', name: '請求管理' },
+  { id: 'heatstroke-checker', name: '日常・熱中症アラート' },
   { id: 'safety-dashboard', name: '安否確認管理' },
   { id: 'completion-reports', name: '完了報告' },
   { id: 'tomorrow-schedules', name: '翌日予定' },
