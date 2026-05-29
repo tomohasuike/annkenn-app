@@ -536,7 +536,7 @@ export default function HeatstrokeChecker() {
         }
 
         setTempOffset(record.temp_offset || 0.0)
-        setForemanId(record.foreman_id || currentWorkerId || "")
+        setForemanId(record.foreman_id || "")
         setFormWorkers(record.worker_checks || [])
         // コメントと指針チェックを復元
         setFormComment(record.comment || "")
@@ -588,8 +588,11 @@ export default function HeatstrokeChecker() {
         setFormWorkers(initialWorkers)
 
 
-        // 職長の初期アサイン（ログイン中のユーザーを最優先、いなければアサインされた正社員などを優先）
-        if (currentWorkerId) {
+        // 自分がこの現場のアサイン（工程）に入っているか確認
+        const isMeAssigned = siteAssignments.some(a => a.worker_id === currentWorkerId)
+
+        // 職長の初期アサイン（ログイン中のユーザーがアサインされていれば最優先、いなければアサインされた正社員などを優先）
+        if (currentWorkerId && isMeAssigned) {
           setForemanId(currentWorkerId)
         } else if (filteredWorkers.length > 0) {
           const sorted = [...filteredWorkers].sort((a, b) => {
