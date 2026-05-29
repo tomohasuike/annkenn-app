@@ -30,6 +30,30 @@ type Vehicle = { vehicle_id: string; vehicle_name: string }
 type Material = { material_name: string; quantity: string; pending_photos: File[]; pending_docs: File[]; existing_photos: string[]; existing_docs: string[] }
 type Subcontractor = { company_name: string; headcount: string; group_id?: string; }
 
+// Google Driveの画像用直接リンク(lh3.googleusercontent.com/d/ID)を、正規プレビューURL(drive.google.com/file/d/ID/view)へ自動コンバートする
+function fixDriveDocUrl(url: string): string {
+  if (!url) return '';
+  if (url.includes('lh3.googleusercontent.com/d/')) {
+    const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (match && match[1]) {
+      return `https://drive.google.com/file/d/${match[1]}/view?usp=drivesdk`;
+    }
+  }
+  return url;
+}
+
+const getFolderIdFromUrl = (url?: string) => {
+  if (!url) return null;
+  const match = url.match(/folders\/([a-zA-Z0-9-_]+)/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  if (/^[a-zA-Z0-9-_]{25,50}$/.test(url)) {
+    return url;
+  }
+  return null;
+};
+
 export default function ReportForm() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -40,7 +64,7 @@ export default function ReportForm() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   
   // Master Data
-  const [projectsList, setProjectsList] = useState<{id: string, name: string, category: string, status: string, project_number?: string, client_name?: string, site_name?: string}[]>([])
+  const [projectsList, setProjectsList] = useState<{id: string, name: string, category: string, status: string, project_number?: string, client_name?: string, site_name?: string, folder_url?: string}[]>([])
   const [selectedProjectCategory, setSelectedProjectCategory] = useState<string>('all')
   const [showCompletedProjects, setShowCompletedProjects] = useState<boolean>(false)
   const [workersList, setWorkersList] = useState<ResourceItem[]>([])
@@ -206,7 +230,7 @@ export default function ReportForm() {
 
   async function fetchMasterData() {
     try {
-      const { data: pData, error: pErr } = await supabase.from('projects').select('id, project_name, category, status_flag, project_number, client_name, site_name').order('created_at', { ascending: false })
+      const { data: pData, error: pErr } = await supabase.from('projects').select('id, project_name, category, status_flag, project_number, client_name, site_name, folder_url').order('created_at', { ascending: false })
       if (pErr) console.error("Error fetching projects:", pErr)
       
       const { data: wData } = await supabase.from('worker_master').select('id, name, type, display_order').neq('type', '事務員').neq('type', '協力会社')
@@ -230,7 +254,8 @@ export default function ReportForm() {
           status: p.status_flag || '着工前',
           project_number: p.project_number || '',
           client_name: p.client_name || '',
-          site_name: p.site_name || ''
+          site_name: p.site_name || '',
+          folder_url: p.folder_url || ''
         })))
       }
       if (sortedWData) setWorkersList(sortedWData.map(w => ({ id: w.id, name: w.name })))
@@ -495,6 +520,9 @@ export default function ReportForm() {
         const { data: { user } } = await supabase.auth.getUser()
         
         // --- Photo Upload Logic ---
+        const selectedProj = projectsList.find(p => p.id === report.project_id);
+        const folderId = selectedProj ? getFolderIdFromUrl(selectedProj.folder_url) : null;
+
         const uploadedUrls = [...existingPhotos];
         if (pendingPhotos.length > 0) {
             for (const file of pendingPhotos) {
@@ -505,6 +533,9 @@ export default function ReportForm() {
                     const finalFile = new File([compressed], fileName, { type: compressed.type });
                     const formData = new FormData();
                     formData.append('file', finalFile);
+                    if (folderId) {
+                        formData.append('folderId', folderId);
+                    }
 
                     const { data: uploadData, error: uploadError } = await supabase.functions.invoke('upload-drive-file', {
                         body: formData,
@@ -615,6 +646,9 @@ export default function ReportForm() {
                 if (mPayload.length > 0) await supabase.from('report_machinery').insert(mPayload)
             }
             if (materials.length > 0) {
+                const selectedProj = projectsList.find(p => p.id === report.project_id);
+                const folderId = selectedProj ? getFolderIdFromUrl(selectedProj.folder_url) : null;
+
                 const matPayload = [];
                 for (const m of materials) {
                     const hasFiles = m.pending_photos.length > 0 || m.pending_docs.length > 0 || m.existing_photos.length > 0 || m.existing_docs.length > 0;
@@ -629,6 +663,9 @@ export default function ReportForm() {
                                 const finalFile = new File([compressed], fileName, { type: compressed.type });
                                 const formData = new FormData();
                                 formData.append('file', finalFile);
+                                if (folderId) {
+                                    formData.append('folderId', folderId);
+                                }
 
                                 const { data: uploadData, error: uploadError } = await supabase.functions.invoke('upload-drive-file', {
                                     body: formData,
@@ -663,6 +700,9 @@ export default function ReportForm() {
                                 const finalFile = new File([file], fileName, { type: file.type });
                                 const formData = new FormData();
                                 formData.append('file', finalFile);
+                                if (folderId) {
+                                    formData.append('folderId', folderId);
+                                }
 
                                 const { data: uploadData, error: uploadError } = await supabase.functions.invoke('upload-drive-file', {
                                     body: formData,
@@ -1340,12 +1380,17 @@ export default function ReportForm() {
                                                 ))}
                                                 {/* Docs */}
                                                 {m.existing_docs.map((url, i) => {
-                                                    const isPdf = url.toLowerCase().includes('.pdf');
+                                                    const isImage = /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(url) || url.includes('lh3.googleusercontent.com');
+                                                    const convertedUrl = fixDriveDocUrl(url);
                                                     return (
                                                         <div key={`ex-dc-${i}`} className="relative border border-border/50 rounded-md bg-background h-16 w-16 flex items-center justify-center group/img">
-                                                            {isPdf ? <ClipboardList className="w-6 h-6 text-red-500/70" /> : (url ? <img src={url} className="object-cover w-full h-full" alt="doc" /> : <div className="text-[8px]">No Image</div>)}
-                                                            <button type="button" onClick={() => removeMaterialFile(index, 'doc', true, i)} className="absolute top-0 right-0 p-0.5 bg-black/60 text-white rounded-bl-md opacity-0 group-hover/img:opacity-100 hover:bg-red-500 transition-all"><X className="w-3 h-3" /></button>
-                                                            {isPdf && <a href={url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-10" title="PDFを開く" />}
+                                                            {isImage ? (
+                                                                <img src={url} className="object-cover w-full h-full" alt="doc" />
+                                                            ) : (
+                                                                <ClipboardList className="w-6 h-6 text-red-500/70" />
+                                                            )}
+                                                            <button type="button" onClick={() => removeMaterialFile(index, 'doc', true, i)} className="absolute top-0 right-0 p-0.5 bg-black/60 text-white rounded-bl-md opacity-0 group-hover/img:opacity-100 hover:bg-red-500 transition-all z-20"><X className="w-3 h-3" /></button>
+                                                            <a href={convertedUrl} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-10" title="ファイルを開く" />
                                                         </div>
                                                     )
                                                 })}
