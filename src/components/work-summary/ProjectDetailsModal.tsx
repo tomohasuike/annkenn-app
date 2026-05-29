@@ -204,24 +204,6 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
                   </div>
                 </div>
 
-                {/* Materials Summary */}
-                <div>
-                  <h4 className="font-bold mb-3 text-sm flex items-center gap-2">
-                    <Package className="w-4 h-4 text-indigo-500" /> 使用材料
-                  </h4>
-                  <div className="flex flex-col gap-2 bg-card p-4 rounded-xl border shadow-sm max-h-[250px] overflow-y-auto">
-                    {project.materials.length > 0
-                        ? project.materials.map((mat: string, i: number) => (
-                            <div key={i} className="flex justify-between items-center text-sm border-b pb-2 last:border-0 last:pb-0 pt-2 first:pt-0">
-                              <span className="font-bold text-foreground/80 truncate mr-2 flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full shrink-0"></span> {mat}
-                              </span>
-                            </div>
-                          ))
-                        : <span className="text-sm text-muted-foreground italic">材料記録なし</span>}
-                  </div>
-                </div>
-
                 {/* Companies Summary */}
                 <div>
                   <h4 className="font-bold mb-3 text-sm flex items-center gap-2">
@@ -238,6 +220,24 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
                             </div>
                           ))
                         : <span className="text-sm text-muted-foreground italic">協力会社の稼働実績なし</span>}
+                  </div>
+                </div>
+
+                {/* Materials Summary */}
+                <div>
+                  <h4 className="font-bold mb-3 text-sm flex items-center gap-2">
+                    <Package className="w-4 h-4 text-indigo-500" /> 使用材料
+                  </h4>
+                  <div className="flex flex-col gap-2 bg-card p-4 rounded-xl border shadow-sm max-h-[250px] overflow-y-auto">
+                    {project.materials.length > 0
+                        ? project.materials.map((mat: string, i: number) => (
+                            <div key={i} className="flex justify-between items-center text-sm border-b pb-2 last:border-0 last:pb-0 pt-2 first:pt-0">
+                              <span className="font-bold text-foreground/80 truncate mr-2 flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full shrink-0"></span> {mat}
+                              </span>
+                            </div>
+                          ))
+                        : <span className="text-sm text-muted-foreground italic">材料記録なし</span>}
                   </div>
                 </div>
 
