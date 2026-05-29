@@ -301,6 +301,63 @@ export default function HeatstrokeChecker() {
     }
   }, [selectedProjectId, checkTimeType, targetDate])
 
+  // 作業指揮者（職長）が変更された際、安否チェックリスト（formWorkers）に強制追加する同期制御
+  useEffect(() => {
+    if (foremanId && workerMasterList.length > 0) {
+      const exists = formWorkers.some(w => w.worker_id === foremanId)
+      if (!exists) {
+        const master = workerMasterList.find(w => w.id === foremanId)
+        if (master) {
+          const newWorker: WorkerCheck = {
+            worker_id: master.id,
+            worker_name: master.name,
+            sleep_hours: 0,
+            breakfast: null as any,
+            hangover: null as any,
+            symptoms: "なし",
+            risk_score: "低",
+            water_checked: false,
+            urine_checked: false,
+            comment: ""
+          }
+          setFormWorkers(prev => {
+            // 状態更新の競合による重複追加を防ぐ
+            if (prev.some(w => w.worker_id === foremanId)) return prev
+            return [...prev, newWorker]
+          })
+        }
+      }
+    }
+  }, [foremanId, workerMasterList])
+
+  // ログイン中の本人（自分自身）がチェックリストに存在しない場合、強制的に追加する同期制御
+  useEffect(() => {
+    if (currentWorkerId && workerMasterList.length > 0) {
+      const exists = formWorkers.some(w => w.worker_id === currentWorkerId)
+      if (!exists) {
+        const master = workerMasterList.find(w => w.id === currentWorkerId)
+        if (master) {
+          const newWorker: WorkerCheck = {
+            worker_id: master.id,
+            worker_name: master.name,
+            sleep_hours: 0,
+            breakfast: null as any,
+            hangover: null as any,
+            symptoms: "なし",
+            risk_score: "低",
+            water_checked: false,
+            urine_checked: false,
+            comment: ""
+          }
+          setFormWorkers(prev => {
+            if (prev.some(w => w.worker_id === currentWorkerId)) return prev
+            return [...prev, newWorker]
+          })
+        }
+      }
+    }
+  }, [currentWorkerId, workerMasterList])
+
   // 日本時間基準の Open-Meteo 予報データをフェッチ（GPS座標優先）
   const fetchWeatherData = async (coordsToUse?: { latitude: number; longitude: number }) => {
     try {
@@ -455,7 +512,14 @@ export default function HeatstrokeChecker() {
           (p.project_name && p.project_name.includes("休暇"))
         return !isVacation
       })
-      setProjects(validProjects)
+
+      // 本日の工程表（本日のアサイン）に登録されているプロジェクトIDのみに絞り込む
+      const todayProjectIds = new Set(validAssignments.map(a => a.project_id))
+      const todayProjects = validProjects.filter(p => todayProjectIds.has(p.id))
+
+      // 万が一、本日のアサインが1件もない場合は、安全のため全現場プロジェクトを表示（エラー・ロック防止）
+      const finalProjects = todayProjects.length > 0 ? todayProjects : validProjects
+      setProjects(finalProjects)
 
       // アサインされているプロジェクトから最初の現場を自動選択（未選択時）
       const assignedProjIds = Array.from(new Set(validAssignments.map(a => a.project_id)))
@@ -467,8 +531,8 @@ export default function HeatstrokeChecker() {
         } else {
           setSelectedProjectId(assignedProjIds[0])
         }
-      } else if (validProjects.length > 0 && !selectedProjectId) {
-        setSelectedProjectId(validProjects[0].id)
+      } else if (finalProjects.length > 0 && !selectedProjectId) {
+        setSelectedProjectId(finalProjects[0].id)
       }
     } catch (e) {
       console.error("Error fetching projects and assignments:", e)
@@ -571,6 +635,15 @@ export default function HeatstrokeChecker() {
         const filteredWorkers = siteAssignments
           .map(a => a.worker_master)
           .filter(w => w && !["社長", "事務員", "協力会社"].includes(w.type))
+
+        // ログイン中の本人（自分）が対象メンバーに入っていなければ強制的にマージ追加
+        const hasMe = filteredWorkers.some(w => w.id === currentWorkerId)
+        if (currentWorkerId && !hasMe) {
+          const meMaster = workerMasterList.find(w => w.id === currentWorkerId)
+          if (meMaster) {
+            filteredWorkers.push(meMaster)
+          }
+        }
 
         const initialWorkers: WorkerCheck[] = filteredWorkers.map(w => ({
           worker_id: w.id,
@@ -863,7 +936,19 @@ export default function HeatstrokeChecker() {
 
   // 欠勤等、作業員をリストから削除（除外）
   const handleRemoveWorker = (workerId: string) => {
-    setFormWorkers(prev => prev.filter(w => w.worker_id !== workerId))
+    // ガード1：作業指揮者（職長）に選ばれている人は削除を拒否
+    if (workerId === foremanId) {
+      alert("🚨 本日の作業指揮者（職長）に指定されているメンバーは、健康チェックリストから除外できません。\n別の人を指揮者に指定するか、現場指揮者を変更してから除外してください。")
+      return
+    }
+    
+    const target = formWorkers.find(w => w.worker_id === workerId)
+    const name = target ? target.worker_name : "この作業員"
+    
+    // ガード2：誤タップ防止の確認
+    if (window.confirm(`⚠️ ${name}さんを本日の健康チェックリストから除外（削除）しますか？\n入力済みの健康状態チェックデータは失われます。`)) {
+      setFormWorkers(prev => prev.filter(w => w.worker_id !== workerId))
+    }
   }
 
   // 現場プロ名と現場名の連結表示
