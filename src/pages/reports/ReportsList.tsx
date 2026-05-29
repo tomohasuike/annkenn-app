@@ -28,6 +28,18 @@ type DailyReport = {
   site_photos: string[]
 }
 
+// Google Driveの画像用直接リンク(lh3.googleusercontent.com/d/ID)を、正規プレビューURL(drive.google.com/file/d/ID/view)へ自動コンバートする
+function fixDriveDocUrl(url: string): string {
+  if (!url) return '';
+  if (url.includes('lh3.googleusercontent.com/d/')) {
+    const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (match && match[1]) {
+      return `https://drive.google.com/file/d/${match[1]}/view?usp=drivesdk`;
+    }
+  }
+  return url;
+}
+
 export default function ReportsList() {
   const [reports, setReports] = useState<DailyReport[]>([])
   const [loading, setLoading] = useState(true)
@@ -338,11 +350,11 @@ export default function ReportsList() {
                                          />
                                        ))}
                                        {mat.docs.map((url, j) => {
-                                         const isPdf = url.toLowerCase().includes('.pdf');
+                                         const isPdf = url.toLowerCase().includes('.pdf') || url.includes('drive.google.com');
                                          return (
                                            <a 
                                              key={`d-${j}`}
-                                             href={url}
+                                             href={fixDriveDocUrl(url)}
                                              target="_blank"
                                              rel="noopener noreferrer"
                                              onClick={(e) => e.stopPropagation()}
