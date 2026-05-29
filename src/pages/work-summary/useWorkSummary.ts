@@ -7,12 +7,14 @@ export type WorkCategory = 'kouji' | 'kanri' | 'mitsumori';
 export type TimeDetail = {
   normal: number;
   ot: number;
+  nightOt: number;
 }
 
 export type SummaryStats = {
   totalPeople: number;
   totalHours: number;
   totalOT: number;
+  totalNightOT: number;
   equipment: Record<string, number>;
   kubunTotals: Record<WorkCategory, number>;
   kubunDetails: Record<WorkCategory, TimeDetail>;
@@ -26,6 +28,7 @@ export type DailyLog = {
   partners: string;
   hours: number;
   ot: number;
+  nightOt: number;
   car: string;
   machine: string;
 }
@@ -41,12 +44,14 @@ export type ProjectSummary = {
   partnerCount: number;
   normalHours: number;
   overtimeHours: number;
+  nightOvertimeHours: number;
   totalHours: number;
   breakdown: Record<WorkCategory, number>;
   breakdownDetails: Record<WorkCategory, TimeDetail>;
   materials: string[];
   photos: { url: string, fileName: string, projectName: string }[];
   docs: { url: string, fileName: string, projectName: string }[];
+  companies: Record<string, number>;
   equipment: Record<string, number>;
   dailyLogs: DailyLog[];
 }
@@ -89,27 +94,46 @@ function calculateActualHours(startVal: string | null | undefined, endVal: strin
   const st = startVal ? parseTime(startVal) : null;
   const et = endVal ? parseTime(endVal) : null;
   
-  if (!st || !et) return { normal: 0, ot: 0 };
+  if (!st || !et) return { normal: 0, ot: 0, nightOt: 0 };
   
   const startMin = st.getHours() * 60 + st.getMinutes();
   const endMin = et.getHours() * 60 + et.getMinutes();
-  if (endMin <= startMin) return { normal: 0, ot: 0 };
+  if (endMin <= startMin) return { normal: 0, ot: 0, nightOt: 0 };
 
-  const standardLimit = 17 * 60;
-  const breakStart = 12 * 60;
-  const breakEnd = 13 * 60;
+  // 各時間帯のインターセクション（重なり分）を求めるヘルパー関数
+  const getOverlap = (s1: number, e1: number, s2: number, e2: number): number => {
+    return Math.max(0, Math.min(e1, e2) - Math.max(s1, s2));
+  };
 
-  let normal = Math.min(standardLimit, endMin) - startMin;
-  
-  if (startMin <= breakStart && endMin >= breakEnd) normal -= 60;
-  else if (startMin > breakStart && startMin < breakEnd) normal -= (breakEnd - startMin);
-  else if (endMin > breakStart && endMin < breakEnd) normal -= (endMin - breakStart);
+  const dayTotal = endMin;
 
-  let ot = Math.max(0, endMin - Math.max(startMin, standardLimit));
-  
+  // 時間帯の定義（分換算）
+  const standardStart = 8 * 60;   // 8:00 (480分)
+  const standardLimit = 17 * 60;  // 17:00 (1020分)
+  const breakStart = 12 * 60;     // 12:00 (720分)
+  const breakEnd = 13 * 60;       // 13:00 (780分)
+  const nightStart = 22 * 60;     // 22:00 (1320分)
+  const nightEarlyEnd = 5 * 60;   // 5:00 (300分)
+
+  // 1. 深夜残業（0:00〜5:00 ＆ 22:00以降）の計算
+  const nightEarlyMinutes = getOverlap(startMin, dayTotal, 0, nightEarlyEnd);
+  const nightLateMinutes = getOverlap(startMin, dayTotal, nightStart, 48 * 60); // 翌日またぎを想定
+  const totalNightMinutes = nightEarlyMinutes + nightLateMinutes;
+
+  // 2. 通常残業（5:00〜8:00 ＆ 17:00〜22:00）の計算
+  const otEarlyMinutes = getOverlap(startMin, dayTotal, nightEarlyEnd, standardStart);
+  const otLateMinutes = getOverlap(startMin, dayTotal, standardLimit, nightStart);
+  const totalOtMinutes = otEarlyMinutes + otLateMinutes;
+
+  // 3. 定時内（8:00〜17:00、お昼休憩12:00〜13:00は控除）の計算
+  const normRawMinutes = getOverlap(startMin, dayTotal, standardStart, standardLimit);
+  const breakOverlapMinutes = getOverlap(startMin, dayTotal, breakStart, breakEnd);
+  const totalNormMinutes = Math.max(0, normRawMinutes - breakOverlapMinutes);
+
   return { 
-    normal: Math.max(0, normal / 60), 
-    ot: Math.max(0, ot / 60) 
+    normal: totalNormMinutes / 60, 
+    ot: totalOtMinutes / 60,
+    nightOt: totalNightMinutes / 60
   };
 }
 
@@ -178,9 +202,14 @@ export function useWorkSummary() {
           totalPeople: 0,
           totalHours: 0,
           totalOT: 0,
+          totalNightOT: 0,
           equipment: {},
           kubunTotals: { kouji: 0, kanri: 0, mitsumori: 0 },
-          kubunDetails: { kouji: {normal:0, ot:0}, kanri: {normal:0, ot:0}, mitsumori: {normal:0, ot:0} }
+          kubunDetails: { 
+            kouji: {normal:0, ot:0, nightOt:0}, 
+            kanri: {normal:0, ot:0, nightOt:0}, 
+            mitsumori: {normal:0, ot:0, nightOt:0} 
+          }
         }
       };
 
@@ -212,10 +241,15 @@ export function useWorkSummary() {
             id: pId, no: pNo, name: pName, kubun: pKubun,
             clientName: pClientName, siteName: pSiteName,
             staffCount: 0, partnerCount: 0,
-            normalHours: 0, overtimeHours: 0, totalHours: 0,
+            normalHours: 0, overtimeHours: 0, nightOvertimeHours: 0, totalHours: 0,
             breakdown: { kouji: 0, kanri: 0, mitsumori: 0 },
-            breakdownDetails: { kouji: {normal:0, ot:0}, kanri: {normal:0, ot:0}, mitsumori: {normal:0, ot:0} },
+            breakdownDetails: { 
+              kouji: {normal:0, ot:0, nightOt:0}, 
+              kanri: {normal:0, ot:0, nightOt:0}, 
+              mitsumori: {normal:0, ot:0, nightOt:0} 
+            },
             materials: [], photos: [], docs: [],
+            companies: {},
             equipment: {},
             dailyLogs: [] 
           };
@@ -227,7 +261,7 @@ export function useWorkSummary() {
 
         // Parse Time
         const timeInfo = calculateActualHours(row.start_time, row.end_time);
-        const totalH = timeInfo.normal + timeInfo.ot;
+        const totalH = timeInfo.normal + timeInfo.ot + timeInfo.nightOt;
 
         // Parse Staff and Deduplicate
         const workers = Array.isArray(row.report_personnel) ? row.report_personnel : [];
@@ -298,6 +332,7 @@ export function useWorkSummary() {
           const name = sub.subcontractor_name || '不明業者';
           pObj.partnerCount += count;
           results.summary.totalPeople += count;
+          pObj.companies[name] = (pObj.companies[name] || 0) + count;
           
           if (!results.companies[name]) {
             results.companies[name] = { total: 0, projects: [] };
@@ -332,9 +367,10 @@ export function useWorkSummary() {
 
         // Materials & Photos
         materials.forEach((m: any) => {
-          if (m.material_name) {
+          if (m.material_name || m.documentation || m.photo) {
+            const matName = m.material_name || '(名称未設定の材料)';
             const qtyStr = m.quantity ? ` ${m.quantity}` : '';
-            pObj.materials.push(m.material_name + qtyStr);
+            pObj.materials.push(matName + qtyStr);
           }
           
           if (m.photo) {
@@ -390,17 +426,20 @@ export function useWorkSummary() {
           kubun: wKubun || "一般",
           staffs: staffsData.map(s => {
               const info = calculateActualHours(s.start_time, s.end_time);
-              const custom = (s.start_time !== row.start_time || s.end_time !== row.end_time) ? `(${info.normal + info.ot}h)` : '';
+              const totalStaffH = info.normal + info.ot + info.nightOt;
+              const custom = (s.start_time !== row.start_time || s.end_time !== row.end_time) ? `(${totalStaffH}h)` : '';
               return `${s.name}${custom}`;
           }).join(", "),
           partners: subs.map((s:any) => {
               const info = calculateActualHours(s.start_time, s.end_time);
-              const custom = (s.start_time !== row.start_time || s.end_time !== row.end_time) ? ` (${info.normal + info.ot}h)` : '';
+              const totalSubH = info.normal + info.ot + info.nightOt;
+              const custom = (s.start_time !== row.start_time || s.end_time !== row.end_time) ? ` (${totalSubH}h)` : '';
               const hc = Number(s.worker_count) > 1 ? `[${s.worker_count}名]` : '';
               return `${s.subcontractor_name}${hc}${custom}`;
           }).join(", "),
           hours: totalH,
           ot: timeInfo.ot,
+          nightOt: timeInfo.nightOt,
           car: cars.join(", "),
           machine: machines.join(", ")
         });
@@ -409,7 +448,7 @@ export function useWorkSummary() {
         staffsData.forEach(staff => {
           // Calculate individual time
           const staffTimeInfo = calculateActualHours(staff.start_time, staff.end_time);
-          const staffTotalH = staffTimeInfo.normal + staffTimeInfo.ot;
+          const staffTotalH = staffTimeInfo.normal + staffTimeInfo.ot + staffTimeInfo.nightOt;
 
           const rawName = staff.name;
           const nKey = rawName.replace(/[\s　]+/g, "");
@@ -420,25 +459,35 @@ export function useWorkSummary() {
           pObj.staffCount++;
           pObj.normalHours += staffTimeInfo.normal;
           pObj.overtimeHours += staffTimeInfo.ot;
+          pObj.nightOvertimeHours += staffTimeInfo.nightOt;
           pObj.totalHours += staffTotalH;
           pObj.breakdown[cat] += staffTotalH;
           pObj.breakdownDetails[cat].normal += staffTimeInfo.normal;
           pObj.breakdownDetails[cat].ot += staffTimeInfo.ot;
+          pObj.breakdownDetails[cat].nightOt += staffTimeInfo.nightOt;
 
           // Summary
           results.summary.totalPeople++;
           results.summary.totalHours += staffTimeInfo.normal;
           results.summary.totalOT += staffTimeInfo.ot;
+          results.summary.totalNightOT += staffTimeInfo.nightOt;
           results.summary.kubunTotals[cat] += staffTotalH;
           results.summary.kubunDetails[cat].normal += staffTimeInfo.normal;
           results.summary.kubunDetails[cat].ot += staffTimeInfo.ot;
+          results.summary.kubunDetails[cat].nightOt += staffTimeInfo.nightOt;
 
           // Staff Array
           if (!results.staff[nKey]) {
-            results.staff[nKey] = { displayName: dName, kouji: { normal: 0, ot: 0 }, kanri: { normal: 0, ot: 0 }, mitsumori: { normal: 0, ot: 0 } };
+            results.staff[nKey] = { 
+              displayName: dName, 
+              kouji: { normal: 0, ot: 0, nightOt: 0 }, 
+              kanri: { normal: 0, ot: 0, nightOt: 0 }, 
+              mitsumori: { normal: 0, ot: 0, nightOt: 0 } 
+            };
           }
           results.staff[nKey][cat].normal += staffTimeInfo.normal;
           results.staff[nKey][cat].ot += staffTimeInfo.ot;
+          results.staff[nKey][cat].nightOt += staffTimeInfo.nightOt;
         });
       }
 

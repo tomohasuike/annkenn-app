@@ -1,8 +1,20 @@
 import { useEffect, useState } from 'react';
 import type { ProjectSummary } from '../../pages/work-summary/useWorkSummary';
-import { X, CalendarDays, ExternalLink, Truck, Package, Info } from 'lucide-react';
+import { X, CalendarDays, ExternalLink, Truck, Package, Info, Building2, Camera, FileText } from 'lucide-react';
 import ReportDetailsModal from '../reports/ReportDetailsModal';
 import { Link } from 'react-router-dom';
+
+// Google Driveの画像用直接リンク(lh3.googleusercontent.com/d/ID)を、正規プレビューURL(drive.google.com/file/d/ID/view)へ自動コンバートする
+function fixDriveDocUrl(url: string): string {
+  if (!url) return '';
+  if (url.includes('lh3.googleusercontent.com/d/')) {
+    const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (match && match[1]) {
+      return `https://drive.google.com/file/d/${match[1]}/view?usp=drivesdk`;
+    }
+  }
+  return url;
+}
 
 type ProjectDetailsModalProps = {
   project: ProjectSummary;
@@ -70,9 +82,10 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
                 <div className="text-3xl sm:text-4xl font-black text-primary tracking-tighter mt-auto">
                   {project.totalHours.toFixed(1)}<span className="text-sm sm:text-lg font-medium text-muted-foreground ml-1">h</span>
                 </div>
-                <div className="text-[10px] font-medium text-muted-foreground mt-2 flex gap-1.5">
+                <div className="text-[10px] font-medium text-muted-foreground mt-2 flex flex-wrap gap-1.5">
                   <span className="bg-muted px-1.5 py-0.5 rounded">日中 {project.normalHours.toFixed(1)}h</span>
                   {project.overtimeHours > 0 && <span className="text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded font-bold">残業 {project.overtimeHours.toFixed(1)}h</span>}
+                  {project.nightOvertimeHours > 0 && <span className="text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded font-bold">深夜 {project.nightOvertimeHours.toFixed(1)}h</span>}
                 </div>
               </div>
 
@@ -81,9 +94,10 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
                 <div className="text-2xl sm:text-3xl font-bold text-blue-600 tracking-tight mt-auto">
                   {project.breakdown.kouji.toFixed(1)}<span className="text-sm font-medium text-muted-foreground ml-1">h</span>
                 </div>
-                <div className="text-[10px] font-medium text-muted-foreground mt-2 flex gap-1.5">
+                <div className="text-[10px] font-medium text-muted-foreground mt-2 flex flex-wrap gap-1.5">
                   <span className="bg-muted px-1.5 py-0.5 rounded">日中 {project.breakdownDetails.kouji.normal.toFixed(1)}h</span>
                   {project.breakdownDetails.kouji.ot > 0 && <span className="text-orange-600 font-bold">残業 {project.breakdownDetails.kouji.ot.toFixed(1)}h</span>}
+                  {project.breakdownDetails.kouji.nightOt > 0 && <span className="text-indigo-600 font-bold">深夜 {project.breakdownDetails.kouji.nightOt.toFixed(1)}h</span>}
                 </div>
               </div>
 
@@ -92,9 +106,10 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
                 <div className="text-2xl sm:text-3xl font-bold text-purple-600 tracking-tight mt-auto">
                   {project.breakdown.kanri.toFixed(1)}<span className="text-sm font-medium text-muted-foreground ml-1">h</span>
                 </div>
-                <div className="text-[10px] font-medium text-muted-foreground mt-2 flex gap-1.5">
+                <div className="text-[10px] font-medium text-muted-foreground mt-2 flex flex-wrap gap-1.5">
                   <span className="bg-muted px-1.5 py-0.5 rounded">日中 {project.breakdownDetails.kanri.normal.toFixed(1)}h</span>
                   {project.breakdownDetails.kanri.ot > 0 && <span className="text-orange-600 font-bold">残業 {project.breakdownDetails.kanri.ot.toFixed(1)}h</span>}
+                  {project.breakdownDetails.kanri.nightOt > 0 && <span className="text-indigo-600 font-bold">深夜 {project.breakdownDetails.kanri.nightOt.toFixed(1)}h</span>}
                 </div>
               </div>
 
@@ -148,9 +163,10 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
                             </td>
                             <td className="px-4 py-3 text-center whitespace-nowrap flex flex-col items-center">
                               <span className="font-bold text-primary text-sm sm:text-base">{log.hours.toFixed(1)}h</span>
-                              <div className="text-[10px] text-muted-foreground mt-1 flex justify-center gap-1">
-                                <span className="bg-muted px-1.5 py-0.5 rounded">日中 {(log.hours - log.ot).toFixed(1)}h</span>
+                              <div className="text-[10px] text-muted-foreground mt-1 flex flex-wrap justify-center gap-1">
+                                <span className="bg-muted px-1.5 py-0.5 rounded">日中 {(log.hours - log.ot - log.nightOt).toFixed(1)}h</span>
                                 {log.ot > 0 && <span className="text-orange-600 font-bold bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded">残業 {log.ot.toFixed(1)}h</span>}
+                                {log.nightOt > 0 && <span className="text-indigo-600 font-bold bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">深夜 {log.nightOt.toFixed(1)}h</span>}
                               </div>
                             </td>
                             <td className="px-4 py-3 text-muted-foreground text-xs font-medium max-w-[150px] truncate" title={log.car ? `${log.car} / ${log.machine}` : ''}>
@@ -203,6 +219,71 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
                             </div>
                           ))
                         : <span className="text-sm text-muted-foreground italic">材料記録なし</span>}
+                  </div>
+                </div>
+
+                {/* Companies Summary */}
+                <div>
+                  <h4 className="font-bold mb-3 text-sm flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-orange-500" /> 協力会社 (延べ人数)
+                  </h4>
+                  <div className="flex flex-col gap-2 bg-card p-4 rounded-xl border shadow-sm max-h-[250px] overflow-y-auto">
+                    {project.companies && Object.keys(project.companies).length > 0
+                        ? Object.entries(project.companies).sort((a, b) => b[1] - a[1]).map(([comp, count]) => (
+                            <div key={comp} className="flex justify-between items-center text-sm border-b pb-2 last:border-0 last:pb-0 pt-2 first:pt-0">
+                              <span className="font-bold text-foreground/80 truncate mr-2 flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 bg-orange-500 rounded-full shrink-0"></span> {comp}
+                              </span>
+                              <span className="bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-0.5 rounded-full font-bold text-[11px] whitespace-nowrap">{count} 名</span>
+                            </div>
+                          ))
+                        : <span className="text-sm text-muted-foreground italic">協力会社の稼働実績なし</span>}
+                  </div>
+                </div>
+
+                {/* Project Documents */}
+                <div>
+                  <h4 className="font-bold mb-3 text-sm flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-blue-500" /> 関連資料・図面
+                  </h4>
+                  <div className="flex flex-col gap-2 bg-card p-4 rounded-xl border shadow-sm max-h-[250px] overflow-y-auto">
+                    {project.docs && project.docs.length > 0
+                        ? project.docs.map((doc, i) => (
+                            <div key={i} className="flex justify-between items-center text-sm border-b pb-2 last:border-0 last:pb-0 pt-2 first:pt-0">
+                              <a 
+                                href={fixDriveDocUrl(doc.url)} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="font-bold text-blue-600 hover:text-blue-800 hover:underline truncate mr-2 flex items-center gap-2"
+                              >
+                                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full shrink-0"></span> {doc.fileName}
+                              </a>
+                            </div>
+                          ))
+                        : <span className="text-sm text-muted-foreground italic">登録されている資料・図面なし</span>}
+                  </div>
+                </div>
+
+                {/* Project Photos */}
+                <div>
+                  <h4 className="font-bold mb-3 text-sm flex items-center gap-2">
+                    <Camera className="w-4 h-4 text-green-500" /> 現場・材料写真
+                  </h4>
+                  <div className="flex flex-col gap-2 bg-card p-4 rounded-xl border shadow-sm max-h-[250px] overflow-y-auto">
+                    {project.photos && project.photos.length > 0
+                        ? project.photos.map((photo, i) => (
+                            <div key={i} className="flex justify-between items-center text-sm border-b pb-2 last:border-0 last:pb-0 pt-2 first:pt-0">
+                              <a 
+                                href={fixDriveDocUrl(photo.url)} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="font-bold text-green-600 hover:text-green-800 hover:underline truncate mr-2 flex items-center gap-2"
+                              >
+                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full shrink-0"></span> {photo.fileName}
+                              </a>
+                            </div>
+                          ))
+                        : <span className="text-sm text-muted-foreground italic">登録されている写真なし</span>}
                   </div>
                 </div>
               </div>

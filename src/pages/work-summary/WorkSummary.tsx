@@ -203,9 +203,10 @@ export default function WorkSummary() {
               {s ? s.kubunTotals.kouji.toFixed(1) : '0.0'} <span className="text-xl font-normal text-muted-foreground">h</span>
             </p>
             {s && (
-              <div className="text-xs font-medium mt-3 flex items-center gap-2">
+              <div className="text-xs font-medium mt-3 flex flex-wrap gap-2">
                 <span className="bg-muted px-2 py-0.5 rounded text-foreground">日中 {s.kubunDetails.kouji.normal.toFixed(1)}h</span>
-                {s.kubunDetails.kouji.ot > 0 && <span className="bg-orange-50 text-orange-600 border border-orange-100 px-2 py-0.5 rounded">残業 {s.kubunDetails.kouji.ot.toFixed(1)}h</span>}
+                {s.kubunDetails.kouji.ot > 0 && <span className="bg-orange-50 text-orange-600 border border-orange-100 px-2 py-0.5 rounded font-bold">残業 {s.kubunDetails.kouji.ot.toFixed(1)}h</span>}
+                {s.kubunDetails.kouji.nightOt > 0 && <span className="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded font-bold">深夜 {s.kubunDetails.kouji.nightOt.toFixed(1)}h</span>}
               </div>
             )}
           </div>
@@ -218,9 +219,10 @@ export default function WorkSummary() {
               {s ? s.kubunTotals.kanri.toFixed(1) : '0.0'} <span className="text-xl font-normal text-muted-foreground">h</span>
             </p>
             {s && (
-              <div className="text-xs font-medium mt-3 flex items-center gap-2">
+              <div className="text-xs font-medium mt-3 flex flex-wrap gap-2">
                 <span className="bg-muted px-2 py-0.5 rounded text-foreground">日中 {s.kubunDetails.kanri.normal.toFixed(1)}h</span>
-                {s.kubunDetails.kanri.ot > 0 && <span className="bg-orange-50 text-orange-600 border border-orange-100 px-2 py-0.5 rounded">残業 {s.kubunDetails.kanri.ot.toFixed(1)}h</span>}
+                {s.kubunDetails.kanri.ot > 0 && <span className="bg-orange-50 text-orange-600 border border-orange-100 px-2 py-0.5 rounded font-bold">残業 {s.kubunDetails.kanri.ot.toFixed(1)}h</span>}
+                {s.kubunDetails.kanri.nightOt > 0 && <span className="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded font-bold">深夜 {s.kubunDetails.kanri.nightOt.toFixed(1)}h</span>}
               </div>
             )}
           </div>
@@ -233,9 +235,10 @@ export default function WorkSummary() {
               {s ? s.kubunTotals.mitsumori.toFixed(1) : '0.0'} <span className="text-xl font-normal text-muted-foreground">h</span>
             </p>
             {s && (
-              <div className="text-xs font-medium mt-3 flex items-center gap-2">
+              <div className="text-xs font-medium mt-3 flex flex-wrap gap-2">
                 <span className="bg-muted px-2 py-0.5 rounded text-foreground">日中 {s.kubunDetails.mitsumori.normal.toFixed(1)}h</span>
-                {s.kubunDetails.mitsumori.ot > 0 && <span className="bg-orange-50 text-orange-600 border border-orange-100 px-2 py-0.5 rounded">残業 {s.kubunDetails.mitsumori.ot.toFixed(1)}h</span>}
+                {s.kubunDetails.mitsumori.ot > 0 && <span className="bg-orange-50 text-orange-600 border border-orange-100 px-2 py-0.5 rounded font-bold">残業 {s.kubunDetails.mitsumori.ot.toFixed(1)}h</span>}
+                {s.kubunDetails.mitsumori.nightOt > 0 && <span className="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded font-bold">深夜 {s.kubunDetails.mitsumori.nightOt.toFixed(1)}h</span>}
               </div>
             )}
           </div>
@@ -295,6 +298,7 @@ export default function WorkSummary() {
                               <div className="text-[10px] text-muted-foreground text-right mt-1 flex flex-col gap-0.5">
                                 <span>日中 {p.breakdownDetails.kouji.normal.toFixed(1)}h</span>
                                 {p.breakdownDetails.kouji.ot > 0 && <span className="text-orange-500 font-bold">残業 {p.breakdownDetails.kouji.ot.toFixed(1)}h</span>}
+                                {p.breakdownDetails.kouji.nightOt > 0 && <span className="text-indigo-500 font-bold">深夜 {p.breakdownDetails.kouji.nightOt.toFixed(1)}h</span>}
                               </div>
                             </div>
                             <div className="flex flex-col w-36 sm:w-40 bg-purple-50/50 px-3 py-1.5 rounded-lg border border-purple-100">
@@ -305,6 +309,7 @@ export default function WorkSummary() {
                               <div className="text-[10px] text-muted-foreground text-right mt-1 flex flex-col gap-0.5">
                                 <span>日中 {p.breakdownDetails.kanri.normal.toFixed(1)}h</span>
                                 {p.breakdownDetails.kanri.ot > 0 && <span className="text-orange-500 font-bold">残業 {p.breakdownDetails.kanri.ot.toFixed(1)}h</span>}
+                                {p.breakdownDetails.kanri.nightOt > 0 && <span className="text-indigo-500 font-bold">深夜 {p.breakdownDetails.kanri.nightOt.toFixed(1)}h</span>}
                               </div>
                             </div>
                             <div className="flex flex-col w-36 sm:w-40 bg-amber-50/50 px-3 py-1.5 rounded-lg border border-amber-100">
@@ -315,6 +320,7 @@ export default function WorkSummary() {
                               <div className="text-[10px] text-muted-foreground text-right mt-1 flex flex-col gap-0.5">
                                 <span>日中 {p.breakdownDetails.mitsumori.normal.toFixed(1)}h</span>
                                 {p.breakdownDetails.mitsumori.ot > 0 && <span className="text-orange-500 font-bold">残業 {p.breakdownDetails.mitsumori.ot.toFixed(1)}h</span>}
+                                {p.breakdownDetails.mitsumori.nightOt > 0 && <span className="text-indigo-500 font-bold">深夜 {p.breakdownDetails.mitsumori.nightOt.toFixed(1)}h</span>}
                               </div>
                             </div>
                           </div>
@@ -329,9 +335,10 @@ export default function WorkSummary() {
                                <div className="text-3xl font-black text-primary tracking-tighter">
                                  {p.totalHours.toFixed(1)}<span className="text-sm font-medium text-muted-foreground ml-1">h</span>
                                </div>
-                               <div className="text-[10px] font-medium text-muted-foreground mt-1 flex gap-1">
+                               <div className="text-[10px] font-medium text-muted-foreground mt-1 flex flex-wrap justify-end gap-1">
                                  <span>日中 {p.normalHours.toFixed(1)}h</span>
                                  {p.overtimeHours > 0 && <span className="text-orange-500 font-bold">残業 {p.overtimeHours.toFixed(1)}h</span>}
+                                 {p.nightOvertimeHours > 0 && <span className="text-indigo-500 font-bold">深夜 {p.nightOvertimeHours.toFixed(1)}h</span>}
                                </div>
                             </div>
                             <button 
