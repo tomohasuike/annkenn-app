@@ -64,6 +64,17 @@ function calculateWBGT(temp: number, humidity: number): number {
   return Math.round(wbgt * 10) / 10
 }
 
+// 作業環境タイプに応じたWBGT（暑さ指数）の補正値を返す関数
+function getEnvironmentWbgtOffset(envType: string): number {
+  if (!envType) return 0.0
+  if (envType.includes("屋外（直射日光）")) return 0.0
+  if (envType.includes("屋外（日陰）")) return -1.5
+  if (envType.includes("屋内（空調なし）")) return -2.0
+  if (envType.includes("屋内（空調あり）")) return -4.0
+  return 0.0
+}
+
+
 // 暑さ指数（WBGT）に対応するリスクレベルと安全指針
 interface RiskInfo {
   level: "ほぼ安全" | "注意" | "警戒" | "厳重警戒" | "危険"
@@ -525,7 +536,7 @@ export default function HeatstrokeChecker() {
         }
 
         setTempOffset(record.temp_offset || 0.0)
-        setForemanId(record.foreman_id || "")
+        setForemanId(record.foreman_id || currentWorkerId || "")
         setFormWorkers(record.worker_checks || [])
         // コメントと指針チェックを復元
         setFormComment(record.comment || "")
@@ -577,8 +588,10 @@ export default function HeatstrokeChecker() {
         setFormWorkers(initialWorkers)
 
 
-        // 職長の初期アサイン（正社員を優先）
-        if (filteredWorkers.length > 0) {
+        // 職長の初期アサイン（ログイン中のユーザーを最優先、いなければアサインされた正社員などを優先）
+        if (currentWorkerId) {
+          setForemanId(currentWorkerId)
+        } else if (filteredWorkers.length > 0) {
           const sorted = [...filteredWorkers].sort((a, b) => {
             const order: Record<string, number> = { "正社員": 1, "契約社員": 2, "外注": 3 }
             return (order[a.type] || 99) - (order[b.type] || 99)
@@ -670,9 +683,10 @@ export default function HeatstrokeChecker() {
         return
       }
 
-      // WBGT の決定（実測値入力があれば最優先、なければGPS予報から計算）
+      // WBGT の決定（実測値入力があれば最優先、なければGPS予報から計算 ＋ 環境補正）
       const actualTemp = baseTemperature + tempOffset
-      const calculatedWbgt = calculateWBGT(actualTemp, baseHumidity)
+      const envOffset = getEnvironmentWbgtOffset(formEnvironment)
+      const calculatedWbgt = Math.round((calculateWBGT(actualTemp, baseHumidity) + envOffset) * 10) / 10
       
       const isActualPrioritized = wbgtActual !== "" && !isNaN(parseFloat(wbgtActual))
       const finalWbgt = isActualPrioritized ? parseFloat(wbgtActual) : calculatedWbgt
@@ -830,9 +844,11 @@ export default function HeatstrokeChecker() {
     return `${num}${p.project_name}${suffix}`
   }
 
-  // 実測値があれば最優先（オーバーライド）、なければ気象データから計算
+  // 実測値があれば最優先（オーバーライド）、なければ気象データから計算 ＋ 環境補正
   const isActualPrioritized = wbgtActual !== "" && !isNaN(parseFloat(wbgtActual))
-  const actualWBGT = isActualPrioritized ? parseFloat(wbgtActual) : calculateWBGT(baseTemperature + tempOffset, baseHumidity)
+  const envOffset = getEnvironmentWbgtOffset(formEnvironment)
+  const baseWbgt = calculateWBGT(baseTemperature + tempOffset, baseHumidity)
+  const actualWBGT = isActualPrioritized ? parseFloat(wbgtActual) : Math.round((baseWbgt + envOffset) * 10) / 10
   const currentRisk = getRiskLevel(actualWBGT)
 
   return (
@@ -941,10 +957,16 @@ export default function HeatstrokeChecker() {
               <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${currentRisk.colorClass}`}>
                 {currentRisk.level}
               </span>
-              {isActualPrioritized && (
+              {isActualPrioritized ? (
                 <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded font-black border border-red-200/30">
                   測定器実測値優先
                 </span>
+              ) : (
+                envOffset !== 0 && (
+                  <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 px-2 py-0.5 rounded font-black border border-blue-200/30">
+                    環境補正: {envOffset > 0 ? `+${envOffset}` : envOffset}℃ ({formEnvironment})
+                  </span>
+                )
               )}
             </div>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
