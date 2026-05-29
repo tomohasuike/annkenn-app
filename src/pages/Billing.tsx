@@ -247,6 +247,11 @@ export default function Billing() {
   // Determine computed project state
   const getProjectBillingState = (proj: ProjectData) => {
     const relatedInvoices = invoices.filter(inv => inv.project_id === proj.id || (inv.project_ids && inv.project_ids.includes(proj.id)));
+    
+    // この案件が「おまとめ請求（合算対象が2件以上）」に含まれているかを判定
+    const combinedInvoicesForThisProject = relatedInvoices.filter(inv => inv.project_ids && inv.project_ids.length >= 2);
+    const isCombinedInAnyInvoice = combinedInvoicesForThisProject.length > 0;
+
     const hasInvoices = relatedInvoices.length > 0;
     
     let isBillingExplicitlyFinalized = false;
@@ -254,6 +259,14 @@ export default function Billing() {
     let hasUnpaidProgressInvoice = false;
 
     for (const inv of relatedInvoices) {
+      // もしこの案件がいずれかのおまとめ請求に合算されており、
+      // かつ、このループ中の請求 `inv` がおまとめ請求ではない個別請求（project_idsが空、または1件以下）である場合、
+      // この個別請求は合算前の古い重複データなので無視（スキップ）する。
+      const isThisIndividualButCombinedElsewhere = isCombinedInAnyInvoice && (!inv.project_ids || inv.project_ids.length <= 1);
+      if (isThisIndividualButCombinedElsewhere) {
+        continue;
+      }
+
       const details = inv.invoice_details || [];
       const hasDetails = details.length > 0;
       let invPaid = true;
@@ -441,9 +454,36 @@ export default function Billing() {
     }
   })
 
+  // おまとめ請求（合算対象プロジェクトが2件以上）のリストを取得
+  const activeCombinedInvoices = enrichedInvoices.filter(inv => inv.project_ids && inv.project_ids.length >= 2);
+
+  // 自身が他の「おまとめ請求」に合算されている、単体の請求（ゾンビ請求）であるか判定する関数
+  const isIndividualInvoiceCombinedElsewhere = (inv: any) => {
+    // 自身がおまとめ請求（project_ids が2件以上）なら除外対象ではない
+    if (inv.project_ids && inv.project_ids.length >= 2) return false;
+
+    // 自身の対象案件（project_id）が、別のいずれかのおまとめ請求の project_ids に含まれているかチェック
+    return activeCombinedInvoices.some(combinedInv => 
+      combinedInv.project_ids && 
+      combinedInv.project_ids.includes(inv.project_id) && 
+      combinedInv.id !== inv.id
+    );
+  };
+
   // Determine which invoices are pending vs completed
-  const pendingInvoices = enrichedInvoices.filter(inv => !inv.isCompleted)
-  const completedInvoices = enrichedInvoices.filter(inv => inv.isCompleted).sort((a, b) => b.lastDepositDateDate.getTime() - a.lastDepositDateDate.getTime())
+  const pendingInvoices = enrichedInvoices.filter(inv => {
+    if (inv.isCompleted) return false;
+    // 他のおまとめ請求に合算されている個別請求は、重複表示を防ぐため除外
+    if (isIndividualInvoiceCombinedElsewhere(inv)) return false;
+    return true;
+  });
+
+  const completedInvoices = enrichedInvoices.filter(inv => {
+    if (!inv.isCompleted) return false;
+    // 完了履歴でも、他のおまとめ請求に合算されている個別請求は重複表示を防ぐため除外
+    if (isIndividualInvoiceCombinedElsewhere(inv)) return false;
+    return true;
+  }).sort((a, b) => b.lastDepositDateDate.getTime() - a.lastDepositDateDate.getTime())
 
   const applySearchToGroup = (inv: any) => {
     if (!searchTerm) return true
