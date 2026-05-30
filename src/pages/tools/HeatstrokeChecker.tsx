@@ -448,27 +448,33 @@ export default function HeatstrokeChecker() {
       const {
         data: { user }
       } = await supabase.auth.getUser()
-      if (user && user.email) {
-        setCurrentUserEmail(user.email)
+      
+      if (user) {
+        // ログイン情報からメールアドレスを正確に取得（前後の不要な空白をトリムし、大文字小文字をすべて小文字にクレンジング）
+        const loginEmail = (user.email || user.user_metadata?.email || "").trim().toLowerCase()
+        setCurrentUserEmail(loginEmail)
 
-        // ユーザー権限と作業員マスターIDの取得
-        const { data: worker } = await supabase
-          .from("worker_master")
-          .select("id, is_admin, type")
-          .eq("email", user.email)
-          .single()
-
-        if (worker) {
-          setIsAdmin(worker.is_admin || worker.type === "社長" || worker.type === "事務員")
-          setCurrentWorkerId(worker.id)
-        }
-
-        // 全作業員マスタの取得
+        // 全作業員マスタのロード（表示順 display_order が保存されていればそれを基準に、なければID順で美しくロード）
         const { data: wm } = await supabase
           .from("worker_master")
-          .select("id, name, type")
-          .order("name")
-        setWorkerMasterList(wm || [])
+          .select("id, name, type, is_admin, email")
+          .order("display_order", { ascending: true, nullsFirst: false })
+          .order("id", { ascending: true })
+        
+        const masterList = wm || []
+        setWorkerMasterList(masterList)
+
+        // ログインしているメールアドレスに合致する作業員レコードをマスタから確実に特定して返す
+        if (loginEmail && masterList.length > 0) {
+          const resolvedWorker = masterList.find(
+            w => (w.email || "").trim().toLowerCase() === loginEmail
+          )
+
+          if (resolvedWorker) {
+            setIsAdmin(resolvedWorker.is_admin || resolvedWorker.type === "社長" || resolvedWorker.type === "事務員")
+            setCurrentWorkerId(resolvedWorker.id)
+          }
+        }
       }
     } catch (e) {
       console.error("Initialization error:", e)
@@ -670,7 +676,15 @@ export default function HeatstrokeChecker() {
         } else if (filteredWorkers.length > 0) {
           const sorted = [...filteredWorkers].sort((a, b) => {
             const order: Record<string, number> = { "正社員": 1, "契約社員": 2, "外注": 3 }
-            return (order[a.type] || 99) - (order[b.type] || 99)
+            const typeDiff = (order[a.type] || 99) - (order[b.type] || 99)
+            if (typeDiff !== 0) return typeDiff
+
+            // 同じ区分の場合は、workerMasterList における表示順（display_order）が若い人を最優先にする
+            const aIndex = workerMasterList.findIndex(m => m.id === a.id)
+            const bIndex = workerMasterList.findIndex(m => m.id === b.id)
+            const aVal = aIndex !== -1 ? aIndex : 9999
+            const bVal = bIndex !== -1 ? bIndex : 9999
+            return aVal - bVal
           })
           setForemanId(sorted[0].id)
         } else {
