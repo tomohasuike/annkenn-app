@@ -523,22 +523,36 @@ export default function HeatstrokeChecker() {
       const todayProjectIds = new Set(validAssignments.map(a => a.project_id))
       const todayProjects = validProjects.filter(p => todayProjectIds.has(p.id))
 
-      // 万が一、本日のアサインが1件もない場合は、安全のため全現場プロジェクトを表示（エラー・ロック防止）
-      const finalProjects = todayProjects.length > 0 ? todayProjects : validProjects
+      // 仮想の「該当現場なし（アサインなし）」プロジェクトを定義
+      const NO_PROJECT: Project = {
+        id: "no-project",
+        project_name: "（現場なし／アサインなし）",
+        site_name: "現場なし",
+        project_number: "NONE",
+        category: "現場なし"
+      }
+
+      // 表示用のプロジェクトリスト。本日の現場＋「現場なし」を常にドロップダウンの選択肢に含める
+      // アサインがない（休日などの）場合は、「現場なし」＋念のための全現場をドロップダウンの予備としてセット
+      let finalProjects: Project[] = []
+      if (todayProjects.length > 0) {
+        finalProjects = [NO_PROJECT, ...todayProjects]
+      } else {
+        finalProjects = [NO_PROJECT, ...validProjects]
+      }
       setProjects(finalProjects)
 
-      // アサインされているプロジェクトから最初の現場を自動選択（未選択時）
-      const assignedProjIds = Array.from(new Set(validAssignments.map(a => a.project_id)))
-      if (assignedProjIds.length > 0 && !selectedProjectId) {
-        // 自分がアサインされている現場を最優先に選択
+      // 初期値 (selectedProjectId) の自動判定
+      if (!selectedProjectId) {
+        // 自分がアサインされている現場があるかを調べる
         const myAssignment = validAssignments.find(a => a.worker_master?.email === currentUserEmail)
         if (myAssignment) {
+          // 自分がアサインされている現場を自動選択
           setSelectedProjectId(myAssignment.project_id)
         } else {
-          setSelectedProjectId(assignedProjIds[0])
+          // 自分自身がアサインされていない、または本日アサインが0件なら、自動的に「現場なし」を初期選択
+          setSelectedProjectId(NO_PROJECT.id)
         }
-      } else if (finalProjects.length > 0 && !selectedProjectId) {
-        setSelectedProjectId(finalProjects[0].id)
       }
     } catch (e) {
       console.error("Error fetching projects and assignments:", e)
@@ -578,10 +592,15 @@ export default function HeatstrokeChecker() {
   const fetchExistingRecord = async () => {
     try {
       setRefreshing(true)
-      const { data, error } = await supabase
-        .from("heatstroke_checks")
-        .select("*")
-        .eq("project_id", selectedProjectId)
+      
+      let query = supabase.from("heatstroke_checks").select("*")
+      if (selectedProjectId === "no-project") {
+        query = query.is("project_id", null)
+      } else {
+        query = query.eq("project_id", selectedProjectId)
+      }
+
+      const { data, error } = await query
         .eq("target_date", targetDate)
         .eq("check_time_type", checkTimeType)
         .maybeSingle()
@@ -807,7 +826,7 @@ export default function HeatstrokeChecker() {
       }
 
       const payload = {
-        project_id: selectedProjectId,
+        project_id: selectedProjectId === "no-project" ? null : selectedProjectId,
         target_date: targetDate,
         foreman_id: foremanId || null,
         check_time_type: checkTimeType,
@@ -1170,11 +1189,18 @@ export default function HeatstrokeChecker() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map(p => {
-              const siteChecks = allChecksForDate.filter(c => c.project_id === p.id)
+              const siteChecks = allChecksForDate.filter(c => {
+                if (p.id === "no-project") {
+                  return c.project_id === null
+                }
+                return c.project_id === p.id
+              })
               const siteAssignments = assignments.filter(a => a.project_id === p.id)
               const hasAssignments = siteAssignments.length > 0
 
-              if (!hasAssignments && siteChecks.length === 0) return null // アサインも登録もない現場は非表示
+              // 現場なしの場合、アサインは常に0件だが、登録データがある場合はダッシュボードに美しく表示する
+              if (p.id === "no-project" && siteChecks.length === 0) return null
+              if (p.id !== "no-project" && !hasAssignments && siteChecks.length === 0) return null
 
               return (
                 <div key={p.id} className="border border-slate-100 dark:border-slate-800/80 rounded-xl p-4 bg-slate-50/50 dark:bg-slate-900/30 flex flex-col justify-between space-y-3 shadow-sm hover:border-slate-200 transition-colors">
