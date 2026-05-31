@@ -211,6 +211,10 @@ interface HeatstrokeSession {
   safety_checks: Record<string, boolean> | null
   overall_comment: string | null
   photo_url: string | null
+  session_member_overrides: {  // 当日限りのメンバー調整
+    added: string[]            // 当日追加メンバーIDの配列
+    removed: string[]          // 当日除外メンバーIDの配列
+  } | null
   created_at: string
   updated_at: string
 }
@@ -1119,6 +1123,65 @@ export default function HeatstrokeChecker() {
   }
 
   // ============================================================
+  // メンバー管理（当日限り追加・除外）
+  // ============================================================
+
+  const [savingMember, setSavingMember] = useState(false)
+
+  // 共通: session_member_overrides を更新して state に反映する
+  const updateMemberOverrides = async (
+    newOverrides: { added: string[]; removed: string[] }
+  ) => {
+    if (!session?.id) return
+    setSavingMember(true)
+    try {
+      const { error } = await supabase
+        .from("heatstroke_sessions")
+        .update({
+          session_member_overrides: newOverrides,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", session.id)
+      if (error) throw error
+      setSession(prev => prev ? { ...prev, session_member_overrides: newOverrides } : prev)
+    } catch (e: any) {
+      console.error("メンバー更新エラー:", e)
+      setModalMessage({ type: "error", text: "メンバーの更新に失敗しました: " + e.message })
+    } finally {
+      setSavingMember(false)
+    }
+  }
+
+  // 当日追加
+  const handleAddMember = async (workerId: string) => {
+    const cur = session?.session_member_overrides ?? { added: [], removed: [] }
+    if (cur.added.includes(workerId)) return
+    await updateMemberOverrides({
+      added: [...cur.added, workerId],
+      removed: cur.removed.filter(id => id !== workerId) // removedにあれば解除
+    })
+  }
+
+  // 当日除外
+  const handleRemoveMember = async (workerId: string) => {
+    const cur = session?.session_member_overrides ?? { added: [], removed: [] }
+    if (cur.removed.includes(workerId)) return
+    await updateMemberOverrides({
+      added: cur.added.filter(id => id !== workerId),  // addedにあれば解除
+      removed: [...cur.removed, workerId]
+    })
+  }
+
+  // 追加・除外を取り消す
+  const handleResetMember = async (workerId: string) => {
+    const cur = session?.session_member_overrides ?? { added: [], removed: [] }
+    await updateMemberOverrides({
+      added: cur.added.filter(id => id !== workerId),
+      removed: cur.removed.filter(id => id !== workerId)
+    })
+  }
+
+  // ============================================================
   // PDF出力
   // ============================================================
 
@@ -1173,23 +1236,36 @@ export default function HeatstrokeChecker() {
     .map(a => a.worker_master)
     .filter(w => w && !["社長", "事務員", "協力会社"].includes(w.type))
 
-  // まとめ役パネルに表示するメンバー一覧（アサイン + 申告済み者のユニオン）
+  // まとめ役パネルに表示するメンバー一覧（アサイン + オーバーライド + 申告済み者のユニオン）
   const panelMembers = (() => {
+    const overrides = session?.session_member_overrides
+    const addedIds   = new Set<string>(overrides?.added   ?? [])
+    const removedIds = new Set<string>(overrides?.removed ?? [])
     const assignedIds = new Set(siteAssignedWorkers.map(w => w.id))
-    const checkedWorkerIds = new Set(allChecks.map(c => c.worker_id))
 
-    // アサインメンバー + 申告済みの非アサインメンバーのユニオン
-    const members: { worker_id: string; worker_name: string; isAssigned: boolean }[] = []
+    const members: { worker_id: string; worker_name: string; isAssigned: boolean; isAdded: boolean }[] = []
 
-    // アサインメンバーを追加
+    // アサインメンバーを追加（当日除外対象はスキップ）
     siteAssignedWorkers.forEach(w => {
-      members.push({ worker_id: w.id, worker_name: w.name, isAssigned: true })
+      if (!removedIds.has(w.id)) {
+        members.push({ worker_id: w.id, worker_name: w.name, isAssigned: true, isAdded: false })
+      }
+    })
+
+    // 当日追加メンバー（アサイン外の人）を追加
+    addedIds.forEach(wid => {
+      if (!assignedIds.has(wid) && !members.some(m => m.worker_id === wid)) {
+        const master = workerMasterList.find(w => w.id === wid)
+        if (master) {
+          members.push({ worker_id: master.id, worker_name: master.name, isAssigned: false, isAdded: true })
+        }
+      }
     })
 
     // 申告済みだがアサインにいない人を追加
     allChecks.forEach(c => {
-      if (!assignedIds.has(c.worker_id)) {
-        members.push({ worker_id: c.worker_id, worker_name: c.worker_name, isAssigned: false })
+      if (!assignedIds.has(c.worker_id) && !members.some(m => m.worker_id === c.worker_id)) {
+        members.push({ worker_id: c.worker_id, worker_name: c.worker_name, isAssigned: false, isAdded: false })
       }
     })
 
@@ -1197,7 +1273,7 @@ export default function HeatstrokeChecker() {
     if (selectedProjectId === "no-project" && currentWorkerId) {
       const alreadyInList = members.some(m => m.worker_id === currentWorkerId)
       if (!alreadyInList) {
-        members.push({ worker_id: currentWorkerId, worker_name: currentWorkerName, isAssigned: false })
+        members.push({ worker_id: currentWorkerId, worker_name: currentWorkerName, isAssigned: false, isAdded: false })
       }
     }
 
@@ -2215,7 +2291,12 @@ export default function HeatstrokeChecker() {
                         <div className={`w-2 h-2 rounded-full shrink-0 ${check ? "bg-green-500" : "bg-red-500 animate-pulse"}`} />
                         <div>
                           <span className="font-bold text-slate-800 dark:text-slate-200">{member.worker_name}</span>
-                          {!member.isAssigned && (
+                          {member.isAdded && (
+                            <span className="ml-2 text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">
+                              当日追加
+                            </span>
+                          )}
+                          {!member.isAssigned && !member.isAdded && (
                             <span className="ml-2 text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded font-bold">
                               当日参加
                             </span>
@@ -2241,12 +2322,33 @@ export default function HeatstrokeChecker() {
                         )}
 
                         {!isSessionConfirmed && iAmForeman && (
-                          <button
-                            onClick={() => openProxyForm(member)}
-                            className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1 rounded-lg font-extrabold border border-blue-200/40 transition-all"
-                          >
-                            {check ? "修正" : "代理入力"}
-                          </button>
+                          <>
+                            <button
+                              onClick={() => openProxyForm(member)}
+                              disabled={savingMember}
+                              className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1 rounded-lg font-extrabold border border-blue-200/40 transition-all"
+                            >
+                              {check ? "修正" : "代理入力"}
+                            </button>
+                            {/* 当日追加メンバーは「追加取消」、アサインメンバーは「除外」 */}
+                            {member.isAdded ? (
+                              <button
+                                onClick={() => handleResetMember(member.worker_id)}
+                                disabled={savingMember}
+                                className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-500 px-2 py-1 rounded-lg font-bold border border-slate-200 transition-all"
+                              >
+                                追加取消
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleRemoveMember(member.worker_id)}
+                                disabled={savingMember}
+                                className="text-[10px] bg-red-50 hover:bg-red-100 text-red-500 px-2 py-1 rounded-lg font-bold border border-red-200/40 transition-all"
+                              >
+                                当日除外
+                              </button>
+                            )}
+                          </>
                         )}
                         {!isSessionConfirmed && !iAmForeman && !foremanId && (
                           <span className="text-[10px] text-slate-400 font-bold">
@@ -2258,6 +2360,73 @@ export default function HeatstrokeChecker() {
                   )
                 })}
               </div>
+
+              {/* 除外済みメンバーの表示 */}
+              {iAmForeman && !isSessionConfirmed && (() => {
+                const removedIds = session?.session_member_overrides?.removed ?? []
+                const removedWorkers = siteAssignedWorkers.filter(w => removedIds.includes(w.id))
+                if (removedWorkers.length === 0) return null
+                return (
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">本日除外中</p>
+                    {removedWorkers.map(w => (
+                      <div key={w.id} className="flex items-center justify-between p-2.5 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 dark:bg-slate-900/20 opacity-60">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-slate-300" />
+                          <span className="text-sm font-bold text-slate-500 line-through">{w.name}</span>
+                          <span className="text-[10px] bg-slate-200 text-slate-400 px-1.5 py-0.5 rounded font-bold">当日除外</span>
+                        </div>
+                        <button
+                          onClick={() => handleResetMember(w.id)}
+                          disabled={savingMember}
+                          className="text-[10px] bg-white text-slate-500 hover:text-blue-600 px-2 py-1 rounded-lg font-bold border border-slate-200 transition-all"
+                        >
+                          復帰
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+
+              {/* まとめ役向け：当日メンバー追加セクション */}
+              {iAmForeman && !isSessionConfirmed && (() => {
+                const currentIds = new Set([
+                  ...panelMembers.map(m => m.worker_id),
+                  ...(session?.session_member_overrides?.removed ?? [])
+                ])
+                const addableWorkers = workerMasterList.filter(w =>
+                  !currentIds.has(w.id) &&
+                  !["社長", "事務員", "協力会社"].includes(w.type)
+                )
+                if (addableWorkers.length === 0) return null
+                return (
+                  <div className="border border-dashed border-blue-200 rounded-xl p-3 space-y-2 bg-blue-50/30 dark:bg-blue-950/10">
+                    <p className="text-xs font-extrabold text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                      ➕ 当日メンバーを追加
+                    </p>
+                    <div className="flex gap-2">
+                      <select
+                        id="add-member-select"
+                        defaultValue=""
+                        className="flex-1 h-10 px-2 bg-white dark:bg-slate-900 border border-blue-200 rounded-lg text-sm font-bold outline-none cursor-pointer"
+                        onChange={async e => {
+                          const wid = e.target.value
+                          if (!wid) return
+                          await handleAddMember(wid)
+                          e.target.value = ""
+                        }}
+                      >
+                        <option value="">追加する人を選んでください</option>
+                        {addableWorkers.map(w => (
+                          <option key={w.id} value={w.id}>{w.name}</option>
+                        ))}
+                      </select>
+                      {savingMember && <Loader2 className="w-5 h-5 animate-spin text-blue-500 shrink-0 self-center" />}
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* まとめ役 最終確認セクション */}
               {!isSessionConfirmed && iAmForeman && (

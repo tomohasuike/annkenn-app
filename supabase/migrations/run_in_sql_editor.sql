@@ -90,3 +90,14 @@ ALTER TABLE public.heatstroke_sessions
   ADD COLUMN IF NOT EXISTS foreman_id UUID REFERENCES auth.users(id);
 
 COMMENT ON COLUMN public.heatstroke_sessions.foreman_id IS 'まとめ役として担当を宣言したユーザーのID';
+
+-- ============================================================
+-- メンバー管理機能：session_member_overrides カラム追加
+-- 2026-06-01
+-- ============================================================
+ALTER TABLE public.heatstroke_sessions
+  ADD COLUMN IF NOT EXISTS session_member_overrides JSONB
+  DEFAULT '{"added":[],"removed":[]}';
+
+COMMENT ON COLUMN public.heatstroke_sessions.session_member_overrides
+  IS '当日限りのメンバー調整。added: 追加メンバーworker_id[], removed: 除外メンバーworker_id[]';
