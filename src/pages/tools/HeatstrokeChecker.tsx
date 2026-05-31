@@ -1210,11 +1210,11 @@ export default function HeatstrokeChecker() {
     value: number
     onChange: (v: number) => void
   }) => (
-    <div className="space-y-1 bg-white dark:bg-slate-900 p-2.5 rounded-lg border shadow-sm border-slate-100">
-      <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block">
+    <div className="space-y-1 bg-white dark:bg-slate-900 p-3 rounded-lg border shadow-sm border-slate-100">
+      <label className="text-xs font-bold text-slate-500 dark:text-slate-400 block">
         昨夜の睡眠時間
       </label>
-      <div className="grid grid-cols-3 gap-1 mt-1 text-[10px] font-bold">
+      <div className="grid grid-cols-3 gap-1.5 mt-1.5 text-xs font-bold">
         {[
           { val: 3, label: "8時間以上", sub: "推奨 😊", activeClass: "bg-green-100 border-green-300 text-green-700" },
           { val: 2, label: "6〜7時間", sub: "最低ライン 😐", activeClass: "bg-yellow-100 border-yellow-300 text-yellow-700" },
@@ -1224,14 +1224,14 @@ export default function HeatstrokeChecker() {
             key={item.val}
             type="button"
             onClick={() => onChange(item.val)}
-            className={`py-1.5 rounded border transition-all text-center ${
+            className={`py-3.5 rounded border transition-all text-center ${
               value === item.val
                 ? item.activeClass + " font-extrabold"
                 : "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-600"
             }`}
           >
             <div>{item.label}</div>
-            <div className="text-[9px] font-medium">{item.sub}</div>
+            <div className="text-[10px] font-medium mt-0.5">{item.sub}</div>
           </button>
         ))}
       </div>
@@ -1251,13 +1251,13 @@ export default function HeatstrokeChecker() {
     noLabel?: string
     yesIsRisk?: boolean
   }) => (
-    <div className="space-y-1 bg-white dark:bg-slate-900 p-2.5 rounded-lg border shadow-sm border-slate-100">
-      <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block">{label}</label>
-      <div className="grid grid-cols-2 gap-1 mt-1 text-[10px] font-bold">
+    <div className="space-y-1 bg-white dark:bg-slate-900 p-3 rounded-lg border shadow-sm border-slate-100">
+      <label className="text-xs font-bold text-slate-500 dark:text-slate-400 block">{label}</label>
+      <div className="grid grid-cols-2 gap-1.5 mt-1.5 text-xs font-bold">
         <button
           type="button"
           onClick={() => onChange(!yesIsRisk ? true : false)}
-          className={`py-1 rounded border transition-all ${
+          className={`py-3 rounded border transition-all ${
             value === (!yesIsRisk ? true : false)
               ? "bg-blue-100 border-blue-200 text-blue-700 font-extrabold"
               : "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-600"
@@ -1268,7 +1268,7 @@ export default function HeatstrokeChecker() {
         <button
           type="button"
           onClick={() => onChange(yesIsRisk ? true : false)}
-          className={`py-1 rounded border transition-all ${
+          className={`py-3 rounded border transition-all ${
             value === (yesIsRisk ? true : false)
               ? "bg-red-100 border-red-200 text-red-700 font-extrabold animate-pulse"
               : "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-600"
@@ -1322,34 +1322,34 @@ export default function HeatstrokeChecker() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* 水分補給 */}
           <div className="space-y-1 bg-white dark:bg-slate-900 p-2.5 rounded-lg border shadow-sm border-slate-100">
-            <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block">水分・塩分補給</label>
+            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 block">水分・塩分補給</label>
             <button
               type="button"
               onClick={() => onUpdate({ water_checked: !data.water_checked })}
-              className={`w-full py-1.5 mt-1 rounded-md border font-black text-[10px] transition-all flex items-center justify-center gap-1 ${
+              className={`w-full py-3.5 mt-1.5 rounded-md border font-black text-xs transition-all flex items-center justify-center gap-1.5 ${
                 data.water_checked
                   ? "bg-green-500 border-green-600 text-white shadow-sm"
                   : "bg-slate-50 border-slate-200 text-slate-400"
               }`}
             >
-              <Smile className="w-3.5 h-3.5" />
+              <Smile className="w-4 h-4" />
               {data.water_checked ? "補給ヨシ！" : "未確認"}
             </button>
           </div>
 
           {/* 尿色 */}
-          <div className="space-y-1 bg-white dark:bg-slate-900 p-2.5 rounded-lg border shadow-sm border-slate-100">
-            <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block">尿色（水分充足確認）</label>
+          <div className="space-y-1 bg-white dark:bg-slate-900 p-3 rounded-lg border shadow-sm border-slate-100">
+            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 block">尿色（水分充足確認）</label>
             <button
               type="button"
               onClick={() => onUpdate({ urine_checked: !data.urine_checked })}
-              className={`w-full py-1.5 mt-1 rounded-md border font-black text-[10px] transition-all flex items-center justify-center gap-1 ${
+              className={`w-full py-3.5 mt-1.5 rounded-md border font-black text-xs transition-all flex items-center justify-center gap-1.5 ${
                 data.urine_checked
                   ? "bg-green-500 border-green-600 text-white shadow-sm"
                   : "bg-slate-50 border-slate-200 text-slate-400"
               }`}
             >
-              <ShieldCheck className="w-3.5 h-3.5" />
+              <ShieldCheck className="w-4 h-4" />
               {data.urine_checked ? "尿色問題なし" : "未確認"}
             </button>
           </div>
@@ -1372,21 +1372,20 @@ export default function HeatstrokeChecker() {
         </div>
 
         {/* 個別メモ */}
-        <div className="bg-white dark:bg-slate-900 p-2.5 rounded-lg border shadow-sm border-slate-100">
-          <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 block flex items-center gap-1">
-            <FileText className="w-3.5 h-3.5 text-blue-500" />
+        <div className="bg-white dark:bg-slate-900 p-3 rounded-lg border shadow-sm border-slate-100">
+          <label className="text-xs font-black text-slate-500 dark:text-slate-400 block flex items-center gap-1.5">
+            <FileText className="w-4 h-4 text-blue-500" />
             気になる点・個別メモ（任意）
           </label>
-          <div className="flex gap-1.5 mt-1">
+          <div className="flex gap-2 mt-1.5">
             <input
               type="text"
               value={voiceListening ? voicePreview : (data.comment || "")}
               onChange={e => { if (!voiceListening && !voiceSummarizing) onUpdate({ comment: e.target.value }) }}
               placeholder={voiceSummarizing ? "✨ AI整形中..." : "（例：昨日無理をした、少し頭が重い 等）"}
-              className="flex-1 h-8 px-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 rounded font-bold text-xs outline-none focus:border-blue-500 placeholder:text-slate-400 placeholder:font-medium text-slate-800 dark:text-slate-200"
+              className="flex-1 h-11 px-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-blue-500 placeholder:text-slate-400 placeholder:font-normal text-slate-800 dark:text-slate-200"
               readOnly={voiceListening || voiceSummarizing}
             />
-            {/* 🎤 音声入力ボタン */}
             <button
               type="button"
               onClick={() => {
@@ -1398,7 +1397,7 @@ export default function HeatstrokeChecker() {
               }}
               disabled={voiceSummarizing}
               title={voiceListening ? "タップして録音停止" : "音声でコメントを入力"}
-              className={`h-8 w-8 flex-shrink-0 flex items-center justify-center rounded text-sm transition-all ${
+              className={`h-11 w-11 flex-shrink-0 flex items-center justify-center rounded-lg text-sm transition-all ${
                 voiceListening
                   ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-200"
                   : voiceSummarizing
@@ -1410,7 +1409,7 @@ export default function HeatstrokeChecker() {
             </button>
           </div>
           {(voiceListening || voiceSummarizing) && (
-            <p className="text-[10px] mt-1 font-bold"
+            <p className="text-xs mt-1.5 font-bold"
                style={{ color: voiceListening ? "#ef4444" : "#a855f7" }}>
               {voiceListening
                 ? "🔴 録音中... 話してください。終わったら ⏹ を押してください"
@@ -1448,8 +1447,8 @@ export default function HeatstrokeChecker() {
 
           {/* 日付・時間帯選択 */}
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200/50 dark:border-slate-700 w-full sm:w-auto">
-              <Calendar className="w-4 h-4 text-slate-500" />
+            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-lg border border-slate-200/50 dark:border-slate-700 w-full sm:w-auto">
+              <Calendar className="w-4 h-4 text-slate-500 shrink-0" />
               <input
                 type="date"
                 value={targetDate}
@@ -1462,9 +1461,9 @@ export default function HeatstrokeChecker() {
                 <button
                   key={type}
                   onClick={() => setCheckTimeType(type)}
-                  className={`py-1.5 px-3 rounded-md transition-all ${
+                  className={`py-2.5 px-2 rounded-md transition-all text-center ${
                     checkTimeType === type
-                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm font-extrabold"
                       : "text-slate-500 dark:text-slate-400 hover:text-slate-800"
                   }`}
                 >
@@ -1483,7 +1482,7 @@ export default function HeatstrokeChecker() {
           <select
             value={selectedProjectId}
             onChange={e => setSelectedProjectId(e.target.value)}
-            className="flex-1 h-10 px-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+            className="flex-1 h-12 px-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
           >
             <option value="" disabled>現場を選択してください</option>
             {projects.map(p => (
@@ -1785,12 +1784,12 @@ export default function HeatstrokeChecker() {
               </label>
               <div className="relative">
                 <textarea
-                  rows={2}
+                  rows={3}
                   value={sessionForm.overall_comment}
                   onChange={e => setSessionForm(prev => ({ ...prev, overall_comment: e.target.value }))}
                   placeholder={voiceListening ? "🎤 話してください..." : voiceSummarizing ? "✨ AI整形中..." : "本日の熱中症対策、作業指示、全体への伝達事項など"}
                   readOnly={voiceListening || voiceSummarizing}
-                  className="w-full p-2.5 pr-10 bg-slate-50 dark:bg-slate-950 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-blue-500 placeholder:text-slate-400 placeholder:font-medium"
+                  className="w-full p-3 pr-12 bg-slate-50 dark:bg-slate-950 border border-slate-200 rounded-lg text-sm font-medium outline-none focus:border-blue-500 placeholder:text-slate-400 placeholder:font-normal"
                 />
                 {/* 🎤 音声入力ボタン（右下に絶対配置） */}
                 <button
@@ -1806,7 +1805,7 @@ export default function HeatstrokeChecker() {
                   }}
                   disabled={voiceSummarizing}
                   title={voiceListening ? "タップして録音停止" : "音声で指示事項を入力"}
-                  className={`absolute bottom-2 right-2 h-7 w-7 flex items-center justify-center rounded text-sm transition-all ${
+                  className={`absolute bottom-2 right-2 h-9 w-9 flex items-center justify-center rounded-lg text-sm transition-all ${
                     voiceListening
                       ? "bg-red-500 text-white animate-pulse shadow-md shadow-red-200"
                       : voiceSummarizing
@@ -1818,7 +1817,7 @@ export default function HeatstrokeChecker() {
                 </button>
               </div>
               {(voiceListening || voiceSummarizing) && (
-                <p className="text-[10px] font-bold"
+                <p className="text-xs font-bold"
                    style={{ color: voiceListening ? "#ef4444" : "#a855f7" }}>
                   {voiceListening
                     ? "🔴 録音中... 話してください。終わったら ⏹ を押してください"

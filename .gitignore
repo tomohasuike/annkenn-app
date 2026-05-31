@@ -23,3 +23,22 @@ dist-ssr
 *.sln
 *.sw?
 supabase/functions/.env
+
+# 一時スクリプト・スクラッチファイル
+scratch/
+scripts/
+
+# ルート直下の一時ファイル
+*.mjs
+*.py
+*.xlsx
+*.csv
+*.pdf
+progress_*.json
+
+# 外部プロジェクト（誤ってルートに配置されたもの）
+Users/
+annkenn-demo/
+public/pdf.worker.min.mjs
+public/data/useBoardHistory.ts
+apply_bookshelf_schema.mjs
