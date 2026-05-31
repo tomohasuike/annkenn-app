@@ -81,3 +81,12 @@ DO $$ BEGIN
     CREATE POLICY worker_checks_delete ON public.heatstroke_worker_checks FOR DELETE TO authenticated USING (true);
   END IF;
 END $$;
+
+-- ============================================================
+-- まとめ役決定機能：foreman_id カラム追加
+-- 2026-06-01
+-- ============================================================
+ALTER TABLE public.heatstroke_sessions
+  ADD COLUMN IF NOT EXISTS foreman_id UUID REFERENCES auth.users(id);
+
+COMMENT ON COLUMN public.heatstroke_sessions.foreman_id IS 'まとめ役として担当を宣言したユーザーのID';

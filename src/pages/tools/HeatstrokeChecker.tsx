@@ -204,6 +204,7 @@ interface HeatstrokeSession {
   gps_longitude: number | null
   gps_captured_at: string | null
   created_by: string | null
+  foreman_id: string | null    // まとめ役のユーザーID
   confirmed_by: string | null
   confirmed_at: string | null
   foreman_confirmation: Record<string, boolean> | null
@@ -1089,6 +1090,35 @@ export default function HeatstrokeChecker() {
   }
 
   // ============================================================
+  // まとめ役担当宣言
+  // ============================================================
+
+  const [savingForeman, setSavingForeman] = useState(false)
+
+  const handleSetForeman = async () => {
+    if (!session?.id || !currentWorkerId) return
+    setSavingForeman(true)
+    try {
+      const { error } = await supabase
+        .from("heatstroke_sessions")
+        .update({
+          foreman_id: currentWorkerId,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", session.id)
+      if (error) throw error
+      // ローカルの session state を即時反映
+      setSession(prev => prev ? { ...prev, foreman_id: currentWorkerId } : prev)
+      setModalMessage({ type: "success", text: "まとめ役を担当します。チームをよろしくお願いします！" })
+    } catch (e: any) {
+      console.error("まとめ役設定エラー:", e)
+      setModalMessage({ type: "error", text: "まとめ役の設定に失敗しました: " + e.message })
+    } finally {
+      setSavingForeman(false)
+    }
+  }
+
+  // ============================================================
   // PDF出力
   // ============================================================
 
@@ -1183,6 +1213,11 @@ export default function HeatstrokeChecker() {
 
   // セッション確認済みかどうか
   const isSessionConfirmed = !!(session?.confirmed_at)
+
+  // まとめ役関連の判定
+  const foremanId = session?.foreman_id ?? null
+  const iAmForeman = !!currentWorkerId && foremanId === currentWorkerId
+  const foremanName = workerMasterList.find(w => w.id === foremanId)?.name ?? null
 
   // 一人モード（現場なし or 自分以外誰もいない）
   const isSoloMode = selectedProjectId === "no-project" ||
@@ -2090,6 +2125,56 @@ export default function HeatstrokeChecker() {
           {foremanPanelOpen && (
             <div className="px-5 pb-5 space-y-4 border-t border-slate-100 dark:border-slate-800 pt-4">
 
+              {/* まとめ役未定・担当バナー */}
+              {!isSessionConfirmed && (
+                <>
+                  {/* まとめ役が決まっていない場合 */}
+                  {!foremanId && (
+                    <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-300/60 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="flex items-center gap-2 flex-1">
+                        <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+                        <div>
+                          <p className="font-extrabold text-amber-800 dark:text-amber-300 text-sm">
+                            まとめ役がまだ決まっていません
+                          </p>
+                          <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                            「私がまとめ役になる」ボタンを押した方が代理入力・最終承認を操作できます
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleSetForeman}
+                        disabled={savingForeman}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-extrabold rounded-xl shadow-sm active:scale-[0.98] transition-all disabled:opacity-60 shrink-0"
+                      >
+                        {savingForeman ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+                        ✋ 私がまとめ役になる
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 自分がまとめ役の場合 */}
+                  {iAmForeman && (
+                    <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 rounded-xl p-3 flex items-center gap-2">
+                      <UserCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                      <p className="text-sm font-extrabold text-blue-700 dark:text-blue-300">
+                        あなたがまとめ役です。代理入力・最終承認を操作できます。
+                      </p>
+                    </div>
+                  )}
+
+                  {/* 他の人がまとめ役の場合 */}
+                  {foremanId && !iAmForeman && (
+                    <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 rounded-xl p-3 flex items-center gap-2">
+                      <UserCheck className="w-4 h-4 text-slate-500 shrink-0" />
+                      <p className="text-sm font-bold text-slate-600 dark:text-slate-400">
+                        まとめ役: <span className="font-extrabold text-slate-800 dark:text-slate-200">{foremanName}</span> さんが担当中です
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
               {/* 確認済みバナー */}
               {isSessionConfirmed && (
                 <div className="bg-green-100 dark:bg-green-950/30 border border-green-300/50 rounded-xl p-4 flex items-center gap-3">
@@ -2155,13 +2240,18 @@ export default function HeatstrokeChecker() {
                           <span className="text-xs text-red-500 font-extrabold">未提出</span>
                         )}
 
-                        {!isSessionConfirmed && (
+                        {!isSessionConfirmed && iAmForeman && (
                           <button
                             onClick={() => openProxyForm(member)}
                             className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1 rounded-lg font-extrabold border border-blue-200/40 transition-all"
                           >
                             {check ? "修正" : "代理入力"}
                           </button>
+                        )}
+                        {!isSessionConfirmed && !iAmForeman && !foremanId && (
+                          <span className="text-[10px] text-slate-400 font-bold">
+                            まとめ役が必要
+                          </span>
                         )}
                       </div>
                     </div>
@@ -2170,7 +2260,7 @@ export default function HeatstrokeChecker() {
               </div>
 
               {/* まとめ役 最終確認セクション */}
-              {!isSessionConfirmed && (
+              {!isSessionConfirmed && iAmForeman && (
                 <div className={`border rounded-xl p-4 space-y-3 ${
                   allMembersChecked
                     ? "border-blue-200 bg-blue-50 dark:bg-blue-950/10"
