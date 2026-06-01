@@ -1537,7 +1537,7 @@ export default function HeatstrokeChecker() {
   // ============================================================
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto pb-12 bg-slate-50 dark:bg-slate-950/20 min-h-screen text-slate-800 dark:text-slate-200">
+    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto pb-12 overflow-x-hidden bg-slate-50 dark:bg-slate-950/20 min-h-screen text-slate-800 dark:text-slate-200">
 
       {/* =====================================================
           ① ヘッダー：タイトル・日付・時間帯・現場選択
@@ -1717,8 +1717,8 @@ export default function HeatstrokeChecker() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 左側：設定項目 */}
-          <div className="lg:col-span-2 space-y-4">
+          {/* 左側：設定項目（モバイルでは下に） */}
+          <div className="lg:col-span-2 space-y-4 order-2 lg:order-1">
 
             {/* 🌡️ 現地測定器の実測WBGT入力（最優先） */}
             <div className="space-y-2 p-4 bg-white/90 dark:bg-slate-900/60 rounded-xl border border-slate-200/40 shadow-sm">
@@ -1741,7 +1741,7 @@ export default function HeatstrokeChecker() {
                   max="45"
                   value={sessionForm.wbgt_actual}
                   onChange={e => setSessionForm(prev => ({ ...prev, wbgt_actual: e.target.value }))}
-                  placeholder="測定器の数値を入力（例: 28.5）　← 最も正確"
+                  placeholder="測定値を入力（例: 28.5）"
                   className="w-full h-11 pl-3 pr-10 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-orange-400 shadow-inner"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
@@ -1793,7 +1793,7 @@ export default function HeatstrokeChecker() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">現地の天気</label>
-                  <div className="grid grid-cols-4 gap-1 text-xs font-bold">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 text-xs font-bold">
                     {["晴れ", "曇り", "雨", "屋内"].map(w => (
                       <button
                         key={w}
@@ -1939,8 +1939,8 @@ export default function HeatstrokeChecker() {
 
           </div>
 
-          {/* 右側：WBGTメーター */}
-          <div className="flex flex-col items-center justify-center gap-4">
+          {/* 右側：WBGTメーター（モバイルでは上に表示） */}
+          <div className="flex flex-col items-center justify-center gap-4 order-1 lg:order-2">
             {/* 円形メーター */}
             <div className="relative w-40 h-40 flex items-center justify-center">
               <svg className="absolute w-full h-full transform -rotate-90">
