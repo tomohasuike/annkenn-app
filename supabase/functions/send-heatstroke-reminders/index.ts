@@ -358,6 +358,46 @@ async function processHeatstrokeReminders(checkTimeType: string, mode: "prompt" 
 }
 
 // ============================================================
+// Deno.cron による自動実行スケジュール（UTC時刻）
+// ① 朝 7:45 JST (UTC 22:45) → 全員への促し
+// ② 朝 8:15 JST (UTC 23:15) → 未申告者へのリマインド
+// ③ 10時 10:00 JST (UTC 01:00) → 全員への促し
+// ④ 10時 10:30 JST (UTC 01:30) → 未申告者へのリマインド
+// ⑤ 15時 15:00 JST (UTC 06:00) → 全員への促し
+// ⑥ 15時 15:30 JST (UTC 06:30) → 未申告者へのリマインド
+// ============================================================
+
+Deno.cron("heatstroke-prompt-morning", "45 22 * * *", async () => {
+  console.log("CRON: 朝 prompt 開始");
+  await processHeatstrokeReminders("朝", "prompt");
+});
+
+Deno.cron("heatstroke-reminder-morning", "15 23 * * *", async () => {
+  console.log("CRON: 朝 reminder 開始");
+  await processHeatstrokeReminders("朝", "reminder");
+});
+
+Deno.cron("heatstroke-prompt-10", "0 1 * * *", async () => {
+  console.log("CRON: 10時休憩 prompt 開始");
+  await processHeatstrokeReminders("10時休憩", "prompt");
+});
+
+Deno.cron("heatstroke-reminder-10", "30 1 * * *", async () => {
+  console.log("CRON: 10時休憩 reminder 開始");
+  await processHeatstrokeReminders("10時休憩", "reminder");
+});
+
+Deno.cron("heatstroke-prompt-15", "0 6 * * *", async () => {
+  console.log("CRON: 15時休憩 prompt 開始");
+  await processHeatstrokeReminders("15時休憩", "prompt");
+});
+
+Deno.cron("heatstroke-reminder-15", "30 6 * * *", async () => {
+  console.log("CRON: 15時休憩 reminder 開始");
+  await processHeatstrokeReminders("15時休憩", "reminder");
+});
+
+// ============================================================
 // HTTP サーバー
 // クエリパラメータ:
 //   type: 朝 / 10 / 15
