@@ -802,7 +802,8 @@ export default function HeatstrokeChecker() {
           id, project_id, check_time_type, wbgt, risk_level,
           confirmed_at, confirmed_by, overall_comment,
           weather, environment_type, temperature, humidity,
-          safety_checks, foreman_confirmation, updated_at
+          safety_checks, foreman_confirmation, updated_at,
+          foreman_id, created_by
         `)
         .eq("target_date", targetDate)
       setAllSessionsForDate(data || [])
@@ -1644,6 +1645,25 @@ export default function HeatstrokeChecker() {
                     <p className="text-[11px] text-slate-400 font-bold mt-1">
                       アサイン: {siteAssignments.map(a => a.worker_master?.name).join(", ") || "なし"}
                     </p>
+                    {/* まとめ役表示 */}
+                    {(() => {
+                      // この現場のいずれかのセッションから foreman_id を取得
+                      const foremanId = siteSessions.find(s => s.foreman_id)?.foreman_id
+                      const foremanName = foremanId
+                        ? (workerMasterList.find(w => w.id === foremanId)?.name || '不明')
+                        : null
+                      return foremanName ? (
+                        <p className="text-[11px] font-extrabold mt-0.5 flex items-center gap-1">
+                          <UserCheck className="w-3 h-3 text-blue-500 shrink-0" />
+                          <span className="text-blue-600 dark:text-blue-400">まとめ役: {foremanName}</span>
+                        </p>
+                      ) : (
+                        <p className="text-[11px] font-bold mt-0.5 text-slate-300 dark:text-slate-600 flex items-center gap-1">
+                          <UserCheck className="w-3 h-3 shrink-0" />
+                          <span>まとめ役: 未設定</span>
+                        </p>
+                      )
+                    })()}
                   </div>
 
                   <div className="grid grid-cols-3 gap-1 bg-white dark:bg-slate-950 p-1.5 rounded-lg border text-center text-[10px] font-bold">
