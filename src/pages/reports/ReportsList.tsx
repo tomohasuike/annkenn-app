@@ -40,6 +40,25 @@ function fixDriveDocUrl(url: string): string {
   return url;
 }
 
+// `<img>` タグで使う際に、任意のGoogle DriveのURLを直接表示可能なlh3形式に変換する
+// webViewLink（drive.google.com/file/d/...）→ directLink（lh3.googleusercontent.com/d/...）
+function getDriveImageUrl(url: string): string {
+  if (!url) return '';
+  // すでにlh3形式（直接画像URL）の場合はそのまま使う
+  if (url.includes('lh3.googleusercontent.com')) return url;
+  // drive.google.com/file/d/FILE_ID/... 形式からlh3形式に変換
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9-_]+)/);
+  if (driveMatch && driveMatch[1]) {
+    return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+  }
+  // drive.google.com/open?id=FILE_ID や ?id=FILE_ID 形式
+  const openMatch = url.match(/[?&]id=([a-zA-Z0-9-_]+)/);
+  if (openMatch && openMatch[1]) {
+    return `https://lh3.googleusercontent.com/d/${openMatch[1]}`;
+  }
+  return url;
+}
+
 export default function ReportsList() {
   const [reports, setReports] = useState<DailyReport[]>([])
   const [loading, setLoading] = useState(true)
@@ -343,7 +362,7 @@ export default function ReportsList() {
                                        {mat.photos.map((url, j) => (
                                          <img 
                                            key={`p-${j}`}
-                                           src={url}
+                                           src={getDriveImageUrl(url)}
                                            alt="材料写真"
                                            className="h-14 w-20 object-cover rounded border bg-background shadow-sm hover:opacity-90 hover:ring-2 hover:ring-primary/50 cursor-zoom-in transition-all"
                                            onClick={(e) => { e.stopPropagation(); setEnlargedPhoto(url); }}
@@ -390,7 +409,7 @@ export default function ReportsList() {
                       {report.site_photos && report.site_photos.length > 0 ? (
                         <div className="flex justify-end">
                           <img 
-                            src={report.site_photos[report.site_photos.length - 1]} 
+                            src={getDriveImageUrl(report.site_photos[report.site_photos.length - 1])} 
                             alt="現場写真" 
                             onClick={(e) => {
                               e.stopPropagation();

@@ -42,6 +42,17 @@ function fixDriveDocUrl(url: string): string {
   return url;
 }
 
+// `<img>` タグで使う際に、任意のGoogle Drive URLを直接表示可能なlh3形式に変換する
+function getDriveImageUrl(url: string): string {
+  if (!url) return '';
+  if (url.includes('lh3.googleusercontent.com')) return url;
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9-_]+)/);
+  if (driveMatch && driveMatch[1]) return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+  const openMatch = url.match(/[?&]id=([a-zA-Z0-9-_]+)/);
+  if (openMatch && openMatch[1]) return `https://lh3.googleusercontent.com/d/${openMatch[1]}`;
+  return url;
+}
+
 const getFolderIdFromUrl = (url?: string) => {
   if (!url) return null;
   const match = url.match(/folders\/([a-zA-Z0-9-_]+)/);
@@ -1584,7 +1595,7 @@ export default function ReportForm() {
                                                 {/* Photos */}
                                                 {m.existing_photos.map((url, i) => (
                                                     <div key={`ex-ph-${i}`} className="relative border border-border/50 rounded-md overflow-hidden bg-background h-16 w-16 group/img">
-                                                        <img src={url} alt="Material photo" className="object-cover w-full h-full" />
+                                                        <img src={getDriveImageUrl(url)} alt="Material photo" className="object-cover w-full h-full" />
                                                         <button type="button" onClick={() => removeMaterialFile(index, 'photo', true, i)} className="absolute top-0 right-0 p-0.5 bg-black/60 text-white rounded-bl-md opacity-0 group-hover/img:opacity-100 hover:bg-red-500 transition-all"><X className="w-3 h-3" /></button>
                                                     </div>
                                                 ))}
@@ -1602,7 +1613,7 @@ export default function ReportForm() {
                                                     return (
                                                         <div key={`ex-dc-${i}`} className="relative border border-border/50 rounded-md bg-background h-16 w-16 flex items-center justify-center group/img">
                                                             {isImage ? (
-                                                                <img src={url} className="object-cover w-full h-full" alt="doc" />
+                                                                <img src={getDriveImageUrl(url)} className="object-cover w-full h-full" alt="doc" />
                                                             ) : (
                                                                 <ClipboardList className="w-6 h-6 text-red-500/70" />
                                                             )}
@@ -1654,7 +1665,7 @@ export default function ReportForm() {
                     <div className="flex gap-3 flex-wrap mb-4">
                         {existingPhotos.map((url, i) => (
                             <div key={`exist-${i}`} className="relative inline-block border border-border/50 rounded-lg overflow-hidden bg-muted/30 shadow-sm group">
-                                <img src={url} alt={`Existing photo ${i}`} className="h-28 w-28 object-cover" />
+                                <img src={getDriveImageUrl(url)} alt={`Existing photo ${i}`} className="h-28 w-28 object-cover" />
                                 <button type="button" onClick={() => removeExistingPhoto(i)} className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"><X className="w-4 h-4" /></button>
                             </div>
                         ))}

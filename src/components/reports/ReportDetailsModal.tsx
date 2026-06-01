@@ -22,6 +22,17 @@ function fixDriveDocUrl(url: string): string {
   return url;
 }
 
+// `<img>` タグで使う際に、任意のGoogle Drive URLを直接表示可能なlh3形式に変換する
+function getDriveImageUrl(url: string): string {
+  if (!url) return '';
+  if (url.includes('lh3.googleusercontent.com')) return url;
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9-_]+)/);
+  if (driveMatch && driveMatch[1]) return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+  const openMatch = url.match(/[?&]id=([a-zA-Z0-9-_]+)/);
+  if (openMatch && openMatch[1]) return `https://lh3.googleusercontent.com/d/${openMatch[1]}`;
+  return url;
+}
+
 export default function ReportDetailsModal({ reportId, onClose }: ReportDetailsModalProps) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
@@ -381,7 +392,7 @@ export default function ReportDetailsModal({ reportId, onClose }: ReportDetailsM
                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                      {data.photos.map((url: string, i: number) => (
                        <a key={i} href={fixDriveDocUrl(url)} target="_blank" rel="noreferrer" className="aspect-square bg-muted rounded-lg overflow-hidden border hover:opacity-90 transition-opacity block shadow-sm group relative">
-                         <img src={url} alt={`現場写真 ${i+1}`} className="w-full h-full object-cover" />
+                         <img src={getDriveImageUrl(url)} alt={`現場写真 ${i+1}`} className="w-full h-full object-cover" />
                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
                             <ImageIcon className="text-white opacity-0 group-hover:opacity-100 drop-shadow-md w-8 h-8 transition-opacity" />
                          </div>
