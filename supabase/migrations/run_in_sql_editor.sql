@@ -101,3 +101,13 @@ ALTER TABLE public.heatstroke_sessions
 
 COMMENT ON COLUMN public.heatstroke_sessions.session_member_overrides
   IS '当日限りのメンバー調整。added: 追加メンバーworker_id[], removed: 除外メンバーworker_id[]';
+
+-- ============================================================
+-- 日報：材料なしフラグ追加
+-- 2026-06-01
+-- ============================================================
+ALTER TABLE public.daily_reports
+  ADD COLUMN IF NOT EXISTS no_materials_used BOOLEAN DEFAULT FALSE;
+
+COMMENT ON COLUMN public.daily_reports.no_materials_used
+  IS '当日の使用材料なし（確認済）フラグ。TRUEの場合は空欄と区別して集計できる。';

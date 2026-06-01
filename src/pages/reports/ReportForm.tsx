@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams, useNavigate, useLocation } from "react-router-dom"
 import { supabase } from "../../lib/supabase"
-import { ArrowLeft, Loader2, Save, Users, Truck, Wrench, Package, Building, ClipboardList, Plus, Trash2, Camera, X } from "lucide-react"
+import { ArrowLeft, Loader2, Save, Users, Truck, Wrench, Package, Building, ClipboardList, Plus, Trash2, Camera, X, Mic, MicOff, Sparkles, PackageX } from "lucide-react"
 import imageCompression from 'browser-image-compression';
 
 import { format, parseISO } from 'date-fns';
@@ -92,6 +92,20 @@ export default function ReportForm() {
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([])
   const [pendingPhotos, setPendingPhotos] = useState<File[]>([])
   const [existingPhotos, setExistingPhotos] = useState<string[]>([])
+
+  // 音声入力関連 state
+  const recognitionRef = useRef<any>(null)
+  const [voiceListening, setVoiceListening] = useState(false)
+  const [voiceTarget, setVoiceTarget] = useState<"content" | "notes" | "materials" | null>(null)
+  const [voicePreview, setVoicePreview] = useState("")
+  const [voiceProcessing, setVoiceProcessing] = useState(false)
+
+  // 材料確認モーダル関連 state
+  const [pendingVoiceMaterials, setPendingVoiceMaterials] = useState<{name: string; quantity: string}[]>([])
+  const [showMaterialsModal, setShowMaterialsModal] = useState(false)
+
+  // 材料なしフラグ
+  const [noMaterialsUsed, setNoMaterialsUsed] = useState(false)
 
   useEffect(() => {
     async function init() {
@@ -341,6 +355,9 @@ export default function ReportForm() {
         }
         setExistingPhotos(initialPhotos);
 
+        // 材料なしフラグの復元
+        setNoMaterialsUsed(rData.no_materials_used ?? false)
+
         setReport({
           project_id: rData.project_id || '',
           보고日時: formatTime(rData.report_date) || (rData.start_time ? `${rData.start_time.substring(0, 10)}T00:00:00` : format(new Date(), "yyyy-MM-dd'T'HH:mm")),
@@ -578,7 +595,8 @@ export default function ReportForm() {
             progress: report.工事進捗,
             work_content: report.工事内容,
             notes: report.備考,
-            site_photos: JSON.stringify(uploadedUrls)
+            site_photos: JSON.stringify(uploadedUrls),
+            no_materials_used: noMaterialsUsed,  // 材料なしフラグ
         }
 
         let currentReportId = id;
@@ -827,6 +845,157 @@ export default function ReportForm() {
       setExistingPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
+  // ============================================================
+  // 音声入力 + Gemini AI 整形
+  // ============================================================
+
+  const GEMINI_PROMPTS = {
+    content: `あなたは建設会社の日報入力アシスタントです。
+音声で話された作業内容を、日報に適した簡潔な文章に変換してください。
+・口語表現を書き言葉（体言止・敦語なし）に変換（例：「〜しました」→「〜を完了」）
+・「えー」「あのー」などの口癒を除去
+・HIVP・VU・HT管・塩ビ管等の建設・土木用語はそのまま維持
+・内容を省略せず整形のみ行う
+整形後の文章のみ返答（説明不要）：`,
+    notes: `あなたは建設会社の日報アシスタントです。
+話された内容を備考・申し送り事項として簡潔にまとめてください。
+・短く端的に（1〜3文程度）
+・重要な情報（天候・中断・翻日の申し送り）を優先
+整形後の文章のみ返答（説明不要）：`,
+    materials: `あなたは建設会社の日報アシスタントです。
+話された内容から使用材料の一覧を抽出し、必ずJSON配列で返してください。
+フォーマット: [{"name": "材料名", "quantity": "数量（単位含む）"}, ...]
+・HIVP・VU・HT管・塩ビ管・エルボ・継手などの建設資材を正確に認識
+・数量は「3本」「10m」「1缶」のように単位を含めて記載
+・JSONのみ返すこと（説明文不要）`
+  }
+
+  /** 音声入力を開始し、終了後Geminiで整形してコールバックに渡す */
+  const startVoiceInput = (target: "content" | "notes" | "materials") => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      alert("お使いのブラウザは音声入力に対応していません。Chromeをお試しください。")
+      return
+    }
+
+    setVoiceTarget(target)
+    setVoicePreview("")
+
+    const recognition = new SpeechRecognition()
+    recognition.lang = "ja-JP"
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.maxAlternatives = 1
+    recognitionRef.current = recognition
+
+    let finalTranscript = ""
+
+    recognition.onstart = () => setVoiceListening(true)
+
+    recognition.onresult = (event: any) => {
+      let interim = ""
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript
+        if (event.results[i].isFinal) finalTranscript += t
+        else interim += t
+      }
+      setVoicePreview(finalTranscript + interim)
+    }
+
+    recognition.onerror = (event: any) => {
+      setVoiceListening(false)
+      setVoiceTarget(null)
+      if (event.error !== "aborted" && event.error !== "no-speech") {
+        alert("音声入力でエラーが発生しました。もう一度お試しください。")
+      }
+    }
+
+    recognition.onend = async () => {
+      setVoiceListening(false)
+      const transcript = finalTranscript.trim()
+      if (!transcript) {
+        setVoicePreview("")
+        setVoiceTarget(null)
+        return
+      }
+      setVoiceProcessing(true)
+      try {
+        const apiKey = import.meta.env.VITE_GOOGLE_API_KEY
+        if (!apiKey) throw new Error("API key not found")
+
+        const prompt = GEMINI_PROMPTS[target]
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: `${prompt}\n\n音声内容：「${transcript}」` }] }],
+              generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
+            })
+          }
+        )
+        if (!res.ok) throw new Error(`Gemini API error: ${res.statusText}`)
+        const data = await res.json()
+        const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || transcript
+
+        if (target === "materials") {
+          // JSON配列としてパースして確認モーダルへ
+          try {
+            const jsonMatch = result.match(/\[.*\]/s)
+            const parsed: {name: string; quantity: string}[] = JSON.parse(jsonMatch ? jsonMatch[0] : result)
+            setPendingVoiceMaterials(parsed)
+            setShowMaterialsModal(true)
+          } catch {
+            alert(`材料の解析に失敗しました。手動で入力してください。\n\n認識内容: ${transcript}`)
+          }
+        } else if (target === "content") {
+          setReport(prev => ({ ...prev, 工事内容: prev.工事内容 ? prev.工事内容 + "\n" + result : result }))
+        } else if (target === "notes") {
+          setReport(prev => ({ ...prev, 備考: prev.備考 ? prev.備考 + "\n" + result : result }))
+        }
+      } catch (err) {
+        console.warn("Gemini failed, using raw transcript:", err)
+        if (target === "content") setReport(prev => ({ ...prev, 工事内容: prev.工事内容 ? prev.工事内容 + "\n" + transcript : transcript }))
+        if (target === "notes") setReport(prev => ({ ...prev, 備考: prev.備考 ? prev.備考 + "\n" + transcript : transcript }))
+      } finally {
+        setVoiceProcessing(false)
+        setVoicePreview("")
+        setVoiceTarget(null)
+      }
+    }
+
+    recognition.start()
+  }
+
+  const stopVoiceInput = () => recognitionRef.current?.stop()
+
+  /** 音声ボタンのUI共通コンポーネント */
+  const VoiceButton = ({ target, disabled = false }: { target: "content" | "notes" | "materials"; disabled?: boolean }) => {
+    const isActive = voiceTarget === target && voiceListening
+    const isProc  = voiceTarget === target && voiceProcessing
+    return (
+      <button
+        type="button"
+        disabled={disabled || (voiceListening && voiceTarget !== target)}
+        onClick={() => isActive ? stopVoiceInput() : startVoiceInput(target)}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+          isActive
+            ? "bg-red-500 text-white border-red-400 animate-pulse"
+            : isProc
+            ? "bg-amber-100 text-amber-700 border-amber-300"
+            : disabled
+            ? "bg-muted text-muted-foreground border-transparent cursor-not-allowed opacity-40"
+            : "bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100"
+        }`}
+      >
+        {isActive ? <MicOff className="w-3.5 h-3.5" /> : isProc ? <Sparkles className="w-3.5 h-3.5 animate-spin" /> : <Mic className="w-3.5 h-3.5" />}
+        {isActive ? "停止" : isProc ? "AI整形中..." : "音声入力"}
+      </button>
+    )
+  }
+
   const handleMaterialFileSelect = (index: number, type: 'photo' | 'doc', files: FileList) => {
       const newMaterials = [...materials];
       if (type === 'photo') {
@@ -1030,7 +1199,15 @@ export default function ReportForm() {
                     />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium text-foreground">作業内容 <span className="text-red-500">*</span></label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-foreground">作業内容 <span className="text-red-500">*</span></label>
+                      <VoiceButton target="content" />
+                    </div>
+                    {voiceTarget === "content" && voicePreview && (
+                      <div className="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-md px-3 py-2 animate-pulse">
+                        🎤 {voicePreview}
+                      </div>
+                    )}
                     <textarea 
                         rows={4}
                         value={report.工事内容}
@@ -1062,7 +1239,15 @@ export default function ReportForm() {
                     </div>
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium text-foreground">備考 / 申し送り事項</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-foreground">備考 / 申し送り事項</label>
+                      <VoiceButton target="notes" />
+                    </div>
+                    {voiceTarget === "notes" && voicePreview && (
+                      <div className="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-md px-3 py-2 animate-pulse">
+                        🎤 {voicePreview}
+                      </div>
+                    )}
                     <textarea 
                         rows={2}
                         value={report.備考}
@@ -1309,21 +1494,53 @@ export default function ReportForm() {
 
       <div className="rounded-xl border bg-card p-6 shadow-sm mb-6">
         <div className="space-y-4">
-                <div className="flex justify-between items-center pb-2 border-b">
+                <div className="flex flex-wrap justify-between items-center pb-2 border-b gap-2">
                     <h3 className="text-lg font-medium flex items-center gap-2">
                         <Package className="w-5 h-5 text-muted-foreground" />
                         使用材料
                     </h3>
-                        <button 
-                            onClick={() => setMaterials([...materials, { material_name: '', quantity: '', pending_photos: [], pending_docs: [], existing_photos: [], existing_docs: [] }])}
-                            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3 py-1 gap-2"
-                        >
-                            <Plus className="w-4 h-4" />
-                            材料を追加
-                        </button>
+                    <div className="flex items-center gap-2">
+                      {!noMaterialsUsed && (
+                        <>
+                          <VoiceButton target="materials" />
+                          <button 
+                              onClick={() => setMaterials([...materials, { material_name: '', quantity: '', pending_photos: [], pending_docs: [], existing_photos: [], existing_docs: [] }])}
+                              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3 py-1 gap-2"
+                          >
+                              <Plus className="w-4 h-4" />
+                              材料を追加
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNoMaterialsUsed(v => !v)
+                          if (!noMaterialsUsed) setMaterials([])
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                          noMaterialsUsed
+                            ? "bg-slate-700 text-white border-slate-600"
+                            : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                        }`}
+                      >
+                        <PackageX className="w-3.5 h-3.5" />
+                        {noMaterialsUsed ? "材料なしを解除" : "今日の材料なし"}
+                      </button>
                     </div>
-                    {materials.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">使用材料が登録されていません</div>
+                </div>
+
+                {/* 材料なしバナー */}
+                {noMaterialsUsed ? (
+                  <div className="flex items-center gap-3 p-5 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 dark:bg-slate-900/30">
+                    <PackageX className="w-8 h-8 text-slate-400 shrink-0" />
+                    <div>
+                      <p className="font-bold text-slate-600 dark:text-slate-400">本日は使用材料なし</p>
+                      <p className="text-xs text-slate-400 mt-0.5">材料入力・音声・添付は無効です。「材料なしを解除」で元に戻せます。</p>
+                    </div>
+                  </div>
+                ) : materials.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">使用材料が登録されていません</div>
                     ) : (
                         <div className="space-y-4">
                             {materials.map((m, index) => (
@@ -1493,6 +1710,72 @@ export default function ReportForm() {
               >
                 {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 {deleting ? "削除中..." : "削除する"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 材料確認モーダル */}
+      {showMaterialsModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-xl border shadow-xl w-full max-w-md">
+            <div className="p-5 border-b">
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <Mic className="w-4 h-4 text-blue-500" />
+                認識した材料を確認してください
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">誤りがあれば「削除」してから追加できます</p>
+            </div>
+            <div className="p-5 space-y-2 max-h-64 overflow-y-auto">
+              {pendingVoiceMaterials.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">材料が認識されませんでした</p>
+              ) : (
+                pendingVoiceMaterials.map((m, i) => (
+                  <div key={i} className="flex items-center justify-between gap-3 p-3 bg-muted/40 rounded-lg border">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold truncate">{m.name}</p>
+                      <p className="text-xs text-muted-foreground">{m.quantity}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPendingVoiceMaterials(prev => prev.filter((_, j) => j !== i))}
+                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="p-5 border-t flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => { setShowMaterialsModal(false); setPendingVoiceMaterials([]) }}
+                className="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-muted transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                disabled={pendingVoiceMaterials.length === 0}
+                onClick={() => {
+                  const newItems = pendingVoiceMaterials.map(m => ({
+                    material_name: m.name,
+                    quantity: m.quantity,
+                    pending_photos: [] as File[],
+                    pending_docs: [] as File[],
+                    existing_photos: [] as string[],
+                    existing_docs: [] as string[]
+                  }))
+                  setMaterials(prev => [...prev, ...newItems])
+                  setShowMaterialsModal(false)
+                  setPendingVoiceMaterials([])
+                }}
+                className="px-4 py-2 text-sm font-bold rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                <Plus className="w-4 h-4" />
+                追加する ({pendingVoiceMaterials.length}点)
               </button>
             </div>
           </div>
