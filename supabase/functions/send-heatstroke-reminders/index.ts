@@ -341,14 +341,10 @@ async function processHeatstrokeReminders(checkTimeType: string, mode: "prompt" 
     return { success: false, reason: "Webhook sending failed" };
   }
 
-  // 通知履歴の記録
-  try {
-    await supabase
-      .from('safety_notification_history')
-      .insert([{ type: `熱中症アラート（${checkTimeType} / ${mode}）` }]);
-  } catch (e) {
-    console.warn("notification history write skipped (non-critical):", e);
-  }
+  // NOTE: safety_notification_history テーブルへの書き込みは廃止。
+  // このテーブルは「安否確認システム（disaster/emergency用）」専用。
+  // 熱中症アラートは別システムのため、ここに記録すると
+  // ダッシュボードの安否確認バナーが誤表示される原因となる。
 
   return {
     success: true,
