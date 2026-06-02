@@ -2682,27 +2682,43 @@ export default function HeatstrokeChecker() {
               </div>
 
               {/* まとめ役確認状況 */}
-              {adminSelectedSession.confirmed_at ? (
-                <div className="bg-green-50 border border-green-200/40 rounded-xl p-4">
-                  <h4 className="text-xs font-black text-green-700 mb-2 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4" />
-                    まとめ役確認完了
-                  </h4>
-                  <p className="text-xs text-green-600 font-bold">
-                    確認者: {workerMasterList.find(w => w.id === adminSelectedSession.confirmed_by)?.name || "不明"} |
-                    確認日時: {formatJST(adminSelectedSession.confirmed_at, "MM/dd HH:mm")}
-                  </p>
-                </div>
-              ) : adminSelectedSession.project_id === null ? (
-                // 現場なし（一人作業）は承認フロー不要
-                <div className="bg-slate-50 border border-slate-200/40 rounded-xl p-3">
-                  <p className="text-xs text-slate-500 font-bold">✅ 一人作業のため、まとめ役確認は不要です</p>
-                </div>
-              ) : (
-                <div className="bg-yellow-50 border border-yellow-200/40 rounded-xl p-3">
-                  <p className="text-xs text-yellow-700 font-bold">⚠️ まだまとめ役の確認が完了していません</p>
-                </div>
-              )}
+              {(() => {
+                // 一人作業かどうかの判定
+                // 条件1: 現場なし（project_id === null）
+                // 条件2: 実際の現場でもアサインが自分1人だけ
+                const adminSessionAssignmentCount = adminSelectedSession.project_id === null
+                  ? 0
+                  : assignments.filter(a => a.project_id === adminSelectedSession.project_id).length
+                const isAdminSessionSolo =
+                  adminSelectedSession.project_id === null || adminSessionAssignmentCount <= 1
+
+                if (adminSelectedSession.confirmed_at) {
+                  return (
+                    <div className="bg-green-50 border border-green-200/40 rounded-xl p-4">
+                      <h4 className="text-xs font-black text-green-700 mb-2 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" />
+                        まとめ役確認完了
+                      </h4>
+                      <p className="text-xs text-green-600 font-bold">
+                        確認者: {workerMasterList.find(w => w.id === adminSelectedSession.confirmed_by)?.name || "不明"} |
+                        確認日時: {formatJST(adminSelectedSession.confirmed_at, "MM/dd HH:mm")}
+                      </p>
+                    </div>
+                  )
+                } else if (isAdminSessionSolo) {
+                  return (
+                    <div className="bg-slate-50 border border-slate-200/40 rounded-xl p-3">
+                      <p className="text-xs text-slate-500 font-bold">✅ 一人作業のため、まとめ役確認は不要です</p>
+                    </div>
+                  )
+                } else {
+                  return (
+                    <div className="bg-yellow-50 border border-yellow-200/40 rounded-xl p-3">
+                      <p className="text-xs text-yellow-700 font-bold">⚠️ まだまとめ役の確認が完了していません</p>
+                    </div>
+                  )
+                }
+              })()}
 
               {/* 全体コメント */}
               {adminSelectedSession.overall_comment && (
