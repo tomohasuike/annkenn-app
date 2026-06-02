@@ -269,6 +269,8 @@ export default function HeatstrokeChecker() {
 
   // マスタデータ
   const [projects, setProjects] = useState<Project[]>([])
+  const [allValidProjects, setAllValidProjects] = useState<Project[]>([])  // 全稼働中の現場
+  const [todayProjects, setTodayProjects] = useState<Project[]>([])        // 今日アサインがある現場
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [workerMasterList, setWorkerMasterList] = useState<any[]>([])
 
@@ -703,6 +705,8 @@ export default function HeatstrokeChecker() {
         finalProjects = [NO_PROJECT, ...validProjects]
       }
       setProjects(finalProjects)
+      setAllValidProjects(validProjects)  // 全稼働中の現場を保存
+      setTodayProjects(todayProjects)     // 今日の配置現場を保存
 
       if (!selectedProjectId) {
         const myAssignment = validAssignments.find(a =>
@@ -1599,9 +1603,30 @@ export default function HeatstrokeChecker() {
             className="w-full h-12 px-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
           >
             <option value="" disabled>現場を選択してください</option>
-            {projects.map(p => (
-              <option key={p.id} value={p.id}>{getProjectDisplayName(p.id)}</option>
-            ))}
+            {/* 現場なし（アサインなし）は常に先頭 */}
+            <option value="no-project">（現場なし／アサインなし）（現場なし）</option>
+            {/* 今日アサインがある現場 */}
+            {todayProjects.length > 0 && (
+              <optgroup label="📅 今日の配置">
+                {todayProjects.map(p => (
+                  <option key={p.id} value={p.id}>{getProjectDisplayName(p.id)}</option>
+                ))}
+              </optgroup>
+            )}
+            {/* 今日の配置以外の稼働中現場（急遽変更・応援など） */}
+            {(() => {
+              const otherProjects = allValidProjects.filter(
+                p => !todayProjects.some(tp => tp.id === p.id)
+              )
+              if (otherProjects.length === 0) return null
+              return (
+                <optgroup label="🔄 その他の現場（急遽変更・応援など）">
+                  {otherProjects.map(p => (
+                    <option key={p.id} value={p.id}>{getProjectDisplayName(p.id)}</option>
+                  ))}
+                </optgroup>
+              )
+            })()}
           </select>
           {refreshing && <Loader2 className="w-4 h-4 animate-spin text-blue-500 shrink-0" />}
         </div>
