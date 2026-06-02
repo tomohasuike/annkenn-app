@@ -1538,18 +1538,18 @@ export default function HeatstrokeChecker() {
   // ============================================================
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto pb-12 overflow-x-hidden bg-slate-50 dark:bg-slate-950/20 min-h-screen text-slate-800 dark:text-slate-200">
+    <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 pb-12 overflow-x-hidden bg-slate-50 dark:bg-slate-950/20 min-h-screen text-slate-800 dark:text-slate-200">
 
       {/* =====================================================
           ① ヘッダー：タイトル・日付・時間帯・現場選択
       ===================================================== */}
       <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded-xl">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded-xl shrink-0">
               <Thermometer className="w-8 h-8" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">日常・熱中症アラート</h1>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
                 自己申告 + まとめ役確認モデル v2.0
@@ -1587,14 +1587,14 @@ export default function HeatstrokeChecker() {
         </div>
 
         {/* 現場選択 */}
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide whitespace-nowrap shrink-0">
             対象現場:
           </label>
           <select
             value={selectedProjectId}
             onChange={e => setSelectedProjectId(e.target.value)}
-            className="flex-1 h-12 px-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+            className="w-full h-12 px-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
           >
             <option value="" disabled>現場を選択してください</option>
             {projects.map(p => (
@@ -1705,13 +1705,13 @@ export default function HeatstrokeChecker() {
       ===================================================== */}
       <div className={`rounded-xl border p-5 transition-all ${session ? sessionRisk.bgClass + " " + sessionRisk.borderClass : "bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-800"} shadow-sm`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2">
-            <CloudSun className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-            <h2 className="font-bold text-sm text-slate-700 dark:text-slate-300">
+          <div className="flex items-center gap-2 min-w-0">
+            <CloudSun className="w-5 h-5 text-slate-600 dark:text-slate-400 shrink-0" />
+            <h2 className="font-bold text-sm text-slate-700 dark:text-slate-300 min-w-0">
               📡 現場の気象情報 ＆ 暑さ指数（WBGT）設定
             </h2>
             {session && (
-              <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-black">
+              <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-black shrink-0">
                 設定済
               </span>
             )}
