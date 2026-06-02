@@ -1610,14 +1610,14 @@ export default function HeatstrokeChecker() {
       ===================================================== */}
       {isAdmin && (
         <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-slate-800">
-            <h2 className="font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-blue-500" />
-              管理者用：本日（{targetDate}）の全稼働現場安否監視一覧
+          <div className="flex items-start justify-between border-b pb-3 border-slate-100 dark:border-slate-800 gap-2 min-w-0">
+            <h2 className="font-extrabold text-sm sm:text-base text-slate-800 dark:text-slate-100 flex items-start gap-2 min-w-0">
+              <ShieldCheck className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+              <span className="leading-snug">管理者用：本日（{targetDate}）の全稼働現場安否監視一覧</span>
             </h2>
             <button
               onClick={() => { fetchProjectsAndAssignments(); fetchAllSessionsForDate() }}
-              className="p-1 text-slate-400 hover:text-blue-500 hover:bg-slate-50 rounded-lg transition-colors"
+              className="p-1 text-slate-400 hover:text-blue-500 hover:bg-slate-50 rounded-lg transition-colors shrink-0"
               title="データを更新"
             >
               <RefreshCw className="w-4 h-4" />

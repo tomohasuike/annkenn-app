@@ -351,7 +351,7 @@ export default function AppLayout() {
         </aside>
 
         {/* Page Content */}
-        <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto flex flex-col min-w-0">
+        <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto overflow-x-hidden flex flex-col min-w-0">
           <Outlet context={{ isSidebarOpen, setIsSidebarOpen }} />
         </main>
       </div>
