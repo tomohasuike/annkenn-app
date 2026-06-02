@@ -2022,13 +2022,10 @@ export default function HeatstrokeChecker() {
           ④ 自己申告フォーム（本人の体調入力）
       ===================================================== */}
       <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-4">
-        <div className="flex justify-between items-center border-b pb-3 border-slate-100 dark:border-slate-800">
-          <h2 className="font-bold flex items-center gap-2 text-slate-800 dark:text-slate-200">
-            <Heart className="w-5 h-5 text-red-500" />
-            自分の体調を自己申告する
-            {currentWorkerName && (
-              <span className="text-sm text-slate-500 font-normal">（{currentWorkerName}）</span>
-            )}
+        <div className="flex justify-between items-start gap-2 border-b pb-3 border-slate-100 dark:border-slate-800 min-w-0">
+          <h2 className="font-bold flex items-center gap-2 text-slate-800 dark:text-slate-200 text-sm sm:text-base min-w-0">
+            <Heart className="w-5 h-5 text-red-500 shrink-0" />
+            <span className="leading-snug">自分の体調を自己申告する{currentWorkerName && <span className="text-sm text-slate-500 font-normal">（{currentWorkerName}）</span>}</span>
           </h2>
 
           {/* 申告済み・未申告バッジ */}
@@ -2195,14 +2192,14 @@ export default function HeatstrokeChecker() {
           {/* まとめ役パネルヘッダー（タップで展開） */}
           <button
             onClick={() => setForemanPanelOpen(!foremanPanelOpen)}
-            className="w-full flex justify-between items-center p-5 text-left"
+            className="w-full flex justify-between items-center p-5 text-left gap-2"
           >
-            <div className="flex items-center gap-2">
-              <UserCheck className={`w-5 h-5 ${isSessionConfirmed ? "text-green-600" : "text-blue-500"}`} />
-              <h2 className="font-bold text-slate-800 dark:text-slate-200">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <UserCheck className={`w-5 h-5 shrink-0 ${isSessionConfirmed ? "text-green-600" : "text-blue-500"}`} />
+              <h2 className="font-bold text-sm sm:text-base text-slate-800 dark:text-slate-200 leading-snug">
                 👥 まとめ役パネル：チェック状況 ＆ 最終確認
               </h2>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
                 isSessionConfirmed
                   ? "bg-green-100 text-green-700"
                   : allMembersChecked
@@ -2215,7 +2212,7 @@ export default function HeatstrokeChecker() {
                 }
               </span>
             </div>
-            {foremanPanelOpen ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+            {foremanPanelOpen ? <ChevronUp className="w-5 h-5 text-slate-400 shrink-0" /> : <ChevronDown className="w-5 h-5 text-slate-400 shrink-0" />}
           </button>
 
           {foremanPanelOpen && (
@@ -2297,7 +2294,7 @@ export default function HeatstrokeChecker() {
                   return (
                     <div
                       key={member.worker_id}
-                      className={`flex items-center justify-between p-3 rounded-xl border text-sm transition-all ${
+                      className={`flex flex-col gap-2 p-3 rounded-xl border text-sm transition-all ${
                         check
                           ? check.risk_score === "高"
                             ? "bg-red-50 border-red-200 dark:bg-red-950/10"
@@ -2307,75 +2304,74 @@ export default function HeatstrokeChecker() {
                           : "bg-slate-50 border-slate-200 dark:bg-slate-900/30 dark:border-slate-700"
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full shrink-0 ${check ? "bg-green-500" : "bg-red-500 animate-pulse"}`} />
-                        <div>
-                          <span className="font-bold text-slate-800 dark:text-slate-200">{member.worker_name}</span>
-                          {member.isAdded && (
-                            <span className="ml-2 text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">
-                              当日追加
-                            </span>
-                          )}
-                          {!member.isAssigned && !member.isAdded && (
-                            <span className="ml-2 text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded font-bold">
-                              当日参加
-                            </span>
+                      {/* 上行：名前 + リスクスコア */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className={`w-2 h-2 rounded-full shrink-0 ${check ? "bg-green-500" : "bg-red-500 animate-pulse"}`} />
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-800 dark:text-slate-200 block truncate">{member.worker_name}</span>
+                            {member.isAdded && (
+                              <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">
+                                当日追加
+                              </span>
+                            )}
+                            {!member.isAssigned && !member.isAdded && (
+                              <span className="text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded font-bold">
+                                当日参加
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {check ? (
+                            <>
+                              <span className={`text-xs font-extrabold ${riskColor}`}>
+                                {check.risk_score}リスク
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {formatJST(check.submitted_at || "", "HH:mm")}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-xs text-red-500 font-extrabold">未提出</span>
                           )}
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        {check ? (
-                          <>
-                            <span className={`text-xs font-extrabold ${riskColor}`}>
-                              {check.risk_score}リスク
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-bold">
-                              {check.submitted_by === "foreman" ? "代理入力" : "本人申告"}
-                            </span>
-                            <span className="text-[10px] text-slate-400">
-                              {formatJST(check.submitted_at || "", "HH:mm")}
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-xs text-red-500 font-extrabold">未提出</span>
-                        )}
-
-                        {!isSessionConfirmed && iAmForeman && (
-                          <>
-                            <button
-                              onClick={() => openProxyForm(member)}
-                              disabled={savingMember}
-                              className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1 rounded-lg font-extrabold border border-blue-200/40 transition-all"
-                            >
-                              {check ? "修正" : "代理入力"}
-                            </button>
-                            {/* 当日追加メンバーは「追加取消」、アサインメンバーは「除外」 */}
-                            {member.isAdded ? (
-                              <button
-                                onClick={() => handleResetMember(member.worker_id)}
-                                disabled={savingMember}
-                                className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-500 px-2 py-1 rounded-lg font-bold border border-slate-200 transition-all"
-                              >
-                                追加取消
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleRemoveMember(member.worker_id)}
-                                disabled={savingMember}
-                                className="text-[10px] bg-red-50 hover:bg-red-100 text-red-500 px-2 py-1 rounded-lg font-bold border border-red-200/40 transition-all"
-                              >
-                                当日除外
-                              </button>
-                            )}
-                          </>
-                        )}
-                        {!isSessionConfirmed && !iAmForeman && !foremanId && (
+                      {/* 下行：ボタン群（まとめ役のみ表示） */}
+                      {!isSessionConfirmed && iAmForeman && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-[10px] text-slate-400 font-bold">
-                            まとめ役が必要
+                            {check?.submitted_by === "foreman" ? "代理入力" : "本人申告"}
                           </span>
-                        )}
-                      </div>
+                          <button
+                            onClick={() => openProxyForm(member)}
+                            disabled={savingMember}
+                            className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1 rounded-lg font-extrabold border border-blue-200/40 transition-all"
+                          >
+                            {check ? "修正" : "代理入力"}
+                          </button>
+                          {member.isAdded ? (
+                            <button
+                              onClick={() => handleResetMember(member.worker_id)}
+                              disabled={savingMember}
+                              className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-500 px-2 py-1 rounded-lg font-bold border border-slate-200 transition-all"
+                            >
+                              追加取消
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleRemoveMember(member.worker_id)}
+                              disabled={savingMember}
+                              className="text-[10px] bg-red-50 hover:bg-red-100 text-red-500 px-2 py-1 rounded-lg font-bold border border-red-200/40 transition-all"
+                            >
+                              当日除外
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {!isSessionConfirmed && !iAmForeman && !foremanId && (
+                        <span className="text-[10px] text-slate-400 font-bold">まとめ役が必要</span>
+                      )}
                     </div>
                   )
                 })}

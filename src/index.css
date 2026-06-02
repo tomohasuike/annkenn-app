@@ -150,12 +150,18 @@
   * {
     @apply border-border;
   }
+  html {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    max-width: 100%;
   }
 }
 
