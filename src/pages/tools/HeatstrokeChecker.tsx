@@ -1230,7 +1230,9 @@ export default function HeatstrokeChecker() {
   // ============================================================
 
   const getProjectDisplayName = (pId: string) => {
-    const p = projects.find(proj => proj.id === pId)
+    // projectsステート（今日の現場）を優先し、見つからない場合はallValidProjects（全稼働中現場）も検索
+    // 「その他の現場」グループはallValidProjectsから生成されるため、両方を参照しないと「現場名未設定」になる
+    const p = projects.find(proj => proj.id === pId) ?? allValidProjects.find(proj => proj.id === pId)
     if (!p) return "現場名未設定"
     const num = p.project_number ? `[${p.project_number}] ` : ""
     const suffix = p.site_name ? ` (${p.site_name})` : ""
