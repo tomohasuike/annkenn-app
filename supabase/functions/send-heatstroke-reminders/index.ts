@@ -365,37 +365,47 @@ async function processHeatstrokeReminders(checkTimeType: string, mode: "prompt" 
 // ④ 10時 10:30 JST (UTC 01:30) → 未申告者へのリマインド
 // ⑤ 15時 15:00 JST (UTC 06:00) → 全員への促し
 // ⑥ 15時 15:30 JST (UTC 06:30) → 未申告者へのリマインド
+// NOTE: Deno.cronが利用できない環境ではtry-catchで無視し、
+//       Supabaseダッシュボードの「Schedules」機能でHTTP経由で呼び出す。
 // ============================================================
 
-Deno.cron("heatstroke-prompt-morning", "45 22 * * *", async () => {
-  console.log("CRON: 朝 prompt 開始");
-  await processHeatstrokeReminders("朝", "prompt");
-});
+try {
+  Deno.cron("heatstroke-prompt-morning", "45 22 * * *", async () => {
+    console.log("CRON: 朝 prompt 開始");
+    await processHeatstrokeReminders("朝", "prompt");
+  });
 
-Deno.cron("heatstroke-reminder-morning", "15 23 * * *", async () => {
-  console.log("CRON: 朝 reminder 開始");
-  await processHeatstrokeReminders("朝", "reminder");
-});
+  Deno.cron("heatstroke-reminder-morning", "15 23 * * *", async () => {
+    console.log("CRON: 朝 reminder 開始");
+    await processHeatstrokeReminders("朝", "reminder");
+  });
 
-Deno.cron("heatstroke-prompt-10", "0 1 * * *", async () => {
-  console.log("CRON: 10時休憩 prompt 開始");
-  await processHeatstrokeReminders("10時休憩", "prompt");
-});
+  Deno.cron("heatstroke-prompt-10", "0 1 * * *", async () => {
+    console.log("CRON: 10時休憩 prompt 開始");
+    await processHeatstrokeReminders("10時休憩", "prompt");
+  });
 
-Deno.cron("heatstroke-reminder-10", "30 1 * * *", async () => {
-  console.log("CRON: 10時休憩 reminder 開始");
-  await processHeatstrokeReminders("10時休憩", "reminder");
-});
+  Deno.cron("heatstroke-reminder-10", "30 1 * * *", async () => {
+    console.log("CRON: 10時休憩 reminder 開始");
+    await processHeatstrokeReminders("10時休憩", "reminder");
+  });
 
-Deno.cron("heatstroke-prompt-15", "0 6 * * *", async () => {
-  console.log("CRON: 15時休憩 prompt 開始");
-  await processHeatstrokeReminders("15時休憩", "prompt");
-});
+  Deno.cron("heatstroke-prompt-15", "0 6 * * *", async () => {
+    console.log("CRON: 15時休憩 prompt 開始");
+    await processHeatstrokeReminders("15時休憩", "prompt");
+  });
 
-Deno.cron("heatstroke-reminder-15", "30 6 * * *", async () => {
-  console.log("CRON: 15時休憩 reminder 開始");
-  await processHeatstrokeReminders("15時休憩", "reminder");
-});
+  Deno.cron("heatstroke-reminder-15", "30 6 * * *", async () => {
+    console.log("CRON: 15時休憩 reminder 開始");
+    await processHeatstrokeReminders("15時休憩", "reminder");
+  });
+
+  console.log("Deno.cron: 6つのジョブを登録しました");
+} catch (e) {
+  // Deno.cronが利用できない環境（Supabase Freeプランなど）では無視
+  // HTTP経由での手動呼び出し・Supabase Schedules機能を使用してください
+  console.warn("Deno.cron is not available in this environment:", e);
+}
 
 // ============================================================
 // HTTP サーバー

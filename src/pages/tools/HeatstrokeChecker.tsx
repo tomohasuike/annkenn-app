@@ -873,9 +873,11 @@ export default function HeatstrokeChecker() {
         if (error) throw error
       } else {
         // 新規セッション作成
+        // 一人モード（誰もいない or 自分だけ）の場合は自動的にまとめ役を自分に設定
+        const autoForemanId = isSoloMode ? currentWorkerId : null
         const { error } = await supabase
           .from("heatstroke_sessions")
-          .insert([{ ...payload, created_by: currentWorkerId }])
+          .insert([{ ...payload, created_by: currentWorkerId, foreman_id: autoForemanId }])
         if (error) throw error
       }
 
@@ -2237,8 +2239,9 @@ export default function HeatstrokeChecker() {
                       </div>
                       <button
                         onClick={handleSetForeman}
-                        disabled={savingForeman}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-extrabold rounded-xl shadow-sm active:scale-[0.98] transition-all disabled:opacity-60 shrink-0"
+                        disabled={savingForeman || !currentWorkerId || !session?.id}
+                        title={!currentWorkerId ? "先に自分の名前を選択してください" : ""}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-extrabold rounded-xl shadow-sm active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                       >
                         {savingForeman ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
                         ✋ 私がまとめ役になる
