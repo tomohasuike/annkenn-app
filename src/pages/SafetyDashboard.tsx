@@ -208,35 +208,24 @@ export default function SafetyDashboard() {
 
   const { activeReports, unconfirmedWorkers, stats } = computeAggregatedData();
 
-  // Send Chat Notification
+  // Chat通知を送信
+  // NOTE: Google Chat webhookはCORSに対応していないため、
+  //       ブラウザから直接fetchするとCORSエラーになる。
+  //       そのため safety-cron エッジ関数をサーバーサイドプロキシとして経由する。
   const sendNotification = async (type: 'test' | 'emergency') => {
-    if (!settings || !settings.safety_webhook_url) {
-      setModalMessage({ type: 'error', text: 'Webhook URLが設定されていません。設定画面から登録してください。' });
-      return;
-    }
-
     setSendingAlert(true);
 
-    const isEmergency = type === 'emergency';
-    const messageText = isEmergency
-      ? `<users/all> 【緊急】安否確認のお願い\n災害等が発生しました。直ちに以下のURLより安否状況を報告してください。\n\n${settings.safety_app_url || window.location.origin + '/safety-report'}`
-      : `【テスト配信】安否確認システムの動作テストです。\n以下のURLから安否状況を報告してください。\n\n${settings.safety_app_url || window.location.origin + '/safety-report'}`;
-
     try {
-      const res = await fetch(settings.safety_webhook_url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: messageText }),
+      // エッジ関数経由でサーバーサイドからwebhookを送信（CORS回避）
+      const { data, error } = await supabase.functions.invoke('safety-cron', {
+        body: { force: true, type },
       });
 
-      if (!res.ok) throw new Error(`送信失敗: ${res.statusText}`);
+      if (error) throw new Error(error.message);
+      if (!data?.success) throw new Error(data?.reason || '送信に失敗しました');
 
-      await supabase
-        .from('safety_notification_history')
-        .insert([{ type: isEmergency ? '本番（緊急）' : 'テスト送信' }]);
-
-      setModalMessage({ type: 'success', text: `${isEmergency ? '緊急' : 'テスト'}通知を送信しました。` });
-      fetchData(); // Refresh to show new event
+      setModalMessage({ type: 'success', text: `${type === 'emergency' ? '緊急' : 'テスト'}通知を送信しました。` });
+      fetchData(); // 送信履歴を更新
     } catch (err: any) {
       setModalMessage({ type: 'error', text: `エラーが発生しました: ${err.message}` });
     } finally {
