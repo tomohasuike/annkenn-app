@@ -1070,9 +1070,12 @@ export default function WorkerAttendance() {
                                   {isVacation ? (
                                     <span className="text-slate-300">-</span>
                                   ) : (
-                                    <span className={`border px-1.5 py-0.5 rounded leading-none ${cr.declRole === '職長' ? 'bg-blue-100 text-blue-700 border-blue-200 font-bold' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                    <button
+                                      onClick={() => openModal(dateStr)}
+                                      title="クリックして編集"
+                                      className={`border px-1.5 py-0.5 rounded leading-none transition-all hover:opacity-70 hover:shadow-sm active:scale-95 cursor-pointer ${cr.declRole === '職長' ? 'bg-blue-100 text-blue-700 border-blue-200 font-bold' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
                                       {cr.declRole || '一般'}
-                                    </span>
+                                    </button>
                                   )}
                                 </div>
                              )}) : <div className="h-[44px] flex items-center justify-center text-slate-300">-</div>}
