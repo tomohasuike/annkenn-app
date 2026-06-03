@@ -266,6 +266,12 @@ export default function HeatstrokeChecker() {
   const [targetDate, setTargetDate] = useState<string>(formatJST(new Date(), "yyyy-MM-dd"))
   const [selectedProjectId, setSelectedProjectId] = useState<string>("")
   const [checkTimeType, setCheckTimeType] = useState<string>("朝")
+  // 現場選択の手動上書きフラグ（trueの時はデータ更新でも選択を保持）
+  const [isProjectManuallyOverridden, setIsProjectManuallyOverridden] = useState(false)
+  // アサインから算出したデフォルトの現場ID
+  const [assignedProjectId, setAssignedProjectId] = useState<string>("")
+  // 修正モードの表示フラグ
+  const [showProjectCorrection, setShowProjectCorrection] = useState(false)
 
   // マスタデータ
   const [projects, setProjects] = useState<Project[]>([])
@@ -475,6 +481,9 @@ export default function HeatstrokeChecker() {
 
   useEffect(() => {
     if (targetDate) {
+      // 日付が変わったら手動上書きをリセットしてアサイン通りに戻す
+      setIsProjectManuallyOverridden(false)
+      setShowProjectCorrection(false)
       fetchProjectsAndAssignments()
       fetchWeatherAuto()
       if (isAdmin) fetchAllSessionsForDate()
@@ -708,15 +717,16 @@ export default function HeatstrokeChecker() {
       setAllValidProjects(validProjects)  // 全稼働中の現場を保存
       setTodayProjects(todayProjects)     // 今日の配置現場を保存
 
-      if (!selectedProjectId) {
-        const myAssignment = validAssignments.find(a =>
-          (a.worker_master?.email || "").trim().toLowerCase() === currentUserEmail
-        )
-        if (myAssignment) {
-          setSelectedProjectId(myAssignment.project_id)
-        } else {
-          setSelectedProjectId(NO_PROJECT.id)
-        }
+      // アサインから自分のデフォルト現場を算出
+      const myAssignment = validAssignments.find(a =>
+        (a.worker_master?.email || "").trim().toLowerCase() === currentUserEmail
+      )
+      const defaultId = myAssignment ? myAssignment.project_id : NO_PROJECT.id
+      setAssignedProjectId(defaultId)
+
+      // 手動上書きがない場合のみ、アサイン通りに設定
+      if (!isProjectManuallyOverridden) {
+        setSelectedProjectId(defaultId)
       }
     } catch (e) {
       console.error("プロジェクト・アサイン取得エラー:", e)
@@ -1595,42 +1605,85 @@ export default function HeatstrokeChecker() {
         </div>
 
         {/* 現場選択 */}
-        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide whitespace-nowrap shrink-0">
-            対象現場:
-          </label>
-          <select
-            value={selectedProjectId}
-            onChange={e => setSelectedProjectId(e.target.value)}
-            className="w-full h-12 px-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
-          >
-            <option value="" disabled>現場を選択してください</option>
-            {/* 現場なし（アサインなし）は常に先頭 */}
-            <option value="no-project">（現場なし／アサインなし）（現場なし）</option>
-            {/* 今日アサインがある現場 */}
-            {todayProjects.length > 0 && (
-              <optgroup label="📅 今日の配置">
-                {todayProjects.map(p => (
-                  <option key={p.id} value={p.id}>{getProjectDisplayName(p.id)}</option>
-                ))}
-              </optgroup>
-            )}
-            {/* 今日の配置以外の稼働中現場（急遽変更・応援など） */}
-            {(() => {
-              const otherProjects = allValidProjects.filter(
-                p => !todayProjects.some(tp => tp.id === p.id)
-              )
-              if (otherProjects.length === 0) return null
-              return (
-                <optgroup label="🔄 その他の現場（急遽変更・応援など）">
-                  {otherProjects.map(p => (
-                    <option key={p.id} value={p.id}>{getProjectDisplayName(p.id)}</option>
-                  ))}
-                </optgroup>
-              )
-            })()}
-          </select>
-          {refreshing && <Loader2 className="w-4 h-4 animate-spin text-blue-500 shrink-0" />}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide whitespace-nowrap shrink-0">
+              対象現場:
+            </label>
+            {/* 通常表示：アサイン通りの現場名（読み取り専用） */}
+            <div className="flex-1 flex items-center gap-2">
+              <div className="flex-1 h-12 px-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                {isProjectManuallyOverridden && (
+                  <span className="text-xs text-orange-500 font-bold shrink-0">✏️ 修正中</span>
+                )}
+                <span className="truncate">{getProjectDisplayName(selectedProjectId) || "現場を読み込み中..."}</span>
+              </div>
+              {refreshing && <Loader2 className="w-4 h-4 animate-spin text-blue-500 shrink-0" />}
+              {/* 修正ボタン */}
+              <button
+                type="button"
+                onClick={() => setShowProjectCorrection(v => !v)}
+                className="shrink-0 h-12 px-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                {showProjectCorrection ? "閉じる" : "修正"}
+              </button>
+            </div>
+          </div>
+
+          {/* 修正パネル（修正ボタンを押した時だけ表示） */}
+          {showProjectCorrection && (
+            <div className="ml-0 sm:ml-[calc(theme(spacing.20)+theme(spacing.3))] flex flex-col gap-2 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+              <p className="text-xs text-orange-700 dark:text-orange-400 font-bold">
+                ⚠️ 現場を手動で変更します。アサイン情報が更新されても自動では戻りません。
+              </p>
+              <select
+                value={selectedProjectId}
+                onChange={e => {
+                  setSelectedProjectId(e.target.value)
+                  setIsProjectManuallyOverridden(true)
+                }}
+                className="w-full h-12 px-3 bg-white dark:bg-slate-900 border border-orange-300 dark:border-orange-700 rounded-lg text-sm font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-orange-500 cursor-pointer"
+              >
+                <option value="" disabled>現場を選択してください</option>
+                <option value="no-project">（現場なし／アサインなし）（現場なし）</option>
+                {todayProjects.length > 0 && (
+                  <optgroup label="📅 今日の配置">
+                    {todayProjects.map(p => (
+                      <option key={p.id} value={p.id}>{getProjectDisplayName(p.id)}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {(() => {
+                  const otherProjects = allValidProjects.filter(
+                    p => !todayProjects.some(tp => tp.id === p.id)
+                  )
+                  if (otherProjects.length === 0) return null
+                  return (
+                    <optgroup label="🔄 その他の現場（急遽変更・応援など）">
+                      {otherProjects.map(p => (
+                        <option key={p.id} value={p.id}>{getProjectDisplayName(p.id)}</option>
+                      ))}
+                    </optgroup>
+                  )
+                })()}
+              </select>
+              {/* アサイン通りに戻すボタン */}
+              {isProjectManuallyOverridden && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedProjectId(assignedProjectId)
+                    setIsProjectManuallyOverridden(false)
+                    setShowProjectCorrection(false)
+                  }}
+                  className="self-start px-3 py-1.5 rounded-lg bg-slate-600 text-white text-xs font-bold hover:bg-slate-700"
+                >
+                  ↩ アサイン通りに戻す
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
