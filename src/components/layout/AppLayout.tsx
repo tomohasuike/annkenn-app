@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Outlet, NavLink } from "react-router-dom"
-import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature, Wrench, Bot, Thermometer } from "lucide-react"
+import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature, Wrench, Bot, Thermometer, Zap } from "lucide-react"
 import { ThemeSwitcher } from "../ui/ThemeSwitcher"
 import logoImg from "../../assets/logo.png"
 import { supabase } from "../../lib/supabase"
@@ -152,7 +152,7 @@ export default function AppLayout() {
                 )}
 
                 {/* 東京電力申込（独立ページ） */}
-                {/* <NavLink to="/tepco-form" className={getNavClass}>
+                <NavLink to="/tepco-form" className={getNavClass}>
                   {({ isActive }) => (
                     <>
                       <Zap className={`w-5 h-5 ${isActive ? 'text-yellow-500' : 'text-yellow-400 group-hover:text-yellow-500'}`} />
@@ -160,7 +160,7 @@ export default function AppLayout() {
                       {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-500 rounded-r-md"></span>}
                     </>
                   )}
-                </NavLink> */}
+                </NavLink>
 
                 {/* デジタル本棚 */}
                 {/* <NavLink to="/bookshelf" className={getNavClass}>
