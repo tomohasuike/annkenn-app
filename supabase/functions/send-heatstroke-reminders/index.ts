@@ -225,12 +225,8 @@ async function processHeatstrokeReminders(checkTimeType: string, mode: "prompt" 
 
       messageText += `*${displayName}*\n`;
 
-      // 名前と@メンションを並べて表示（名前が見えるようにする）
       const memberLines = group.workers
-        .map((w: any) => w.email
-          ? `  *${w.name}* <users/${w.email}>`
-          : `  *${w.name}*`
-        )
+        .map((w: any) => `  *${w.name}*`)
         .join('\n');
       messageText += `${memberLines}\n`;
       messageText += `  ↑ HITECポータルアプリで「体調を自己申告する」をタップ！💪\n\n`;
@@ -275,12 +271,8 @@ async function processHeatstrokeReminders(checkTimeType: string, mode: "prompt" 
         totalMissing += group.workers.length;
         messageText += `*${displayName}*\n`;
         messageText += `  ❌ 気象情報の設定＆全員の申告が未登録\n`;
-        // 名前と@メンションを並べて表示
         const mentionLines = group.workers
-          .map((w: any) => w.email
-            ? `  👆 *${w.name}* <users/${w.email}>`
-            : `  👆 *${w.name}*`
-          )
+          .map((w: any) => `  👆 *${w.name}*`)
           .join('\n');
         messageText += `${mentionLines} 現地に着いたらアプリで設定してください！\n`;
         messageText += `\n`;
@@ -290,12 +282,7 @@ async function processHeatstrokeReminders(checkTimeType: string, mode: "prompt" 
         totalMissing += unsubmitted.length;
         messageText += `*${displayName}* （${group.workers.length - unsubmitted.length}/${group.workers.length}名 申告済み）\n`;
         for (const w of unsubmitted) {
-          // 名前と@メンションを1行にまとめて表示（メールだけにならないよう改善）
-          if (w.email) {
-            messageText += `  ❌ *${w.name}* <users/${w.email}> さんが未申告 → アプリで申告をお願いします！💪\n`;
-          } else {
-            messageText += `  ❌ *${w.name}* さんが未申告 → アプリで申告をお願いします！💪\n`;
-          }
+          messageText += `  ❌ *${w.name}* さんが未申告 → アプリで申告をお願いします！💪\n`;
         }
         messageText += `\n`;
 
@@ -306,10 +293,7 @@ async function processHeatstrokeReminders(checkTimeType: string, mode: "prompt" 
         messageText += `  🔔 まとめ役の最終承認（目視確認）がまだです\n`;
         const foremanId = group.session.foreman_id || group.session.created_by;
         const foremanCandidate = group.workers.find((w: any) => w.id === foremanId) || group.workers[0];
-        if (foremanCandidate?.email) {
-          // 名前と@メンションを並べて表示
-          messageText += `  → *${foremanCandidate.name}* <users/${foremanCandidate.email}> アプリで「まとめ役確認・承認」をお願いします！✅\n`;
-        } else if (foremanCandidate) {
+        if (foremanCandidate) {
           messageText += `  → *${foremanCandidate.name}* さん アプリで「まとめ役確認・承認」をお願いします！✅\n`;
         }
         messageText += `\n`;
