@@ -341,18 +341,32 @@ export default function Settings() {
   }
 
   const handleDeleteWorker = async (id: string, name: string) => {
-      if (!confirm(`本当に「${name}」を削除しますか？\n\n※ この作業員の日報・勤怠データは残りますが、担当者の紐付けが解除されます。`)) return
+      if (!confirm(`本当に「${name}」を削除しますか？\n\n※ 過去の日報・勤怠データには名前が残ります。`)) return
       try {
-          // 外部キー制約でブロックされる可能性があるテーブルを事前にNULLクリア
+          // 日報の担当者テーブル：名前を保持してからIDを解除
+          const { error: rpNameError } = await supabase
+              .from('report_personnel')
+              .update({ worker_name: name })
+              .eq('worker_id', id)
+              .is('worker_name', null)
+          if (rpNameError) throw rpNameError
+
           const { error: rpError } = await supabase
               .from('report_personnel')
               .update({ worker_id: null })
               .eq('worker_id', id)
           if (rpError) throw rpError
 
+          // 案件アサイン：worker_idの参照を解除（名前カラムなし）
+          const { error: asError } = await supabase
+              .from('assignments')
+              .update({ worker_id: null })
+              .eq('worker_id', id)
+          if (asError) throw asError
+
           const { error } = await supabase.from('worker_master').delete().eq('id', id)
           if (error) throw error
-          fetchData() // Refresh
+          fetchData()
           setModalMessage({ type: 'success', text: `「${name}」を削除しました。` })
       } catch (e: any) {
           console.error(e)
