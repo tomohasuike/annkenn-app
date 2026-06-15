@@ -56,7 +56,8 @@ const MANAGEMENT_APPS = [
 
 const FIELD_APPS = [
   { id: 'tools-dashboard', name: '現場ツール(計算等)' },
-  { id: 'material-assistant', name: '材料検索(AI)' }
+  { id: 'material-assistant', name: '材料検索(AI)' },
+  { id: 'tepco-application', name: '東電申請' }
 ]
 
 const APPS = [...MANAGEMENT_APPS, ...FIELD_APPS]
@@ -340,11 +341,19 @@ export default function Settings() {
   }
 
   const handleDeleteWorker = async (id: string, name: string) => {
-      if (!confirm(`本当に「${name}」を削除しますか？`)) return
+      if (!confirm(`本当に「${name}」を削除しますか？\n\n※ この作業員の日報・勤怠データは残りますが、担当者の紐付けが解除されます。`)) return
       try {
+          // 外部キー制約でブロックされる可能性があるテーブルを事前にNULLクリア
+          const { error: rpError } = await supabase
+              .from('report_personnel')
+              .update({ worker_id: null })
+              .eq('worker_id', id)
+          if (rpError) throw rpError
+
           const { error } = await supabase.from('worker_master').delete().eq('id', id)
           if (error) throw error
           fetchData() // Refresh
+          setModalMessage({ type: 'success', text: `「${name}」を削除しました。` })
       } catch (e: any) {
           console.error(e)
           setModalMessage({ type: 'error', text: "削除に失敗しました: " + e.message })
