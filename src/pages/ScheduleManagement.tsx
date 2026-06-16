@@ -113,7 +113,7 @@ export default function ScheduleManagement() {
   // Add Resource Modal
   const [showAddResourceModal, setShowAddResourceModal] = useState(false)
   const [newResourceName, setNewResourceName] = useState("")
-  const [newResourceType, setNewResourceType] = useState<'president'|'employee'|'partner'|'vehicle'|'machine'>('employee')
+  const [newResourceType, setNewResourceType] = useState<'president'|'employee'|'partner'|'vehicle'|'machine'>('partner')
 
   // Drag and drop / selection state
   type SelectedItem = { id: string, type: 'worker' | 'vehicle', sourceProjectId?: string, sourceDate?: string, assignmentId?: string };
@@ -2144,8 +2144,6 @@ export default function ScheduleManagement() {
                   onChange={(e) => setNewResourceType(e.target.value as any)}
                   className="w-full p-0.5 text-[0.95em] border border-slate-300 rounded outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 >
-                  <option value="president">社長</option>
-                  <option value="employee">作業員</option>
                   <option value="partner">協力会社</option>
                   <option value="vehicle">作業車</option>
                   <option value="machine">建設機械</option>
