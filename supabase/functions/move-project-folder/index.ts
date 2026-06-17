@@ -28,9 +28,10 @@ serve(async (req: Request) => {
 
     // Determine target state
     const category = record.category || "一般"
-    const isCompleted = record.status_flag === "完工"
-    const wasCompleted = old_record.status_flag === "完工"
-    
+    const COMPLETED_STATUSES = ["完工", "失注"]
+    const isCompleted = COMPLETED_STATUSES.includes(record.status_flag)
+    const wasCompleted = COMPLETED_STATUSES.includes(old_record.status_flag)
+
     // Check if we need to move (either moving to completed, or moving back to active)
     if (!isCompleted && !wasCompleted) {
        // Moving from active state to another active state (e.g. 着工前 <-> 着工中)

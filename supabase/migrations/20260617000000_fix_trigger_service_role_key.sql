@@ -1,0 +1,13 @@
+-- トリガーからEdge Functionを呼び出す際のservice_role_keyを設定する
+-- ※ セキュリティ上、実際のキー値はSQLファイルに書かず、Supabase Dashboardから設定すること
+--
+-- 【手動設定手順】
+-- Supabase Dashboard > Project Settings > Database > Configuration で
+-- 以下を追加してください:
+--
+--   ALTER DATABASE postgres SET "app.settings.service_role_key" = '<your-service-role-key>';
+--
+-- または SQL Editor で直接実行してください。
+--
+-- このマイグレーションファイル自体はキー設定を行いません（GitHubへの秘密情報漏洩を防ぐため）。
+SELECT 'Please set app.settings.service_role_key in Supabase Dashboard > SQL Editor' AS note;
