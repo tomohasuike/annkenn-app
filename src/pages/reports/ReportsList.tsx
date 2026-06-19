@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react"
 import { supabase } from "../../lib/supabase"
-import { Loader2, Search, Plus, Calendar, Pencil, Users, Truck, Package, Building, X, ClipboardList, ChevronLeft, ChevronRight } from "lucide-react"
+import { Loader2, Search, Plus, Calendar, Pencil, Users, Truck, Package, Building, X, ClipboardList, ChevronLeft, ChevronRight, Download } from "lucide-react"
 import { Link } from "react-router-dom"
 import { format, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
@@ -48,6 +48,44 @@ function getDriveImageUrl(url: string): string {
 }
 
 const PAGE_SIZE = 20
+
+function exportCsv(reports: DailyReport[], formatDate: (s: string) => string) {
+  const headers = [
+    '日付', '工事番号', '案件名', '現場名', '発注者',
+    '作業区分', '開始時間', '終了時間', '作業内容', '進捗(%)',
+    '報告者', '作業員', '協力会社', '車両・機械', '使用材料'
+  ]
+
+  const escape = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`
+
+  const rows = reports.map(r => [
+    escape(formatDate(r.report_date)),
+    escape(r.project.project_number),
+    escape(r.project.project_name),
+    escape(r.project.site_name),
+    escape(r.project.client_name),
+    escape(r.work_category),
+    escape(r.start_time ? r.start_time.substring(0, 5) : ''),
+    escape(r.end_time ? r.end_time.substring(0, 5) : ''),
+    escape(r.work_content),
+    escape(r.progress.replace('%', '')),
+    escape(r.reporter_name),
+    escape(r.personnel.map(p => p.replace(/\s*\(.*?\)/, '')).join('・')),
+    escape(r.subcontractors.map(s => s.replace(/\s*\(.*?\)/, '')).join('・')),
+    escape([...r.vehicles, ...r.machinery].join('・')),
+    escape(r.materials.map(m => m.name).join('・')),
+  ].join(','))
+
+  const bom = '﻿'
+  const csv = bom + [headers.map(h => `"${h}"`).join(','), ...rows].join('\r\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `日報_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 export default function ReportsList() {
   const [reports, setReports] = useState<DailyReport[]>([])
@@ -252,13 +290,23 @@ export default function ReportsList() {
             <h2 className="text-3xl font-bold tracking-tight">日報管理</h2>
             <p className="text-muted-foreground">現場の作業日報の一覧と検索</p>
           </div>
-          <Link
-            to="/reports/new"
-            className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 gap-2 shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            新規日報作成
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => exportCsv(filteredReports, formatDate)}
+              disabled={filteredReports.length === 0}
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background hover:bg-muted transition-colors h-10 px-4 py-2 gap-2 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Download className="w-4 h-4" />
+              CSV出力
+            </button>
+            <Link
+              to="/reports/new"
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 gap-2 shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              新規日報作成
+            </Link>
+          </div>
         </div>
 
         {/* 検索・絞り込みエリア */}
