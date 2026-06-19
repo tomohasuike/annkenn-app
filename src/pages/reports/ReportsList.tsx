@@ -89,6 +89,7 @@ function exportCsv(reports: DailyReport[], formatDate: (s: string) => string) {
 
 export default function ReportsList() {
   const [reports, setReports] = useState<DailyReport[]>([])
+  const [activeWorkers, setActiveWorkers] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [dateFrom, setDateFrom] = useState("")
@@ -200,6 +201,10 @@ export default function ReportsList() {
         }))
 
         setReports(mappedData)
+
+        // 在籍中の作業員を取得
+        const { data: workers } = await supabase.from('worker_master').select('name')
+        setActiveWorkers(new Set((workers || []).map((w: any) => w.name)))
       } catch (err) {
         console.error("Error fetching reports:", err)
       } finally {
@@ -210,8 +215,8 @@ export default function ReportsList() {
     fetchReports()
   }, [])
 
-  // 作業員名の選択肢（重複排除）
-  const workerOptions = useMemo(() => {
+  // 作業員名の選択肢（在籍中・退職者に分類）
+  const { activeOptions, retiredOptions } = useMemo(() => {
     const names = new Set<string>()
     reports.forEach(r => {
       r.personnel.forEach(p => {
@@ -219,8 +224,14 @@ export default function ReportsList() {
         if (name) names.add(name)
       })
     })
-    return Array.from(names).sort()
-  }, [reports])
+    const active: string[] = []
+    const retired: string[] = []
+    Array.from(names).sort().forEach(name => {
+      if (activeWorkers.has(name)) active.push(name)
+      else retired.push(name)
+    })
+    return { activeOptions: active, retiredOptions: retired }
+  }, [reports, activeWorkers])
 
   // フィルタリング
   const filteredReports = useMemo(() => {
@@ -346,9 +357,20 @@ export default function ReportsList() {
                 onChange={(e) => { setWorkerFilter(e.target.value); resetPage(); }}
               >
                 <option value="">作業員（全員）</option>
-                {workerOptions.map(name => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
+                {activeOptions.length > 0 && (
+                  <optgroup label="在籍中">
+                    {activeOptions.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {retiredOptions.length > 0 && (
+                  <optgroup label="退職者">
+                    {retiredOptions.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
             {hasFilter && (
