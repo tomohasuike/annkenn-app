@@ -310,12 +310,14 @@ export default function Settings() {
 
   const handleSaveWorker = async () => {
       if (!editingWorker || !editingWorker.name) return
+      // 全角・半角スペースを除去して統一
+      const normalizedName = editingWorker.name.replace(/[\s　]/g, '')
       setWorkerSaving(true)
       try {
           if (editingWorker.id) {
               // Update
               const { error } = await supabase.from('worker_master').update({
-                  name: editingWorker.name,
+                  name: normalizedName,
                   email: editingWorker.email,
                   type: editingWorker.type,
               }).eq('id', editingWorker.id)
@@ -323,7 +325,7 @@ export default function Settings() {
           } else {
               // Insert
               const { error } = await supabase.from('worker_master').insert({
-                  name: editingWorker.name,
+                  name: normalizedName,
                   email: editingWorker.email,
                   type: editingWorker.type,
                   is_active: true
