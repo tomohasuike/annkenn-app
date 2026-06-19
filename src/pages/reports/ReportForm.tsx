@@ -548,8 +548,8 @@ export default function ReportForm() {
         const { data: { user } } = await supabase.auth.getUser()
         
         // --- Photo Upload Logic ---
-        const selectedProj = projectsList.find(p => p.id === report.project_id);
-        const folderId = selectedProj ? getFolderIdFromUrl(selectedProj.folder_url) : null;
+        // 現場写真はグローバルフォルダの「日報写真（現場写真）」サブフォルダへ
+        const NISSHI_FOLDER_ID = "1KstQFkbu18x0Z8vnaZgW02drHp2ZFOhu";
 
         const uploadedUrls = [...existingPhotos];
         if (pendingPhotos.length > 0) {
@@ -557,13 +557,11 @@ export default function ReportForm() {
                 try {
                     const compressed = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1920 });
                     const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-                    
+
                     const finalFile = new File([compressed], fileName, { type: compressed.type });
                     const formData = new FormData();
                     formData.append('file', finalFile);
-                    if (folderId) {
-                        formData.append('folderId', folderId);
-                    }
+                    formData.append('folderId', NISSHI_FOLDER_ID);
 
                     const { data: uploadData, error: uploadError } = await supabase.functions.invoke('upload-drive-file', {
                         body: formData,
@@ -675,14 +673,14 @@ export default function ReportForm() {
                 if (mPayload.length > 0) await supabase.from('report_machinery').insert(mPayload)
             }
             if (materials.length > 0) {
-                const selectedProj = projectsList.find(p => p.id === report.project_id);
-                const folderId = selectedProj ? getFolderIdFromUrl(selectedProj.folder_url) : null;
+                // 材料写真・資料はグローバルフォルダの「材料・資料」サブフォルダへ
+                const MATERIAL_FOLDER_ID = "1-dPi7oHiY73nrtg0dN-HR7OuJHDOTrWJ";
 
                 const matPayload = [];
                 for (const m of materials) {
                     const hasFiles = m.pending_photos.length > 0 || m.pending_docs.length > 0 || m.existing_photos.length > 0 || m.existing_docs.length > 0;
                     if (m.material_name.trim() === '' && !hasFiles && m.quantity.trim() === '') continue;
-                    
+
                     const uploadedPhotos = [...m.existing_photos];
                     if (m.pending_photos.length > 0) {
                         for (const file of m.pending_photos) {
@@ -692,9 +690,7 @@ export default function ReportForm() {
                                 const finalFile = new File([compressed], fileName, { type: compressed.type });
                                 const formData = new FormData();
                                 formData.append('file', finalFile);
-                                if (folderId) {
-                                    formData.append('folderId', folderId);
-                                }
+                                formData.append('folderId', MATERIAL_FOLDER_ID);
 
                                 const { data: uploadData, error: uploadError } = await supabase.functions.invoke('upload-drive-file', {
                                     body: formData,
@@ -729,9 +725,7 @@ export default function ReportForm() {
                                 const finalFile = new File([file], fileName, { type: file.type });
                                 const formData = new FormData();
                                 formData.append('file', finalFile);
-                                if (folderId) {
-                                    formData.append('folderId', folderId);
-                                }
+                                formData.append('folderId', MATERIAL_FOLDER_ID);
 
                                 const { data: uploadData, error: uploadError } = await supabase.functions.invoke('upload-drive-file', {
                                     body: formData,
