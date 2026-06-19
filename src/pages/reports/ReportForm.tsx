@@ -6,64 +6,29 @@ import imageCompression from 'browser-image-compression';
 
 import { format, parseISO } from 'date-fns';
 import { AutocompleteInput } from '../../components/ui/AutocompleteInput';
+import type { ResourceItem, ReportData, Personnel, TimeGroup, Vehicle, Material, Subcontractor } from './reportFormTypes';
+import { fixDriveDocUrl, getDriveImageUrl, getFolderIdFromUrl } from '../../utils/driveHelpers';
 
-// --- TYPES ---
-
-type ResourceItem = { id: string; name: string; category?: string }
-
-type ReportData = {
-  project_id: string
-  보고日時: string // 報告日時
-  作業区分: string
-  作業開始時間: string
-  作業終了時間: string
-  工事進捗: string
-  工事内容: string
-  備考: string
-  reporter_name?: string
-  site_photos?: string
+const GEMINI_PROMPTS = {
+  content: `あなたは建設会社の日報入力アシスタントです。
+音声で話された作業内容を、日報に適した簡潔な文章に変換してください。
+・口語表現を書き言葉（体言止・敦語なし）に変換（例：「〜しました」→「〜を完了」）
+・「えー」「あのー」などの口癒を除去
+・HIVP・VU・HT管・塩ビ管等の建設・土木用語はそのまま維持
+・内容を省略せず整形のみ行う
+整形後の文章のみ返答（説明不要）：`,
+  notes: `あなたは建設会社の日報アシスタントです。
+話された内容を備考・申し送り事項として簡潔にまとめてください。
+・短く端的に（1〜3文程度）
+・重要な情報（天候・中断・翻日の申し送り）を優先
+整形後の文章のみ返答（説明不要）：`,
+  materials: `あなたは建設会社の日報アシスタントです。
+話された内容から使用材料の一覧を抽出し、必ずJSON配列で返してください。
+フォーマット: [{"name": "材料名", "quantity": "数量（単位含む）"}, ...]
+・HIVP・VU・HT管・塩ビ管・エルボ・継手などの建設資材を正確に認識
+・数量は「3本」「10m」「1缶」のように単位を含めて記載
+・JSONのみ返すこと（説明文不要）`
 }
-
-type Personnel = { worker_id: string; worker_name: string; group_id?: string; start_time?: string; end_time?: string; }
-type TimeGroup = { id: string; start_time: string; end_time: string; }
-type Vehicle = { vehicle_id: string; vehicle_name: string }
-type Material = { material_name: string; quantity: string; pending_photos: File[]; pending_docs: File[]; existing_photos: string[]; existing_docs: string[] }
-type Subcontractor = { company_name: string; headcount: string; group_id?: string; }
-
-// Google Driveの画像用直接リンク(lh3.googleusercontent.com/d/ID)を、正規プレビューURL(drive.google.com/file/d/ID/view)へ自動コンバートする
-function fixDriveDocUrl(url: string): string {
-  if (!url) return '';
-  if (url.includes('lh3.googleusercontent.com/d/')) {
-    const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (match && match[1]) {
-      return `https://drive.google.com/file/d/${match[1]}/view?usp=drivesdk`;
-    }
-  }
-  return url;
-}
-
-// `<img>` タグで使う際に、任意のGoogle Drive URLを直接表示可能なlh3形式に変換する
-function getDriveImageUrl(url: string): string {
-  if (!url) return '';
-  if (url.includes('lh3.googleusercontent.com')) return url;
-  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9-_]+)/);
-  if (driveMatch && driveMatch[1]) return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
-  const openMatch = url.match(/[?&]id=([a-zA-Z0-9-_]+)/);
-  if (openMatch && openMatch[1]) return `https://lh3.googleusercontent.com/d/${openMatch[1]}`;
-  return url;
-}
-
-const getFolderIdFromUrl = (url?: string) => {
-  if (!url) return null;
-  const match = url.match(/folders\/([a-zA-Z0-9-_]+)/);
-  if (match && match[1]) {
-    return match[1];
-  }
-  if (/^[a-zA-Z0-9-_]{25,50}$/.test(url)) {
-    return url;
-  }
-  return null;
-};
 
 export default function ReportForm() {
   const { id } = useParams()
@@ -853,8 +818,6 @@ export default function ReportForm() {
   // ============================================================
   // 音声入力 + Gemini AI 整形
   // ============================================================
-
-  const GEMINI_PROMPTS = {
     content: `あなたは建設会社の日報入力アシスタントです。
 音声で話された作業内容を、日報に適した簡潔な文章に変換してください。
 ・口語表現を書き言葉（体言止・敦語なし）に変換（例：「〜しました」→「〜を完了」）

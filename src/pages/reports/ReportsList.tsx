@@ -28,24 +28,7 @@ type DailyReport = {
   site_photos: string[]
 }
 
-function fixDriveDocUrl(url: string): string {
-  if (!url) return '';
-  if (url.includes('lh3.googleusercontent.com/d/')) {
-    const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (match && match[1]) return `https://drive.google.com/file/d/${match[1]}/view?usp=drivesdk`;
-  }
-  return url;
-}
-
-function getDriveImageUrl(url: string): string {
-  if (!url) return '';
-  if (url.includes('lh3.googleusercontent.com')) return url;
-  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9-_]+)/);
-  if (driveMatch && driveMatch[1]) return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
-  const openMatch = url.match(/[?&]id=([a-zA-Z0-9-_]+)/);
-  if (openMatch && openMatch[1]) return `https://lh3.googleusercontent.com/d/${openMatch[1]}`;
-  return url;
-}
+import { fixDriveDocUrl, getDriveImageUrl } from '../../utils/driveHelpers';
 
 const PAGE_SIZE = 20
 
