@@ -96,7 +96,7 @@ export default function ReportsList() {
   const [dateTo, setDateTo] = useState("")
   const [workerFilter, setWorkerFilter] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  const [enlargedPhoto, setEnlargedPhoto] = useState<string | null>(null)
+  const [gallery, setGallery] = useState<{ photos: string[]; index: number } | null>(null)
 
   useEffect(() => {
     async function fetchReports() {
@@ -483,7 +483,7 @@ export default function ReportsList() {
                                             src={getDriveImageUrl(url)}
                                             alt="材料写真"
                                             className="h-14 w-20 object-cover rounded border bg-background shadow-sm hover:opacity-90 hover:ring-2 hover:ring-primary/50 cursor-zoom-in transition-all"
-                                            onClick={(e) => { e.stopPropagation(); setEnlargedPhoto(url); }}
+                                            onClick={(e) => { e.stopPropagation(); setGallery({ photos: mat.photos, index: j }); }}
                                           />
                                         ))}
                                         {mat.docs.map((url, j) => {
@@ -517,17 +517,24 @@ export default function ReportsList() {
                       </td>
                       <td className="px-3 sm:px-4 py-3 text-right align-top">
                         {report.site_photos && report.site_photos.length > 0 ? (
-                          <div className="flex justify-end">
+                          <div
+                            className="relative inline-block cursor-pointer"
+                            onClick={(e) => { e.stopPropagation(); setGallery({ photos: report.site_photos, index: 0 }); }}
+                          >
                             <img
-                              src={getDriveImageUrl(report.site_photos[report.site_photos.length - 1])}
+                              src={getDriveImageUrl(report.site_photos[0])}
                               alt="現場写真"
-                              onClick={(e) => { e.stopPropagation(); setEnlargedPhoto(report.site_photos![report.site_photos!.length - 1]); }}
-                              className="h-28 w-44 rounded-lg object-cover border bg-muted shadow-sm shrink-0 cursor-pointer hover:opacity-90 hover:ring-2 hover:ring-primary/50 transition-all"
+                              className="h-28 w-44 rounded-lg object-cover border bg-muted shadow-sm shrink-0 hover:opacity-90 hover:ring-2 hover:ring-primary/50 transition-all"
                               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                             />
+                            {report.site_photos.length > 1 && (
+                              <span className="absolute bottom-1.5 right-1.5 bg-black/60 text-white text-xs font-medium px-1.5 py-0.5 rounded-md">
+                                +{report.site_photos.length - 1}枚
+                              </span>
+                            )}
                           </div>
                         ) : (
-                          <div className="flex justify-end h-28 w-44 ml-auto rounded-lg border border-dashed bg-muted/20 items-center text-muted-foreground text-xs font-medium">
+                          <div className="flex justify-end h-28 w-44 ml-auto rounded-lg border border-dashed bg-muted/20 items-center justify-center text-muted-foreground text-xs font-medium">
                             写真なし
                           </div>
                         )}
@@ -597,24 +604,73 @@ export default function ReportsList() {
         )}
       </div>
 
-      {enlargedPhoto && (
+      {gallery && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-8 transition-opacity"
-          onClick={() => setEnlargedPhoto(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-8"
+          onClick={() => setGallery(null)}
         >
-          <div className="relative max-w-5xl w-full flex items-center justify-center animate-in fade-in zoom-in-95 duration-200">
+          <div
+            className="relative max-w-5xl w-full flex flex-col items-center gap-4 animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 閉じるボタン */}
             <button
-              onClick={() => setEnlargedPhoto(null)}
+              onClick={() => setGallery(null)}
               className="absolute -top-12 right-0 p-2 text-white/50 hover:text-white bg-black/50 rounded-full transition-colors"
             >
               <X className="w-6 h-6" />
             </button>
-            <img
-              src={enlargedPhoto}
-              alt="拡大写真"
-              className="max-h-[85vh] max-w-full rounded-md shadow-2xl object-contain border border-white/20"
-              onClick={(e) => e.stopPropagation()}
-            />
+
+            {/* 枚数表示 */}
+            {gallery.photos.length > 1 && (
+              <div className="text-white/70 text-sm font-medium">
+                {gallery.index + 1} / {gallery.photos.length}
+              </div>
+            )}
+
+            {/* メイン画像 */}
+            <div className="relative flex items-center justify-center w-full">
+              {gallery.photos.length > 1 && (
+                <button
+                  onClick={() => setGallery(g => g && g.index > 0 ? { ...g, index: g.index - 1 } : g)}
+                  disabled={gallery.index === 0}
+                  className="absolute left-0 z-10 p-2 text-white/70 hover:text-white bg-black/40 hover:bg-black/60 rounded-full transition-colors disabled:opacity-20"
+                >
+                  <ChevronLeft className="w-7 h-7" />
+                </button>
+              )}
+              <img
+                src={getDriveImageUrl(gallery.photos[gallery.index])}
+                alt={`現場写真 ${gallery.index + 1}`}
+                className="max-h-[78vh] max-w-full rounded-md shadow-2xl object-contain border border-white/20"
+              />
+              {gallery.photos.length > 1 && (
+                <button
+                  onClick={() => setGallery(g => g && g.index < g.photos.length - 1 ? { ...g, index: g.index + 1 } : g)}
+                  disabled={gallery.index === gallery.photos.length - 1}
+                  className="absolute right-0 z-10 p-2 text-white/70 hover:text-white bg-black/40 hover:bg-black/60 rounded-full transition-colors disabled:opacity-20"
+                >
+                  <ChevronRight className="w-7 h-7" />
+                </button>
+              )}
+            </div>
+
+            {/* サムネイル一覧 */}
+            {gallery.photos.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto max-w-full pb-1">
+                {gallery.photos.map((url, i) => (
+                  <img
+                    key={i}
+                    src={getDriveImageUrl(url)}
+                    alt={`サムネイル ${i + 1}`}
+                    onClick={() => setGallery(g => g ? { ...g, index: i } : g)}
+                    className={`h-14 w-20 object-cover rounded border-2 cursor-pointer shrink-0 transition-all ${
+                      i === gallery.index ? 'border-white opacity-100' : 'border-transparent opacity-50 hover:opacity-80'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
