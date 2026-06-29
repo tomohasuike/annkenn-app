@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { supabase } from "../lib/supabase"
 import { Plus, Search, FileText, Building2, Loader2, Edit, Trash2, ChevronDown, ChevronRight, MapPin, RefreshCw } from "lucide-react"
+import { toast } from 'sonner'
 
 type ProjectData = {
   id: string
@@ -153,7 +154,7 @@ export default function Billing() {
       const hasBillingAccess = permissions.includes('billing') || permissions.includes('schedule-admin') || workerData?.is_admin
       
       if (!hasBillingAccess) {
-        alert("請求管理にアクセスする権限がありません。")
+        toast.error("請求管理にアクセスする権限がありません。")
         navigate('/')
         return
       }
@@ -210,7 +211,7 @@ export default function Billing() {
       setInvoices(prev => prev.filter(inv => inv.id !== id))
     } catch (err) {
       console.error("Error deleting invoice:", err)
-      alert("削除に失敗しました。")
+      toast.error("削除に失敗しました。")
     }
   }
 
@@ -339,7 +340,7 @@ export default function Billing() {
       })))
     } catch (err) {
       console.error("Failed to update status:", err)
-      alert("ステータスの更新に失敗しました。")
+      toast.error("ステータスの更新に失敗しました。")
     }
   }
 
@@ -360,7 +361,7 @@ export default function Billing() {
       setProjects(prev => prev.map(p => p.id === projId ? { ...p, status_flag: '完工' } : p));
     } catch (err) {
       console.error("Failed to update project status:", err);
-      alert("状態の更新に失敗しました。");
+      toast.error("状態の更新に失敗しました。");
     }
   }
 

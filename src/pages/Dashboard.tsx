@@ -68,268 +68,191 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
+      // Step 1: ユーザー認証 → 権限取得（順番依存）
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.email) return;
 
-      // 1. Fetch Permissions
       const { data: workerData } = await supabase
         .from('worker_master')
         .select('id, allowed_apps, is_admin, type')
         .eq('email', user.email)
         .single();
-      
+
       const permissions = workerData?.allowed_apps || [];
       setAllowedApps(permissions);
       const canViewBilling = permissions.includes('billing') || workerData?.is_admin;
       const workerId = workerData?.id || null;
       setCurrentWorkerId(workerId);
 
-      const todayStr = dateFns.format(new Date(), 'yyyy-MM-dd');
-      const tomorrowStr = dateFns.format(dateFns.addDays(new Date(), 1), 'yyyy-MM-dd');
-      const isBeforeNoon = new Date().getHours() < 12;
+      const now = new Date();
+      const todayStr = dateFns.format(now, 'yyyy-MM-dd');
+      const tomorrowStr = dateFns.format(dateFns.addDays(now, 1), 'yyyy-MM-dd');
+      const weeklyEndStr = dateFns.format(dateFns.addDays(now, 6), 'yyyy-MM-dd');
+      const isBeforeNoon = now.getHours() < 12;
+      const startOfMonthStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-      const today = new Date();
-  const currentMonth = today.getMonth() + 1;
-  const currentYear = today.getFullYear();
-  
-  let fiscalStart, fiscalEnd;
-  if (currentMonth >= 5) {
-      fiscalStart = new Date(currentYear, 4, 1); // May 1st
-      fiscalEnd = new Date(currentYear + 1, 3, 30); // April 30th next year
-  } else {
-      fiscalStart = new Date(currentYear - 1, 4, 1); // May 1st last year
-      fiscalEnd = new Date(currentYear, 3, 30); // April 30th
-  }
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      const fiscalStart = currentMonth >= 5
+        ? new Date(currentYear, 4, 1)
+        : new Date(currentYear - 1, 4, 1);
+      const fiscalEnd = currentMonth >= 5
+        ? new Date(currentYear + 1, 3, 30)
+        : new Date(currentYear, 3, 30);
+      const fiscalYearStartStr = dateFns.format(fiscalStart, 'yyyy-MM-dd');
+      const fiscalYearEndStr = dateFns.format(fiscalEnd, 'yyyy-MM-dd');
 
-  const fiscalYearStartStr = dateFns.format(fiscalStart, 'yyyy-MM-dd');
-  const fiscalYearEndStr = dateFns.format(fiscalEnd, 'yyyy-MM-dd');
-
-  // 1.5. Check Safety Report Status
-  if (workerId) {
-      const { data: latestEvent } = await supabase
-          .from('safety_notification_history')
-          .select('sent_at')
-          .order('sent_at', { ascending: false })
-          .limit(1)
-          .single();
-          
-      if (latestEvent) {
-           const { data: myReport } = await supabase
-               .from('safety_reports')
-               .select('id')
-               .eq('worker_id', workerId)
-               .gte('created_at', latestEvent.sent_at)
-               .limit(1);
-               
-           if (!myReport || myReport.length === 0) {
-               setShowSafetyReportPrompt(true);
-           } else {
-               setShowSafetyReportPrompt(false);
-           }
-      }
-  }
-
-  // 2. Fetch Assignments for Today and Tomorrow
-      // Today schedules
-      const { data: schedules } = await supabase
-        .from('assignments')
-        .select(`
-          id,
-          project_id,
-          assignment_date,
-          start_time,
-          end_time,
-          worker_id,
-          vehicle_id,
+      // Step 2: 残り全クエリを並列実行
+      const [
+        schedulesRes,
+        tomAssignmentsRes,
+        activeWorkersRes,
+        allAssignmentsRes,
+        projectsRes,
+        todayReportsRes,
+        tomorrowReportsRawRes,
+        reportsRes,
+        billingRes,
+        vDataRes,
+        iDataRes,
+        safetyEventRes,
+      ] = await Promise.all([
+        supabase.from('assignments').select(`
+          id, project_id, assignment_date, start_time, end_time, worker_id, vehicle_id,
           worker_master!assignments_worker_id_fkey ( name, type ),
           vehicle_master ( vehicle_name ),
           project:projects ( id, project_name, site_name, project_number, category, client_name )
-        `)
-        .eq('assignment_date', todayStr);
-      setTodaySchedules(schedules || []);
+        `).eq('assignment_date', todayStr),
 
-      // Tomorrow assignments (for display)
-      const { data: tomAssignments } = await supabase
-        .from('assignments')
-        .select(`
-          id,
-          project_id,
-          assignment_date,
-          start_time,
-          end_time,
-          worker_id,
-          vehicle_id,
+        supabase.from('assignments').select(`
+          id, project_id, assignment_date, start_time, end_time, worker_id, vehicle_id,
           worker_master!assignments_worker_id_fkey ( name, type ),
           vehicle_master ( vehicle_name ),
           project:projects ( id, project_name, site_name, project_number, category, client_name )
-        `)
-        .eq('assignment_date', tomorrowStr);
-      setTomorrowSchedules(tomAssignments || []);
+        `).eq('assignment_date', tomorrowStr),
 
-      // 2.5 Fetch All Workers Weekly Schedule (Always fetched now)
-      const weeklyEndStr = dateFns.format(dateFns.addDays(new Date(), 6), 'yyyy-MM-dd');
-      
-      const { data: activeWorkersRaw } = await supabase
-          .from('worker_master')
-          .select('id, name, type, display_order')
+        supabase.from('worker_master').select('id, name, type, display_order')
           .eq('is_active', true)
           .order('display_order', { ascending: true })
-          .order('name', { ascending: true });
-      
-      const filteredWorkers = (activeWorkersRaw || []).filter(w => !['社長', '事務員', '協力会社'].includes(w.type));
-      setAllWorkers(filteredWorkers);
+          .order('name', { ascending: true }),
 
-      const { data: allAssignments } = await supabase
-          .from('assignments')
-          .select(`
-              id,
-              project_id,
-              assignment_date,
-              worker_id,
-              project:projects ( id, project_name, site_name, project_number, category, client_name, folder_url )
-          `)
-          .gte('assignment_date', todayStr)
-          .lte('assignment_date', weeklyEndStr)
-          .not('worker_id', 'is', null)
-          .order('assignment_date', { ascending: true });
-      
-      setAllWorkersWeeklySchedules(allAssignments || []);
+        supabase.from('assignments').select(`
+          id, project_id, assignment_date, worker_id,
+          project:projects ( id, project_name, site_name, project_number, category, client_name, folder_url )
+        `).gte('assignment_date', todayStr).lte('assignment_date', weeklyEndStr)
+          .not('worker_id', 'is', null).order('assignment_date', { ascending: true }),
 
-      // 3. Fetch Active Projects (着工中)
-      const { data: projects } = await supabase
-        .from('projects')
-        .select('id, project_name, site_name, project_number, status_flag, category, client_name')
-        .eq('status_flag', '着工中');
-      setActiveProjects(projects || []);
+        supabase.from('projects')
+          .select('id, project_name, site_name, project_number, status_flag, category, client_name')
+          .eq('status_flag', '着工中'),
 
-      // 3.5 Fetch Today's Daily Reports (作成済の日報)
-      const { data: todayReports } = await supabase
-        .from('daily_reports')
-        .select('id, project_id')
-        .gte('report_date', `${todayStr}T00:00:00+09:00`)
-        .lte('report_date', `${todayStr}T23:59:59+09:00`);
-        
-      const submittedMap: Record<string, string> = {};
-      if (todayReports) {
-          todayReports.forEach(r => {
-              if (r.project_id) submittedMap[r.project_id] = r.id;
-          });
+        supabase.from('daily_reports').select('id, project_id')
+          .gte('report_date', `${todayStr}T00:00:00+09:00`)
+          .lte('report_date', `${todayStr}T23:59:59+09:00`),
+
+        supabase.from('tomorrow_schedules').select(`
+          id, project_id, schedule_date, arrival_time, workers,
+          project:projects(project_name, project_number, site_name, client_name, category)
+        `),
+
+        supabase.from('daily_reports').select(`
+          id, project_id, report_date, created_at, work_content, reporter_name,
+          project:projects ( project_name, site_name, project_number, category, client_name )
+        `).order('created_at', { ascending: false }).limit(5),
+
+        canViewBilling
+          ? supabase.from('invoice_details')
+              .select('id, amount, billing_date, expected_deposit_date, details_status')
+              .neq('details_status', '未請求')
+          : Promise.resolve({ data: null }),
+
+        supabase.from('vehicle_master')
+          .select('id, vehicle_name, category, last_inspected_mileage, last_oil_change_mileage'),
+
+        supabase.from('vehicle_inspections')
+          .select('id, vehicle_id, created_at, action_type')
+          .gte('created_at', startOfMonthStr),
+
+        workerId
+          ? supabase.from('safety_notification_history')
+              .select('sent_at').order('sent_at', { ascending: false }).limit(1).single()
+          : Promise.resolve({ data: null }),
+      ]);
+
+      // Step 3: 安否確認（safety_notification_historyの結果に依存）
+      if (workerId && safetyEventRes.data) {
+        const { data: myReport } = await supabase
+          .from('safety_reports')
+          .select('id')
+          .eq('worker_id', workerId)
+          .gte('created_at', safetyEventRes.data.sent_at)
+          .limit(1);
+        setShowSafetyReportPrompt(!myReport || myReport.length === 0);
       }
+
+      // 結果を各stateに反映
+      setTodaySchedules(schedulesRes.data || []);
+      setTomorrowSchedules(tomAssignmentsRes.data || []);
+      setAllWorkers((activeWorkersRes.data || []).filter(w => !['社長', '事務員', '協力会社'].includes(w.type)));
+      setAllWorkersWeeklySchedules(allAssignmentsRes.data || []);
+      setActiveProjects(projectsRes.data || []);
+      setRecentReports(reportsRes.data || []);
+
+      const submittedMap: Record<string, string> = {};
+      (todayReportsRes.data || []).forEach((r: any) => { if (r.project_id) submittedMap[r.project_id] = r.id; });
       setSubmittedTodayReports(submittedMap);
 
-      // 3.6 Fetch Future Next Day Plans (今後の予定翌日予定)
-      const { data: tomorrowReportsRaw } = await supabase
-        .from('tomorrow_schedules')
-        .select(`
-            id, project_id, schedule_date, arrival_time, workers,
-            project:projects(project_name, project_number, site_name, client_name, category)
-        `);
-        
+      const tomorrowReportsRaw = tomorrowReportsRawRes.data || [];
       const submittedTomMap: Record<string, string> = {};
-      if (tomorrowReportsRaw) {
-          // In-memory filter with sanitized dates (since past dates with `/` could bypass Supabase `.gte` string comparison against `-`)
-          const tomorrowReports = tomorrowReportsRaw.filter((r: any) => {
-              if (!r.schedule_date) return false;
-              const cleanDate = r.schedule_date.replace(/\//g, '-');
-              if (cleanDate >= tomorrowStr) return true;
-              if (isBeforeNoon && cleanDate === todayStr) return true;
-              return false;
-          });
-
-          tomorrowReports.forEach((r: any) => {
-              const cleanDate = r.schedule_date ? r.schedule_date.replace(/\//g, '-') : '';
-              if (r.project_id && cleanDate === tomorrowStr) {
-                  submittedTomMap[r.project_id] = r.id;
-              }
-          });
-
-          setTomorrowPlans(tomorrowReports.sort((a: any, b: any) => {
-              const dateA = (a.schedule_date || '9999-12-31').replace(/\//g, '-');
-              const dateB = (b.schedule_date || '9999-12-31').replace(/\//g, '-');
-              const dateCmp = dateA.localeCompare(dateB);
-              if (dateCmp !== 0) return dateCmp;
-
-              const timeA = a.arrival_time || '99:99';
-              const timeB = b.arrival_time || '99:99';
-              return timeA.localeCompare(timeB);
-          }));
-      }
+      const tomorrowReports = tomorrowReportsRaw.filter((r: any) => {
+        if (!r.schedule_date) return false;
+        const cleanDate = r.schedule_date.replace(/\//g, '-');
+        if (cleanDate >= tomorrowStr) return true;
+        if (isBeforeNoon && cleanDate === todayStr) return true;
+        return false;
+      });
+      tomorrowReports.forEach((r: any) => {
+        const cleanDate = r.schedule_date ? r.schedule_date.replace(/\//g, '-') : '';
+        if (r.project_id && cleanDate === tomorrowStr) submittedTomMap[r.project_id] = r.id;
+      });
+      setTomorrowPlans(tomorrowReports.sort((a: any, b: any) => {
+        const dateA = (a.schedule_date || '9999-12-31').replace(/\//g, '-');
+        const dateB = (b.schedule_date || '9999-12-31').replace(/\//g, '-');
+        const dateCmp = dateA.localeCompare(dateB);
+        if (dateCmp !== 0) return dateCmp;
+        return (a.arrival_time || '99:99').localeCompare(b.arrival_time || '99:99');
+      }));
       setSubmittedTomorrowReports(submittedTomMap);
 
-      // 4. Fetch Recent Reports (Daily)
-      const { data: reports } = await supabase
-        .from('daily_reports')
-        .select(`
-          id,
-          project_id,
-          report_date,
-          created_at,
-          work_content,
-          reporter_name,
-          project:projects ( project_name, site_name, project_number, category, client_name )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      setRecentReports(reports || []);
-
-      // 5. Fetch Billing Data if authorized
-      if (canViewBilling) {
-        // Fetch all billing details except unbilled (未請求)
-        const { data: billingDetails } = await supabase
-          .from('invoice_details')
-          .select('id, amount, billing_date, expected_deposit_date, details_status')
-          .neq('details_status', '未請求');
-        
+      if (canViewBilling && billingRes.data) {
         let fiscalYearSalesTotal = 0;
-        let overdue: any[] = [];
-
-        if (billingDetails) {
-          billingDetails.forEach(bd => {
-            // Add to fiscal year sales if billing date is within the fiscal year and status is '請求済', '入金済', or '完了'
-            const isBilledOrPaid = ['請求済', '入金済', '完了'].includes(bd.details_status);
-            if (isBilledOrPaid && bd.billing_date >= fiscalYearStartStr && bd.billing_date <= fiscalYearEndStr) {
-              fiscalYearSalesTotal += bd.amount || 0;
-            }
-
-            // Check if overdue: status is 請求済 and expected deposit date has passed
-            if (bd.expected_deposit_date && bd.expected_deposit_date < todayStr && bd.details_status === '請求済') {
-              overdue.push(bd);
-            }
-          });
-        }
+        const overdue: any[] = [];
+        billingRes.data.forEach((bd: any) => {
+          if (['請求済', '入金済', '完了'].includes(bd.details_status) &&
+              bd.billing_date >= fiscalYearStartStr && bd.billing_date <= fiscalYearEndStr) {
+            fiscalYearSalesTotal += bd.amount || 0;
+          }
+          if (bd.expected_deposit_date && bd.expected_deposit_date < todayStr && bd.details_status === '請求済') {
+            overdue.push(bd);
+          }
+        });
         setFiscalYearSales(fiscalYearSalesTotal);
         setOverdueInvoices(overdue);
       }
 
-      // 6. Fetch Vehicle Inspections Alerts
-      const startOfMonthStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-      const { data: vData } = await supabase.from('vehicle_master').select('id, vehicle_name, category, last_inspected_mileage, last_oil_change_mileage');
-      const { data: iData } = await supabase.from('vehicle_inspections').select('id, vehicle_id, created_at, action_type').gte('created_at', startOfMonthStr);
-      
-      if (vData) {
-          const inspectedThisMonth = new Set((iData || []).filter(i => i.action_type === '点検').map(i => i.vehicle_id));
-          
-          const uninspected: typeof vehicleAlerts.uninspected = [];
-          const oilOverdue: typeof vehicleAlerts.oilOverdue = [];
-          
-          vData.forEach(v => {
-              // Hide 建設機械 from Dashboard alerts
-              if (v.category === '建設機械') return;
-
-              if (!inspectedThisMonth.has(v.id)) {
-                  uninspected.push({ id: v.id, name: v.vehicle_name, category: v.category });
-              }
-              
-              const current = Math.max(v.last_inspected_mileage || 0, v.last_oil_change_mileage || 0);
-              if (v.last_oil_change_mileage) {
-                  const diff = current - v.last_oil_change_mileage;
-                  if (diff >= 8000) {
-                      oilOverdue.push({ id: v.id, name: v.vehicle_name, category: v.category, diff });
-                  }
-              }
-          });
-          
-          setVehicleAlerts({ uninspected, oilOverdue });
+      if (vDataRes.data) {
+        const inspectedThisMonth = new Set((iDataRes.data || []).filter((i: any) => i.action_type === '点検').map((i: any) => i.vehicle_id));
+        const uninspected: typeof vehicleAlerts.uninspected = [];
+        const oilOverdue: typeof vehicleAlerts.oilOverdue = [];
+        vDataRes.data.forEach((v: any) => {
+          if (v.category === '建設機械') return;
+          if (!inspectedThisMonth.has(v.id)) uninspected.push({ id: v.id, name: v.vehicle_name, category: v.category });
+          const current = Math.max(v.last_inspected_mileage || 0, v.last_oil_change_mileage || 0);
+          if (v.last_oil_change_mileage && current - v.last_oil_change_mileage >= 8000) {
+            oilOverdue.push({ id: v.id, name: v.vehicle_name, category: v.category, diff: current - v.last_oil_change_mileage });
+          }
+        });
+        setVehicleAlerts({ uninspected, oilOverdue });
       }
 
     } catch (error) {

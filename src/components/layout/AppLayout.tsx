@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react"
-import { Outlet, NavLink } from "react-router-dom"
-import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature, Wrench, Bot, Thermometer, Zap } from "lucide-react"
+import { Outlet, NavLink, useNavigate } from "react-router-dom"
+import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature, Wrench, Bot, Thermometer, Zap, LogOut } from "lucide-react"
 import { ThemeSwitcher } from "../ui/ThemeSwitcher"
 import logoImg from "../../assets/logo.png"
 import { supabase } from "../../lib/supabase"
 
 export default function AppLayout() {
+  const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024)
   const [userInitial, setUserInitial] = useState("U");
   const [allowedApps, setAllowedApps] = useState<string[]>([]);
@@ -348,6 +349,20 @@ export default function AppLayout() {
               </>
             )}
           </nav>
+
+          {/* ログアウトボタン */}
+          <div className="p-3 border-t border-border/50">
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate('/login');
+              }}
+              className="flex items-center gap-4 px-5 py-3 w-full text-[15px] font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
+            >
+              <LogOut className="w-5 h-5" />
+              ログアウト
+            </button>
+          </div>
         </aside>
 
         {/* Page Content */}

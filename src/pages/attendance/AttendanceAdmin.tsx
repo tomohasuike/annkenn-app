@@ -530,10 +530,10 @@ export default function AttendanceAdmin() {
                       try {
                         const { error } = await supabase.from('daily_attendance').delete().lt('target_date', '2026-01-25');
                         if (error) throw error;
-                        alert('1月24日以前の勤怠データの全消去が完了しました。');
+                        toast.success('1月24日以前の勤怠データの全消去が完了しました。');
                         if (selectedWorkerId) fetchWorkerData(selectedWorkerId);
                       } catch(err: any) {
-                        alert('消去エラー: ' + err.message);
+                        toast.error('消去エラー: ' + err.message);
                       }
                    }
                 }}

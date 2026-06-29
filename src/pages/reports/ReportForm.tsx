@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useParams, useNavigate, useLocation } from "react-router-dom"
+import { toast } from 'sonner'
 import { supabase } from "../../lib/supabase"
 import { ArrowLeft, Loader2, Save, Users, Truck, Wrench, Package, Building, ClipboardList, Plus, Trash2, Camera, X, Mic, MicOff, Sparkles, PackageX } from "lucide-react"
 import imageCompression from 'browser-image-compression';
@@ -476,35 +477,35 @@ export default function ReportForm() {
 
   const handleSave = async () => {
     if (!report.project_id) {
-        alert("対象案件を選択してください")
+        toast.warning("対象案件を選択してください")
         return
     }
     if (!report.作業区分) {
-        alert("作業区分を選択してください")
+        toast.warning("作業区分を選択してください")
         return
     }
     if (!report.作業開始時間 || !report.作業終了時間) {
-        alert("作業開始日時および作業終了日時を入力してください")
+        toast.warning("作業開始日時および作業終了日時を入力してください")
         return
     }
     if (!report.工事内容 || report.工事内容.trim() === '') {
-        alert("作業内容を入力してください")
+        toast.warning("作業内容を入力してください")
         return
     }
     if (!report.工事進捗 || report.工事進捗 === '') {
-        alert("工事進捗を入力してください")
+        toast.warning("工事進捗を入力してください")
         return
     }
 
     const hasPersonnel = personnel.some(p => p.worker_id || (p.worker_name && p.worker_name.trim() !== ''));
     if (!hasPersonnel) {
-        alert("作業員編成を1名以上入力してください")
+        toast.warning("作業員編成を1名以上入力してください")
         return
     }
 
 
     if (existingPhotos.length === 0 && pendingPhotos.length === 0) {
-        alert("現場写真を1枚以上追加してください")
+        toast.warning("現場写真を1枚以上追加してください")
         return
     }
 
@@ -542,20 +543,20 @@ export default function ReportForm() {
                         } catch(e) {}
                         
                         console.error('Photo Upload Edge Function Error:', uploadError, detailedMsg);
-                        alert(`写真アップロードに失敗しました:\n${detailedMsg}`);
+                        toast.error(`写真アップロードに失敗しました:\n${detailedMsg}`);
                         continue;
                     }
 
                     if (!uploadData?.success) {
                         console.error('Photo Upload error:', uploadData?.error);
-                        alert(`写真アップロードに失敗しました: ${uploadData?.error}`);
+                        toast.error(`写真アップロードに失敗しました: ${uploadData?.error}`);
                     } else if (uploadData) {
                         const driveImgUrl = uploadData.directLink ? uploadData.directLink : uploadData.webViewLink;
                         uploadedUrls.push(driveImgUrl);
                     }
                 } catch (err: any) {
                     console.error('Compression or upload failed:', err);
-                    alert(`写真のアップロード中に予期せぬエラーが発生しました: ${err.message}`);
+                    toast.error(`写真のアップロード中に予期せぬエラーが発生しました: ${err.message}`);
                 }
             }
         }
@@ -768,7 +769,7 @@ export default function ReportForm() {
         navigate('/reports')
     } catch (e: any) {
         console.error(e)
-        alert("保存に失敗しました: " + e.message)
+        toast.error("保存に失敗しました: " + e.message)
     } finally {
         setSaving(false)
     }
@@ -794,7 +795,7 @@ export default function ReportForm() {
       navigate('/reports')
     } catch (e: any) {
       console.error("Delete outer error:", e)
-      alert("削除に失敗しました: " + e.message)
+      toast.error("削除に失敗しました: " + e.message)
       setDeleting(false)
       setShowDeleteConfirm(false)
     }
@@ -843,7 +844,7 @@ export default function ReportForm() {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognition) {
-      alert("お使いのブラウザは音声入力に対応していません。Chromeをお試しください。")
+      toast.warning("お使いのブラウザは音声入力に対応していません。Chromeをお試しください。")
       return
     }
 
@@ -875,7 +876,7 @@ export default function ReportForm() {
       setVoiceListening(false)
       setVoiceTarget(null)
       if (event.error !== "aborted" && event.error !== "no-speech") {
-        alert("音声入力でエラーが発生しました。もう一度お試しください。")
+        toast.error("音声入力でエラーが発生しました。もう一度お試しください。")
       }
     }
 
@@ -916,7 +917,7 @@ export default function ReportForm() {
             setPendingVoiceMaterials(parsed)
             setShowMaterialsModal(true)
           } catch {
-            alert(`材料の解析に失敗しました。手動で入力してください。\n\n認識内容: ${transcript}`)
+            toast.error(`材料の解析に失敗しました。手動で入力してください。\n\n認識内容: ${transcript}`)
           }
         } else if (target === "content") {
           setReport(prev => ({ ...prev, 工事内容: prev.工事内容 ? prev.工事内容 + "\n" + result : result }))

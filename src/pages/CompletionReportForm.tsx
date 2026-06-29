@@ -5,6 +5,7 @@ import { ArrowLeft, Loader2, Save, CheckSquare, Calendar, User, Search, Camera, 
 import imageCompression from 'browser-image-compression';
 import { format } from 'date-fns';
 import { AutocompleteInput } from "../components/ui/AutocompleteInput"
+import { toast } from 'sonner'
 
 type ProjectData = {
   id: string
@@ -157,7 +158,7 @@ export default function CompletionReportForm() {
 
   const handleSave = async () => {
     if (!report.project_id) {
-      alert("案件を選択してください")
+      toast.warning("案件を選択してください")
       return
     }
 
@@ -226,7 +227,7 @@ export default function CompletionReportForm() {
       navigate('/completion-reports')
     } catch (e: any) {
       console.error("Error saving report:", e)
-      alert("保存中にエラーが発生しました: " + e.message)
+      toast.error("保存中にエラーが発生しました: " + e.message)
     } finally {
       setSaving(false)
     }

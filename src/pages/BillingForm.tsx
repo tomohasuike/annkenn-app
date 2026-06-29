@@ -3,6 +3,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom"
 import { supabase } from "../lib/supabase"
 import { ArrowLeft, Save, Trash2, Loader2, FileText, PlusCircle, Folder } from "lucide-react"
 import { AutocompleteInput } from "../components/ui/AutocompleteInput"
+import { toast } from 'sonner'
 
 type ProjectData = { 
   id: string; 
@@ -102,7 +103,7 @@ export default function BillingForm() {
       const hasBillingAccess = permissions.includes('billing') || permissions.includes('schedule-admin') || workerData?.is_admin
       
       if (!hasBillingAccess) {
-        alert("請求管理にアクセスする権限がありません。")
+        toast.error("請求管理にアクセスする権限がありません。")
         navigate('/')
         return
       }
@@ -197,7 +198,7 @@ export default function BillingForm() {
       }
     } catch (error) {
       console.error("Error fetching invoice:", error)
-      alert("請求データの読み込みに失敗しました")
+      toast.error("請求データの読み込みに失敗しました")
       navigate("/billing")
     } finally {
       setLoading(false)
@@ -291,7 +292,7 @@ export default function BillingForm() {
 
   const handleSave = async () => {
     if (!projectId) {
-      alert("案件を選択してください。")
+      toast.warning("案件を選択してください。")
       return
     }
 
@@ -346,7 +347,7 @@ export default function BillingForm() {
       navigate("/billing", { state: { returnToInvoiceId: currentInvoiceId } })
     } catch (e: any) {
       console.error("Error saving invoice:", e)
-      alert("保存中にエラーが発生しました: " + e.message)
+      toast.error("保存中にエラーが発生しました: " + e.message)
     } finally {
       setSaving(false)
     }

@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase"
 import { format, addDays, subDays, startOfWeek } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Search, ChevronLeft, ChevronRight, Plus, RefreshCw, Users, MessageSquare, Info, X, CalendarDays, List, ListTodo, History, PanelLeft, ChevronDown, ChevronRight as ChevronRightIcon, Truck, Trash2, Clock, FolderGit2, User } from 'lucide-react'
+import { toast } from 'sonner'
 
 type ProjectData = { id: string; name: string; category: string; status: string; no: string | null; site: string | null; legacy_id?: string; client_name?: string | null; client_company_name?: string | null; folder_url?: string | null; parent_project_id?: string | null }
 type ResourceData = { id: string; name: string; type: 'worker' | 'vehicle'; categoryId?: 'president' | 'employee' | 'partner' | 'vehicle' | 'machine' }
@@ -596,7 +597,7 @@ export default function ScheduleManagement() {
       fetchData() // Refresh list
     } catch (err) {
       console.error("Add resource error:", err)
-      alert("リソースの追加に失敗しました。")
+      toast.error("リソースの追加に失敗しました。")
     }
   }
 
@@ -614,7 +615,7 @@ export default function ScheduleManagement() {
       if (error) throw error
     } catch (err: any) {
       console.error('削除エラー:', err)
-      alert('配置の解除に失敗しました。')
+      toast.error('配置の解除に失敗しました。')
       setAssignments(prevAssignments)
     }
   }
@@ -797,7 +798,7 @@ export default function ScheduleManagement() {
       fetchAssignments();
     } catch (e) {
       console.error("Error adding multiple assignments:", e);
-      alert("配置の追加に失敗しました。");
+      toast.error("配置の追加に失敗しました。");
     }
   };
 
@@ -980,7 +981,7 @@ export default function ScheduleManagement() {
                 onClick={() => {
                   const { projectId, dateStr, start, end } = timeBlockModalState;
                   if (!start || !end) {
-                    alert('時間を入力してください');
+                    toast.warning('時間を入力してください');
                     return;
                   }
                   const key = `${projectId}-${dateStr}`;

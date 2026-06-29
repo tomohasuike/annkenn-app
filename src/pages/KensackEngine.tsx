@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Search, Camera, Cpu, AlertTriangle, CheckCircle2, Loader2, ImagePlus, ShoppingCart, Trash2, Mail, FileText, ChevronUp, ChevronDown, Mic, Plus, GripVertical, ArrowUp, SlidersHorizontal } from 'lucide-react';
 import { executeKensackSearch, executeKensackVisionSearch, parseVoiceToCartItems } from '../services/KensackService';
 import imageCompression from 'browser-image-compression';
@@ -688,7 +689,7 @@ export const KensackEngine: React.FC = () => {
     const w = window as any;
     const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("お使いのブラウザは音声入力に対応していません。推奨: Chrome / Safari");
+      toast.warning("お使いのブラウザは音声入力に対応していません。推奨: Chrome / Safari");
       return;
     }
 
@@ -730,7 +731,7 @@ export const KensackEngine: React.FC = () => {
     const w = window as any;
     const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("お使いのブラウザは音声入力に対応していません。推奨: Chrome / Safari");
+      toast.warning("お使いのブラウザは音声入力に対応していません。推奨: Chrome / Safari");
       return;
     }
     const recognition = new SpeechRecognition();
@@ -789,7 +790,7 @@ export const KensackEngine: React.FC = () => {
         setIsListening(false); // 成功してから閉じる
       } catch (error) {
         console.error(error);
-        alert('音声の解析に失敗しました。');
+        toast.error('音声の解析に失敗しました。');
         setIsListening(false);
       } finally {
         setIsVoiceParsing(false);

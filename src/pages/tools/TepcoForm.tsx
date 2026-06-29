@@ -4,6 +4,8 @@ import {
   ChevronDown, ChevronUp, Check, AlertTriangle, Trash2, FileText, X,
   FolderOpen, Clock, ExternalLink
 } from "lucide-react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { supabase } from "../../lib/supabase";
 
 // ─── 型定義 ───────────────────────────────────────────
@@ -26,13 +28,16 @@ interface FormData {
   startDate: string;
   completionDate: string;
   powerDate: string;
+  powerAsap: boolean;
   // 電灯
   hasDentou: boolean;
   dentouType: string;
   dentouCapacity: string;
+  dentouCapacityUnit: 'A' | 'kVA';
   // 動力
   hasDouryoku: boolean;
   douryokuCapacity: string;
+  douryokuCapacityUnit: 'A' | 'kVA';
   // ④引込線
   poleName: string;
   poleLength: string;
@@ -80,9 +85,9 @@ const INITIAL_FORM: FormData = {
   needsName: "", needsAddress: "", needsPhone: "", needsPerson: "",
   billingSame: false,
   billingName: "", billingAddress: "", billingPerson: "", billingPhone: "",
-  startDate: "", completionDate: "2000/00/00", powerDate: "最短日",
-  hasDentou: true, dentouType: "単相3線式100/200V", dentouCapacity: "50",
-  hasDouryoku: false, douryokuCapacity: "3",
+  startDate: "", completionDate: "", powerDate: "", powerAsap: true,
+  hasDentou: true, dentouType: "単相3線式100/200V", dentouCapacity: "50", dentouCapacityUnit: 'A',
+  hasDouryoku: false, douryokuCapacity: "3", douryokuCapacityUnit: 'kVA',
   poleName: "", poleLength: "", poleHeight: "",
   memo: "",
 };
@@ -142,6 +147,20 @@ export default function TepcoForm() {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locError, setLocError] = useState<string | null>(null);
   const [mapClipUrl, setMapClipUrl] = useState<string | null>(null);
+  // 3電柱の位置
+  type PoleKey = 'main' | 'right' | 'left' | 'service';
+  const [poleLocations, setPoleLocations] = useState<Record<PoleKey, { lat: number; lng: number } | null>>({
+    main: null, right: null, left: null, service: null
+  });
+  const [poleCapturing, setPoleCapturing] = useState(false);
+  const [placingMode, setPlacingMode] = useState<PoleKey>('main');
+  const mapDivRef = useRef<HTMLDivElement>(null);
+  const lMapRef = useRef<L.Map | null>(null);
+  const lMarkersRef = useRef<Record<PoleKey, L.CircleMarker | null>>({ main: null, right: null, left: null, service: null });
+  const placingModeRef = useRef<PoleKey>('main');
+  const [poleNumbers, setPoleNumbers] = useState<Record<PoleKey, string>>({ main: '', right: '', left: '', service: '' });
+  const lLightningRef = useRef<L.Polyline | null>(null);
+  const lDistLabelRef = useRef<L.Marker | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -231,6 +250,132 @@ export default function TepcoForm() {
     );
   }, []);
 
+  // 電柱番号が変わったらマーカーのツールチップを更新
+  useEffect(() => {
+    (['main', 'right', 'left', 'service'] as PoleKey[]).forEach(key => {
+      const marker = lMarkersRef.current[key];
+      if (!marker) return;
+      if (poleNumbers[key]) {
+        marker.bindTooltip(poleNumbers[key], { permanent: true, direction: 'top', className: 'pole-number-label' }).openTooltip();
+      } else {
+        marker.unbindTooltip();
+      }
+    });
+  }, [poleNumbers]);
+
+  // 引込柱↔当該柱の雷撃ライン描画
+  useEffect(() => {
+    const map = lMapRef.current;
+    if (!map) return;
+    if (lLightningRef.current) { lLightningRef.current.remove(); lLightningRef.current = null; }
+    if (lDistLabelRef.current) { lDistLabelRef.current.remove(); lDistLabelRef.current = null; }
+    const a = poleLocations.main;
+    const b = poleLocations.service;
+    if (!a || !b) return;
+    const dLat = b.lat - a.lat;
+    const dLng = b.lng - a.lng;
+    const len = Math.sqrt(dLat * dLat + dLng * dLng) || 1;
+    const offset = len * 0.35;
+    const perpLat = (-dLng / len) * offset;
+    const perpLng = (dLat / len) * offset;
+    const path: [number, number][] = [
+      [a.lat, a.lng],
+      [a.lat + dLat * 0.35 + perpLat, a.lng + dLng * 0.35 + perpLng],
+      [a.lat + dLat * 0.65 - perpLat, a.lng + dLng * 0.65 - perpLng],
+      [b.lat, b.lng],
+    ];
+    lLightningRef.current = L.polyline(path, {
+      color: '#f59e0b', weight: 3, opacity: 0.9, dashArray: '8 4',
+    }).addTo(map);
+    // ラベルをラインの垂直方向にオフセットして重なりを避ける
+    const labelOffset = len * 0.55;
+    const labelLat = (a.lat + b.lat) / 2 + (-dLng / len) * labelOffset;
+    const labelLng = (a.lng + b.lng) / 2 + (dLat / len) * labelOffset;
+    const distText = form.poleLength ? `⚡ ${form.poleLength}m` : '⚡ 引込線';
+    const icon = L.divIcon({
+      html: `<div style="color:#fbbf24;font-size:14px;font-weight:bold;white-space:nowrap;text-shadow:0 0 4px #000,0 0 4px #000,0 0 4px #000;">${distText}</div>`,
+      className: '', iconAnchor: [30, 10],
+    });
+    lDistLabelRef.current = L.marker([labelLat, labelLng], { icon, interactive: false }).addTo(map);
+  }, [poleLocations.main, poleLocations.service, form.poleLength]);
+
+  // GPS取得してマップをその位置に移動（ピンは手動タップ）
+  const moveToCurrentLocation = useCallback(() => {
+    if (!navigator.geolocation) { setLocError("Geolocationに対応していません"); return; }
+    setPoleCapturing(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGpsCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setPoleCapturing(false);
+      },
+      (e) => { setLocError(`位置情報エラー: ${e.message}`); setPoleCapturing(false); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, []);
+
+  // placingMode をrefに同期（マップクリックハンドラのクロージャで使う）
+  useEffect(() => { placingModeRef.current = placingMode; }, [placingMode]);
+
+  // Leaflet マップ初期化（マウント時一度だけ）
+  useEffect(() => {
+    if (!mapDivRef.current || lMapRef.current) return;
+    const map = L.map(mapDivRef.current, { zoomControl: true }).setView([35.6812, 139.7671], 18);
+    // ESRIの衛星タイル（無料・APIキー不要）
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles © Esri',
+      maxZoom: 20,
+    }).addTo(map);
+    map.on('click', (e) => {
+      const { lat, lng } = e.latlng;
+      const key = placingModeRef.current;
+      if (lMarkersRef.current[key]) lMarkersRef.current[key]!.remove();
+      const fillColor = key === 'main' ? '#ef4444' : key === 'right' ? '#3b82f6' : key === 'left' ? '#22c55e' : '#f59e0b';
+      const cm = L.circleMarker([lat, lng], {
+        radius: key === 'main' ? 12 : 10,
+        fillColor,
+        fillOpacity: 1,
+        color: '#fff',
+        weight: 2,
+      }).addTo(map);
+      // 電柱番号が入力済みならすぐラベル表示
+      const num = placingModeRef.current === key
+        ? (document.getElementById(`pole-num-${key}`) as HTMLInputElement | null)?.value ?? ''
+        : '';
+      if (num) cm.bindTooltip(num, { permanent: true, direction: 'top', className: 'pole-number-label' }).openTooltip();
+      lMarkersRef.current[key] = cm;
+      setPoleLocations(p => ({ ...p, [key]: { lat, lng } }));
+    });
+    lMapRef.current = map;
+    return () => { map.remove(); lMapRef.current = null; };
+  }, []);
+
+  // GPS取得時：マップをその位置に移動するだけ（ピンは手動タップで）
+  const [gpsCenter, setGpsCenter] = useState<{ lat: number; lng: number } | null>(null);
+  useEffect(() => {
+    if (!lMapRef.current || !gpsCenter) return;
+    lMapRef.current.panTo([gpsCenter.lat, gpsCenter.lng]);
+  }, [gpsCenter]);
+
+  // 3ピン静的マップURL（Drive保存用サムネイルとして引き続き使用）
+  const multiPinMapUrl = (() => {
+    const pins = [
+      { key: 'main' as PoleKey, color: 'red',   label: '当' },
+      { key: 'right' as PoleKey, color: 'blue',  label: '右' },
+      { key: 'left' as PoleKey, color: 'green', label: '左' },
+    ].filter(p => poleLocations[p.key]);
+    if (pins.length === 0) return null;
+    const lats = pins.map(p => poleLocations[p.key]!.lat);
+    const lngs = pins.map(p => poleLocations[p.key]!.lng);
+    const centerLat = (Math.max(...lats) + Math.min(...lats)) / 2;
+    const centerLng = (Math.max(...lngs) + Math.min(...lngs)) / 2;
+    let url = `https://maps.googleapis.com/maps/api/staticmap?center=${centerLat},${centerLng}&zoom=17&size=600x400&key=${MAPS_KEY}`;
+    pins.forEach(p => {
+      const loc = poleLocations[p.key]!;
+      url += `&markers=color:${p.color}%7Clabel:${encodeURIComponent(p.label)}%7C${loc.lat},${loc.lng}`;
+    });
+    return url;
+  })();
+
   useEffect(() => { getLocation(); }, [getLocation]);
 
   const set = (k: keyof FormData, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
@@ -265,19 +410,19 @@ export default function TepcoForm() {
 
       // フォルダ作成
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      const subName = `${form.appKind}_${form.voltageClass}_${form.poleName || "未入力"}_${today}`;
+      const subName = `${form.appKind}_${form.voltageClass}_${poleNumbers.main || "未入力"}_${today}`;
       const tepcoFolderId = await driveCreateFolder("TEPCO申込", PARENT_FOLDER_ID, token);
       const subFolderId = await driveCreateFolder(subName, tepcoFolderId, token);
 
       // フォームデータ保存
-      const dentouText = form.hasDentou ? `[電灯] 電気方式：${form.dentouType} / 契約容量：${form.dentouCapacity}A` : '';
-      const douryokuText = form.hasDouryoku ? `[動力] 電気方式：三相3線式200V / 契約容量：${form.douryokuCapacity}kVA` : '';
+      const dentouText = form.hasDentou ? `[電灯] 電気方式：${form.dentouType} / 契約容量：${form.dentouCapacity}${form.dentouCapacityUnit}` : '';
+      const douryokuText = form.hasDouryoku ? `[動力] 電気方式：三相3線式200V / 契約容量：${form.douryokuCapacity}${form.douryokuCapacityUnit}` : '';
       const text = `東京電力 申込依頼書\n作成日：${new Date().toLocaleDateString("ja-JP")}\n\n` +
         `《申込区分》 ${form.appKind} / ${form.voltageClass}\n\n` +
         `《①契約需給先》\n名義：${form.needsName}\n住所：${form.needsAddress}\n担当者：${form.needsPerson}\n連絡先：${form.needsPhone}\n\n` +
         `【②請求先】\n名義：${form.billingName}\n住所：${form.billingAddress}\n担当者：${form.billingPerson}\n連絡先：${form.billingPhone}\n\n` +
-        `【③申込内容】\n工事着工日：${form.startDate}\n工事完了日（落成日）：${form.completionDate}\n送電希望日：${form.powerDate}\n電気方式：${form.electricType}\n契約容量：${form.capacity}A\n\n` +
-        `【④引込線】\n引込柱NO：${form.poleName}\n電柱〜引込位置の長さ：${form.poleLength}m\n引込点の高さ：${form.poleHeight}m\n\n` +
+        `【③申込内容】\n工事着工日：${form.startDate}\n工事完了日（落成日）：${form.completionDate}\n送電希望日：${form.powerAsap ? "最短日" : form.powerDate}\n電気方式：${form.electricType}\n契約容量：${form.capacity}A\n\n` +
+        `【④引込線】\n引込柱NO：${poleNumbers.main}\n電柱〜引込位置の長さ：${form.poleLength}m\n引込点の高さ：${form.poleHeight}m\n\n` +
         `【メモ】\n${form.memo}`;
       await driveUploadFile("申込内容.txt", text, "text/plain", subFolderId, token);
 
@@ -300,7 +445,7 @@ export default function TepcoForm() {
       const newItem: HistoryItem = {
         id: Date.now().toString(),
         date: new Date().toLocaleDateString('ja-JP'),
-        poleName: form.poleName || '未入力',
+        poleName: poleNumbers.main || '未入力',
         needsName: form.needsName,
         address: form.needsAddress,
         projectName: selectedProject ? `[${selectedProject.project_number}] ${selectedProject.project_name}` : '案件未選択',
@@ -543,8 +688,8 @@ export default function TepcoForm() {
 
       {/* ①契約需給先 */}
       <Section id="s1" title="① 契約需給先" open={openSection} toggle={toggle}>
-        <Field label="名義" value={form.needsName} onChange={v => set("needsName", v)} placeholder="鈴木智寿" />
-        <Field label="需給箇所住所" value={form.needsAddress} onChange={v => set("needsAddress", v)} placeholder="栃木県那須塩原市青木29番地7" />
+        <Field label="名義" value={form.needsName} onChange={v => set("needsName", v)} placeholder="田中 一郎" />
+        <Field label="需給箇所住所" value={form.needsAddress} onChange={v => set("needsAddress", v)} placeholder="東京都○○市○○1丁目1番地1" />
         <Field label="担当者" value={form.needsPerson} onChange={v => set("needsPerson", v)} placeholder="山田太郎" />
         <Field label="連絡先" value={form.needsPhone} onChange={v => set("needsPhone", v)} placeholder="090-0000-0000" type="tel" />
       </Section>
@@ -565,8 +710,18 @@ export default function TepcoForm() {
       {/* ③申込内容 */}
       <Section id="s3" title="③ 申込内容の確認" open={openSection} toggle={toggle}>
         <Field label="工事着工日" value={form.startDate} onChange={v => set("startDate", v)} type="date" />
-        <Field label="工事完了日（落成日）" value={form.completionDate} onChange={v => set("completionDate", v)} placeholder="2000/00/00" />
-        <Field label="送電希望日" value={form.powerDate} onChange={v => set("powerDate", v)} placeholder="最短日" />
+        <Field label="工事完了日（落成日）" value={form.completionDate} onChange={v => set("completionDate", v)} type="date" />
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-600 dark:text-slate-400">送電希望日</label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={form.powerAsap} onChange={e => set("powerAsap", e.target.checked)}
+              className="w-4 h-4 accent-blue-600" />
+            <span className="text-sm text-slate-600 dark:text-slate-400">最短日</span>
+          </label>
+          {!form.powerAsap && (
+            <Field label="" value={form.powerDate} onChange={v => set("powerDate", v)} type="date" />
+          )}
+        </div>
 
         {/* 電灯申込 */}
         <div className="border border-blue-200 dark:border-blue-800 rounded-xl overflow-hidden">
@@ -587,10 +742,19 @@ export default function TepcoForm() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">契約容量</label>
-                <select value={form.dentouCapacity} onChange={e => set("dentouCapacity", e.target.value)}
-                  className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-sm font-medium focus:ring-2 focus:ring-blue-500">
-                  {["10","15","20","30","40","50","60"].map(v => <option key={v}>{v}A</option>)}
-                </select>
+                <div className="flex gap-2">
+                  <input type="number" min="0" value={form.dentouCapacity} onChange={e => set("dentouCapacity", e.target.value)}
+                    className="flex-1 px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-sm font-medium focus:ring-2 focus:ring-blue-500"
+                    placeholder="例：50" />
+                  <div className="flex rounded-lg border border-slate-300 dark:border-slate-600 overflow-hidden text-sm font-medium">
+                    {(['A', 'kVA'] as const).map(unit => (
+                      <button key={unit} type="button" onClick={() => set("dentouCapacityUnit", unit)}
+                        className={`px-3 py-2.5 transition-colors ${form.dentouCapacityUnit === unit ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50'}`}>
+                        {unit}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -612,11 +776,20 @@ export default function TepcoForm() {
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">契約容量 (kVA)</label>
-                <select value={form.douryokuCapacity} onChange={e => set("douryokuCapacity", e.target.value)}
-                  className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-sm font-medium focus:ring-2 focus:ring-blue-500">
-                  {["1.5","3","4.5","6","7.5","9","11","15","18.5","22","30"].map(v => <option key={v}>{v}kVA</option>)}
-                </select>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">契約容量</label>
+                <div className="flex gap-2">
+                  <input type="number" min="0" step="0.1" value={form.douryokuCapacity} onChange={e => set("douryokuCapacity", e.target.value)}
+                    className="flex-1 px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-sm font-medium focus:ring-2 focus:ring-blue-500"
+                    placeholder="例：3" />
+                  <div className="flex rounded-lg border border-slate-300 dark:border-slate-600 overflow-hidden text-sm font-medium">
+                    {(['A', 'kVA'] as const).map(unit => (
+                      <button key={unit} type="button" onClick={() => set("douryokuCapacityUnit", unit)}
+                        className={`px-3 py-2.5 transition-colors ${form.douryokuCapacityUnit === unit ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50'}`}>
+                        {unit}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -631,77 +804,94 @@ export default function TepcoForm() {
 
       {/* ④引込線 */}
       <Section id="s4" title="④ 引込線について" open={openSection} toggle={toggle}>
-        <Field label="引込柱NO" value={form.poleName} onChange={v => set("poleName", v)} placeholder="青木577" />
+        <div className="space-y-1">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">引込柱NO（当該柱）</label>
+          <div className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300">
+            {poleNumbers.main || <span className="text-slate-400 dark:text-slate-500">電柱位置マップの当該柱から自動入力</span>}
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="電柱〜引込位置の長さ（m）" value={form.poleLength} onChange={v => set("poleLength", v)} type="number" placeholder="15" />
           <Field label="引込点の高さ（m）" value={form.poleHeight} onChange={v => set("poleHeight", v)} type="number" placeholder="4" />
         </div>
       </Section>
 
-      {/* 地図クリッピング */}
-      <Section id="s5" title="📍 現在地マップ（ピン付き）" open={openSection} toggle={toggle}>
+      {/* 電柱位置マップ */}
+      <Section id="s5" title="📍 電柱位置マップ（3ピン）" open={openSection} toggle={toggle}>
         <div className="space-y-3">
           {locError && (
             <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               <AlertTriangle className="w-4 h-4 shrink-0" /> {locError}
             </div>
           )}
-          {location ? (
-            <>
-              {/* 座標表示 */}
-              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                <MapPin className="w-4 h-4 text-green-600 shrink-0" />
-                <span className="text-xs text-green-700 dark:text-green-400 font-mono">
-                  {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
-                </span>
-              </div>
 
-              {/* インタラクティブ埋め込みマップ（ピン付き） */}
-              <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
-                <iframe
-                  title="現場位置マップ"
-                  src={`https://maps.google.com/maps?q=${location.lat},${location.lng}&z=17&output=embed&hl=ja`}
-                  width="100%"
-                  height="320"
-                  style={{ border: 0 }}
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-                <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs text-slate-500 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <Check className="w-3 h-3 text-green-500" />
-                    現在地にピンを表示中
-                  </span>
-                  <a
-                    href={`https://www.google.com/maps?q=${location.lat},${location.lng}`}
-                    target="_blank" rel="noopener noreferrer"
-                    className="text-blue-500 hover:text-blue-700 font-medium flex items-center gap-1"
-                  >
-                    <MapPin className="w-3 h-3" /> 大きく開く
-                  </a>
-                </div>
-              </div>
+          {/* GPS：現在地にマップを移動するだけ */}
+          <button
+            onClick={moveToCurrentLocation}
+            disabled={poleCapturing}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 text-xs font-bold hover:bg-slate-100 disabled:opacity-50 transition-colors"
+          >
+            {poleCapturing
+              ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> 取得中...</>
+              : <><MapPin className="w-3.5 h-3.5" /> 現在地にマップを移動</>}
+          </button>
 
-              {/* Drive保存用の静的地図（非表示・URLのみ保持） */}
-              {mapClipUrl && (
-                <p className="text-xs text-slate-400 flex items-center gap-1">
-                  <Check className="w-3 h-3 text-green-500" />
-                  地図スクリーンショット取得済み（Drive保存時に自動添付されます）
-                </p>
-              )}
-            </>
-          ) : (
-            <div className="h-48 bg-slate-100 dark:bg-slate-800 rounded-xl flex flex-col items-center justify-center gap-2 text-slate-400 text-sm">
-              <MapPin className="w-8 h-8 opacity-30" />
-              {isOnline ? "位置情報を取得中..." : "オフラインのため地図を表示できません"}
+          {/* モード選択：3本とも地図タップで配置 */}
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              {([
+                { key: 'main' as PoleKey, label: '🔴 当該柱', active: 'bg-red-500 border-red-500 text-white shadow-md', inactive: 'bg-red-50 border-red-200 text-red-700' },
+                { key: 'right' as PoleKey, label: '🔵 右柱', active: 'bg-blue-500 border-blue-500 text-white shadow-md', inactive: 'bg-blue-50 border-blue-200 text-blue-700' },
+                { key: 'left' as PoleKey, label: '🟢 左柱', active: 'bg-green-500 border-green-500 text-white shadow-md', inactive: 'bg-green-50 border-green-200 text-green-700' },
+                { key: 'service' as PoleKey, label: '⚡ 引込柱', active: 'bg-amber-500 border-amber-500 text-white shadow-md', inactive: 'bg-amber-50 border-amber-200 text-amber-700' },
+              ]).map(({ key, label, active, inactive }) => (
+                <button key={key} onClick={() => setPlacingMode(key)}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${placingMode === key ? active : inactive}`}
+                >
+                  {label}{poleLocations[key] && <span className="ml-1 opacity-80">✓</span>}
+                </button>
+              ))}
+            </div>
+            {/* 電柱番号入力（選択中のモードのみ表示） */}
+            {([
+              { key: 'main' as PoleKey, placeholder: '例: 千葉１２３４', ring: 'focus:ring-red-300 border-red-200', label: '当該柱' },
+              { key: 'right' as PoleKey, placeholder: '例: 千葉１２３５', ring: 'focus:ring-blue-300 border-blue-200', label: '右柱' },
+              { key: 'left' as PoleKey, placeholder: '例: 千葉１２３３', ring: 'focus:ring-green-300 border-green-200', label: '左柱' },
+              { key: 'service' as PoleKey, placeholder: '例: 千葉１２３６', ring: 'focus:ring-amber-300 border-amber-200', label: '引込柱' },
+            ]).map(({ key, placeholder, ring, label }) => placingMode === key && (
+              <input
+                key={key}
+                id={`pole-num-${key}`}
+                type="text"
+                placeholder={`電柱番号（${label}）　${placeholder}`}
+                value={poleNumbers[key]}
+                onChange={e => setPoleNumbers(p => ({ ...p, [key]: e.target.value }))}
+                className={`w-full px-3 py-2 text-sm border rounded-lg bg-white text-slate-800 focus:outline-none focus:ring-2 ${ring}`}
+              />
+            ))}
+          </div>
+
+          {/* インタラクティブマップ */}
+          <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
+            <div ref={mapDivRef} className="w-full h-72" />
+            <div className="absolute top-2 left-2 pointer-events-none z-[999]">
+              <span className={`inline-block px-2 py-1 rounded text-[11px] font-bold text-white shadow ${
+                placingMode === 'main' ? 'bg-red-500' : placingMode === 'right' ? 'bg-blue-500' : 'bg-green-500'
+              }`}>
+                タップで{placingMode === 'main' ? '🔴当該柱' : placingMode === 'right' ? '🔵右柱' : '🟢左柱'}を置く
+              </span>
+            </div>
+          </div>
+
+          {/* 配置済み座標サマリ */}
+          {(poleLocations.main || poleLocations.right || poleLocations.left || poleLocations.service) && (
+            <div className="flex flex-col gap-1 text-[11px] font-mono text-slate-500">
+              {poleLocations.main && <span className="bg-red-50 border border-red-100 rounded px-2 py-1">🔴 当該柱 {poleLocations.main.lat.toFixed(5)}, {poleLocations.main.lng.toFixed(5)}</span>}
+              {poleLocations.right && <span className="bg-blue-50 border border-blue-100 rounded px-2 py-1">🔵 右柱 {poleLocations.right.lat.toFixed(5)}, {poleLocations.right.lng.toFixed(5)}</span>}
+              {poleLocations.left && <span className="bg-green-50 border border-green-100 rounded px-2 py-1">🟢 左柱 {poleLocations.left.lat.toFixed(5)}, {poleLocations.left.lng.toFixed(5)}</span>}
+              {poleLocations.service && <span className="bg-amber-50 border border-amber-100 rounded px-2 py-1">⚡ 引込柱 {poleLocations.service.lat.toFixed(5)}, {poleLocations.service.lng.toFixed(5)}</span>}
             </div>
           )}
-
-          <button onClick={getLocation}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors">
-            <RefreshCw className="w-4 h-4" /> 現在地を再取得
-          </button>
         </div>
       </Section>
 

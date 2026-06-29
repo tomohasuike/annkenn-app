@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "../lib/supabase"
 import { Loader2, Search, Plus, Building2, Folder, Pencil, ClipboardList, CalendarPlus } from "lucide-react"
 import { Link } from "react-router-dom"
+import { toast } from 'sonner'
 
 type Project = {
   id: string
@@ -101,7 +102,7 @@ export default function Projects() {
       ))
     } catch (err: any) {
       console.error("Error updating status:", err)
-      alert("ステータスの更新に失敗しました: " + err.message)
+      toast.error("ステータスの更新に失敗しました: " + err.message)
     }
   }
 

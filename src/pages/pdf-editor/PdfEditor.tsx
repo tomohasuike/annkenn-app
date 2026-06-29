@@ -776,7 +776,7 @@ export default function PdfEditor() {
       
       const droppedFile = droppedFiles[0];
       if (droppedFile.type !== 'application/pdf') {
-          alert("PDFファイルのみ追加可能です。");
+          toast.warning("PDFファイルのみ追加可能です。");
           return;
       }
       
@@ -840,7 +840,7 @@ export default function PdfEditor() {
       
       const newOrder = pageOrder.filter(id => !targets.includes(id));
       if (newOrder.length === 0) {
-          alert("最後の1ページは削除できません。");
+          toast.warning("最後の1ページは削除できません。");
           return;
       }
 
@@ -1005,7 +1005,7 @@ export default function PdfEditor() {
           setFuture([]);
       } catch (e) {
           console.error("Local file load error", e);
-          alert("ファイルの読み込みに失敗しました。");
+          toast.error("ファイルの読み込みに失敗しました。");
       }
     }
   };
@@ -1131,7 +1131,7 @@ export default function PdfEditor() {
           setFiles(prev => [...prev, inMemoryFile]);
       } catch (e) {
           console.error("Merge error", e);
-          alert("PDFの追加に失敗しました。");
+          toast.error("PDFの追加に失敗しました。");
       } finally {
           setIsMerging(false);
           setIsAddMenuOpen(false);
@@ -1362,7 +1362,7 @@ export default function PdfEditor() {
         if (err.name !== 'AbortError') {
             const errMsg = err.message || JSON.stringify(err);
             console.error('PDFのエクスポートに失敗しました:', err);
-            alert('PDF保存エラー: ' + errMsg);
+            toast.error('PDF保存エラー: ' + errMsg);
         }
     } finally {
         setIsExporting(false);
@@ -1371,7 +1371,7 @@ export default function PdfEditor() {
 
   const handleOpenFromDrive = (mode: 'replace' | 'append' = 'replace') => {
       if (!tokenClient || !isGoogleApiLoaded) {
-          alert('Google APIを読み込み中です。少し待ってから再度お試しください。');
+          toast.warning('Google APIを読み込み中です。少し待ってから再度お試しください。');
           return;
       }
       tokenClient.callback = async (response: any) => {
@@ -1437,7 +1437,7 @@ export default function PdfEditor() {
                               setFiles(prev => [...prev, downloadedFile]);
                           }
                       } catch (e) {
-                          alert('ファイルの読み込みに失敗しました');
+                          toast.error('ファイルの読み込みに失敗しました');
                           console.error(e);
                       } finally {
                           setIsMerging(false);

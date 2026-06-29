@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import type { ProjectSummary } from './useWorkSummary';
 import { useWorkSummary } from './useWorkSummary';
 import { PieChart, Hammer, Briefcase, FileSignature, List, Truck, Building2, UserCircle, Package, Camera, FileText, Info } from 'lucide-react';
@@ -38,7 +39,7 @@ export default function WorkSummary() {
 
   const handleSearch = () => {
     if (!startDate || !endDate) {
-      alert('期間を設定してください');
+      toast.warning('期間を設定してください');
       return;
     }
     fetchData(startDate, endDate, projectId, isAllTime);

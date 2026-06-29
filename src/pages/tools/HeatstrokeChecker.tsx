@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react"
+import { toast } from 'sonner'
 import { supabase } from "../../lib/supabase"
 import {
   Thermometer,
@@ -610,7 +611,7 @@ export default function HeatstrokeChecker() {
 
   const acquireGPS = () => {
     if (!navigator.geolocation) {
-      alert("お使いのブラウザはGPS位置情報取得に対応していません。")
+      toast.warning("お使いのブラウザはGPS位置情報取得に対応していません。")
       return
     }
     setGpsLoading(true)
@@ -629,7 +630,7 @@ export default function HeatstrokeChecker() {
       (error) => {
         let errMsg = "位置情報の取得に失敗しました。"
         if (error.code === error.PERMISSION_DENIED) errMsg = "位置情報の利用許可が拒否されました。"
-        alert(`${errMsg}\n那須塩原本社の気象基準を使用します。`)
+        toast.warning(`${errMsg}\n那須塩原本社の気象基準を使用します。`)
         setGpsStatus("那須塩原本社基準")
         setGpsLoading(false)
         fetchWeatherData()
@@ -849,7 +850,7 @@ export default function HeatstrokeChecker() {
 
   const handleSetupSession = async () => {
     if (!selectedProjectId) {
-      alert("現場を選択してください。")
+      toast.warning("現場を選択してください。")
       return
     }
     setSavingSession(true)
@@ -912,18 +913,18 @@ export default function HeatstrokeChecker() {
 
   const handleSubmitMyCheck = async () => {
     if (!session?.id || !currentWorkerId) {
-      alert("現場の気象情報が設定されていません。先に「現地の気象を設定する」を押してください。")
+      toast.warning("現場の気象情報が設定されていません。先に「現地の気象を設定する」を押してください。")
       return
     }
     // バリデーション
     if (checkTimeType === "朝") {
       if (myForm.sleep_hours === 0 || myForm.breakfast === null || myForm.hangover === null) {
-        alert("睡眠時間・朝食・アルコールの確認が完了していません。すべて選択してから送信してください。")
+        toast.warning("睡眠時間・朝食・アルコールの確認が完了していません。すべて選択してから送信してください。")
         return
       }
     }
     if (!myForm.water_checked || !myForm.urine_checked) {
-      alert("水分補給・尿色の確認が完了していません。確認してから送信してください。")
+      toast.warning("水分補給・尿色の確認が完了していません。確認してから送信してください。")
       return
     }
 
@@ -1009,12 +1010,12 @@ export default function HeatstrokeChecker() {
     if (!session?.id || !proxyTarget) return
     if (checkTimeType === "朝") {
       if (proxyForm.sleep_hours === 0 || proxyForm.breakfast === null || proxyForm.hangover === null) {
-        alert("睡眠時間・朝食・アルコールを確認して選択してください。")
+        toast.warning("睡眠時間・朝食・アルコールを確認して選択してください。")
         return
       }
     }
     if (!proxyForm.water_checked || !proxyForm.urine_checked) {
-      alert("水分補給・尿色の確認を選択してください。")
+      toast.warning("水分補給・尿色の確認を選択してください。")
       return
     }
 
@@ -1062,7 +1063,7 @@ export default function HeatstrokeChecker() {
       await fetchSessionAndChecks()
     } catch (e: any) {
       console.error("代理入力エラー:", e)
-      alert("代理入力中にエラーが発生しました: " + e.message)
+      toast.error("代理入力中にエラーが発生しました: " + e.message)
     } finally {
       setSavingProxy(false)
     }
@@ -1081,7 +1082,7 @@ export default function HeatstrokeChecker() {
       const incompleteSafety = !safetyChecks.rest_time || !safetyChecks.hydration ||
         !safetyChecks.shade || !safetyChecks.buddy_system || !safetyChecks.clothing
       if (incompleteSafety) {
-        alert(`【🚨警告: 暑さ指数危険領域】\nWBGT ${sessionWbgt}℃は危険レベルです。\n安全管理指針（全5項目）を確認してから承認してください。`)
+        toast.warning(`【🚨警告: 暑さ指数危険領域】\nWBGT ${sessionWbgt}℃は危険レベルです。\n安全管理指針（全5項目）を確認してから承認してください。`)
         return
       }
     }
@@ -1611,8 +1612,8 @@ export default function HeatstrokeChecker() {
               対象現場:
             </label>
             {/* 通常表示：アサイン通りの現場名（読み取り専用） */}
-            <div className="flex-1 flex items-center gap-2">
-              <div className="flex-1 h-12 px-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <div className="flex-1 flex items-center gap-2 min-w-0">
+              <div className="min-w-0 flex-1 h-12 px-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 overflow-hidden">
                 {isProjectManuallyOverridden && (
                   <span className="text-xs text-orange-500 font-bold shrink-0">✏️ 修正中</span>
                 )}

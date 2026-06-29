@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import { useParams, useNavigate, useLocation, useOutletContext } from 'react-router-dom';
 import { ChevronRight, Trash2, Network, ChevronDown, ShieldCheck, Activity, AlertTriangle, ExternalLink, Link as LinkIcon, Printer, Zap, Upload, Bot, Undo2, Redo2, Loader2, CloudOff, CheckCircle2, Settings2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -276,7 +277,7 @@ export default function SiteDesignDashboard() {
       handleUpdate(nodeId, { name: board.name });
     } catch(e) {
       console.error(e);
-      alert('リンクエラーが発生しました。');
+      toast.error('リンクエラーが発生しました。');
     }
   };
 
@@ -414,11 +415,11 @@ export default function SiteDesignDashboard() {
         await supabase.from('site_tools_data').insert({ project_id: projectId, tool_type: 'SITE_TREE', name: 'Site Distribution Tree', is_active: true, data_payload: payload });
       }
 
-      alert('AI設計図面の取り込みが完了しました！');
+      toast.success('AI設計図面の取り込みが完了しました！');
 
     } catch (e: any) {
       console.error(e);
-      alert('インポート失敗: ' + (e.message || 'JSONの形式が正しくない可能性があります'));
+      toast.error('インポート失敗: ' + (e.message || 'JSONの形式が正しくない可能性があります'));
     } finally {
       setIsImporting(false);
     }

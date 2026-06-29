@@ -17,6 +17,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import imageCompression from 'browser-image-compression';
 import { AutocompleteInput } from '../../components/ui/AutocompleteInput';
+import { toast } from 'sonner';
 
 interface CompletionReportFormData {
   id?: string;
@@ -186,7 +187,7 @@ export function CompletionReportForm() {
       }
     } catch (err) {
       console.error('Error fetching data:', err);
-      alert('データの読み込みに失敗しました。');
+      toast.error('データの読み込みに失敗しました。');
     } finally {
       setLoading(false);
     }
@@ -214,7 +215,7 @@ export function CompletionReportForm() {
     
     // Check max limit (6)
     if (photos.length + files.length > 6) {
-        alert("写真は最大6枚までアップロード可能です。");
+        toast.warning("写真は最大6枚までアップロード可能です。");
         return;
     }
 
@@ -292,11 +293,11 @@ export function CompletionReportForm() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.project_id) {
-        alert("工事案件を選択してください。");
+        toast.warning("工事案件を選択してください。");
         return;
     }
     if (!formData.inspection_result) {
-        alert("検査結果（合格 / 不合格）を選択してください。");
+        toast.warning("検査結果（合格 / 不合格）を選択してください。");
         return;
     }
     
@@ -380,12 +381,12 @@ export function CompletionReportForm() {
         }
       }
 
-      alert("完了報告を保存しました！");
+      toast.success("完了報告を保存しました！");
       navigate('/reports'); // Go back to reports list, or maybe a dedicated completion reports list
       
     } catch (err) {
       console.error('Error saving:', err);
-      alert('保存に失敗しました。詳細をご確認ください。');
+      toast.error('保存に失敗しました。詳細をご確認ください。');
     } finally {
       setSaving(false);
     }

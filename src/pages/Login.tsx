@@ -3,6 +3,7 @@ import { Navigate, useLocation } from "react-router-dom"
 import { supabase } from "../lib/supabase"
 import { Loader2, AlertCircle } from "lucide-react"
 import logoImg from "../assets/logo.png"
+import { toast } from 'sonner'
 
 export default function Login() {
   const [loading, setLoading] = useState(false)
@@ -36,7 +37,7 @@ export default function Login() {
     })
     
     if (error) {
-      alert("ログインエラー: " + error.message)
+      toast.error("ログインエラー: " + error.message)
       setLoading(false)
     }
   }
@@ -127,7 +128,7 @@ export default function Login() {
                         }
                     }
 
-                    if (error) alert("Dev login error: " + error.message);
+                    if (error) toast.error("Dev login error: " + error.message);
                 }}
                 className="w-full h-12 mt-4 flex items-center justify-center gap-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-medium transition-all"
             >

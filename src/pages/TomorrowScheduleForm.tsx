@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase"
 import { ArrowLeft, Loader2, Save, CalendarClock, User, Users, Search, Target, Plus, Trash2, Truck, Wrench } from "lucide-react"
 import { format, addDays } from 'date-fns';
 import { AutocompleteInput } from '../components/ui/AutocompleteInput';
+import { toast } from 'sonner';
 
 type ProjectData = {
   id: string
@@ -334,7 +335,7 @@ export default function TomorrowScheduleForm() {
 
   const handleSave = async () => {
     if (!schedule.project_id) {
-      alert("案件を選択してください")
+      toast.warning("案件を選択してください")
       return
     }
 
@@ -408,7 +409,7 @@ export default function TomorrowScheduleForm() {
       navigate('/tomorrow-schedules')
     } catch (e: any) {
       console.error("Error saving schedule:", e)
-      alert("保存中にエラーが発生しました: " + e.message)
+      toast.error("保存中にエラーが発生しました: " + e.message)
     } finally {
       setSaving(false)
     }

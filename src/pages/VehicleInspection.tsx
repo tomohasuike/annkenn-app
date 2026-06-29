@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase"
 import { Truck, Wrench, ShieldCheck, Camera, History, Loader2, Save, AlertTriangle, AlertCircle, X, CheckCircle2 } from "lucide-react"
 import { format } from "date-fns"
 import imageCompression from 'browser-image-compression'
+import { toast } from 'sonner'
 
 interface Vehicle {
   id: string
@@ -200,7 +201,7 @@ export default function VehicleInspection() {
   const saveInspection = async () => {
       if (!selectedVehicle) return
       if (!formData.current_mileage) {
-          alert("現在の走行距離を入力してください")
+          toast.warning("現在の走行距離を入力してください")
           return
       }
 
@@ -232,12 +233,12 @@ export default function VehicleInspection() {
           
           if (updateErr) throw updateErr
 
-          alert("点検を記録しました。")
+          toast.success("点検を記録しました。")
           setActiveModal(null)
           fetchData()
       } catch (err: any) {
           console.error(err)
-          alert("エラーが発生しました: " + err.message)
+          toast.error("エラーが発生しました: " + err.message)
       } finally {
           setSaving(false)
       }
@@ -246,7 +247,7 @@ export default function VehicleInspection() {
   const saveOilChange = async () => {
       if (!selectedVehicle) return
       if (!oilChangeMileage) {
-          alert("現在の走行距離を入力してください")
+          toast.warning("現在の走行距離を入力してください")
           return
       }
 
@@ -271,12 +272,12 @@ export default function VehicleInspection() {
           
           if (updateErr) throw updateErr
 
-          alert("オイル交換を記録しました。")
+          toast.success("オイル交換を記録しました。")
           setActiveModal(null)
           fetchData()
       } catch (err: any) {
           console.error(err)
-          alert("エラーが発生しました: " + err.message)
+          toast.error("エラーが発生しました: " + err.message)
       } finally {
           setSaving(false)
       }

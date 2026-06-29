@@ -35,7 +35,7 @@ import SiteDesignDashboard from "./pages/tools/SiteDesignDashboard"
 import PowerCalc from "./pages/tools/PowerCalc"
 import LightingCalc from "./pages/tools/LightingCalc"
 import { KensackEngine } from "./pages/KensackEngine"
-// import TepcoForm from "./pages/tools/TepcoForm"
+import TepcoForm from "./pages/tools/TepcoForm"
 
 function WorkersPlaceholder() {
   return <div className="p-8"><h2 className="text-xl font-bold">作業員マスター</h2></div>
@@ -99,7 +99,7 @@ function App() {
               </Route>
 
               {/* 東電申込フォーム（独立ページ） */}
-              {/* <Route path="tepco-form" element={<TepcoForm />} /> */}
+              <Route path="tepco-form" element={<TepcoForm />} />
             </Route>
           </Route>
         </Routes>

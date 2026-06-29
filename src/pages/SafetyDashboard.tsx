@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
 import {
   ShieldAlert,
   Download,
@@ -258,7 +259,7 @@ export default function SafetyDashboard() {
       .filter((e): e is string => !!e && e.trim() !== '');
 
     if (emails.length === 0) {
-      alert('未回答の作業員に有効なメールアドレスが登録されていません。別途作業員マスタをご確認ください。');
+      toast.warning('未回答の作業員に有効なメールアドレスが登録されていません。別途作業員マスタをご確認ください。');
       return;
     }
 
