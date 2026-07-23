@@ -819,25 +819,6 @@ export default function ReportForm() {
   // ============================================================
   // 音声入力 + Gemini AI 整形
   // ============================================================
-    content: `あなたは建設会社の日報入力アシスタントです。
-音声で話された作業内容を、日報に適した簡潔な文章に変換してください。
-・口語表現を書き言葉（体言止・敦語なし）に変換（例：「〜しました」→「〜を完了」）
-・「えー」「あのー」などの口癒を除去
-・HIVP・VU・HT管・塩ビ管等の建設・土木用語はそのまま維持
-・内容を省略せず整形のみ行う
-整形後の文章のみ返答（説明不要）：`,
-    notes: `あなたは建設会社の日報アシスタントです。
-話された内容を備考・申し送り事項として簡潔にまとめてください。
-・短く端的に（1〜3文程度）
-・重要な情報（天候・中断・翻日の申し送り）を優先
-整形後の文章のみ返答（説明不要）：`,
-    materials: `あなたは建設会社の日報アシスタントです。
-話された内容から使用材料の一覧を抽出し、必ずJSON配列で返してください。
-フォーマット: [{"name": "材料名", "quantity": "数量（単位含む）"}, ...]
-・HIVP・VU・HT管・塩ビ管・エルボ・継手などの建設資材を正確に認識
-・数量は「3本」「10m」「1缶」のように単位を含めて記載
-・JSONのみ返すこと（説明文不要）`
-  }
 
   /** 音声入力を開始し、終了後Geminiで整形してコールバックに渡す */
   const startVoiceInput = (target: "content" | "notes" | "materials") => {
@@ -890,23 +871,18 @@ export default function ReportForm() {
       }
       setVoiceProcessing(true)
       try {
-        const apiKey = import.meta.env.VITE_GOOGLE_API_KEY
-        if (!apiKey) throw new Error("API key not found")
-
         const prompt = GEMINI_PROMPTS[target]
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+        const { data, error: aiError } = await supabase.functions.invoke("gemini-proxy", {
+          body: {
+            model: "gemini-2.5-flash",
+            action: "generateContent",
+            payload: {
               contents: [{ parts: [{ text: `${prompt}\n\n音声内容：「${transcript}」` }] }],
               generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
-            })
+            }
           }
-        )
-        if (!res.ok) throw new Error(`Gemini API error: ${res.statusText}`)
-        const data = await res.json()
+        })
+        if (aiError) throw aiError
         const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || transcript
 
         if (target === "materials") {

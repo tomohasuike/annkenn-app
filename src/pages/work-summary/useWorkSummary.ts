@@ -54,6 +54,7 @@ export type ProjectSummary = {
   companies: Record<string, number>;
   equipment: Record<string, number>;
   dailyLogs: DailyLog[];
+  staffBreakdown: Record<string, { displayName: string } & Record<WorkCategory, TimeDetail>>;
 }
 
 export type StaffSummary = Record<WorkCategory, TimeDetail> & { displayName: string };
@@ -251,7 +252,8 @@ export function useWorkSummary() {
             materials: [], photos: [], docs: [],
             companies: {},
             equipment: {},
-            dailyLogs: [] 
+            dailyLogs: [],
+            staffBreakdown: {}
           };
         }
         const pObj = results.projects[pId];
@@ -475,6 +477,21 @@ export function useWorkSummary() {
           results.summary.kubunDetails[cat].normal += staffTimeInfo.normal;
           results.summary.kubunDetails[cat].ot += staffTimeInfo.ot;
           results.summary.kubunDetails[cat].nightOt += staffTimeInfo.nightOt;
+
+          // Per-project staff breakdown (実績時間がある場合のみ)
+          if (staffTotalH > 0) {
+            if (!pObj.staffBreakdown[nKey]) {
+              pObj.staffBreakdown[nKey] = {
+                displayName: dName,
+                kouji: { normal: 0, ot: 0, nightOt: 0 },
+                kanri: { normal: 0, ot: 0, nightOt: 0 },
+                mitsumori: { normal: 0, ot: 0, nightOt: 0 },
+              };
+            }
+            pObj.staffBreakdown[nKey][cat].normal += staffTimeInfo.normal;
+            pObj.staffBreakdown[nKey][cat].ot += staffTimeInfo.ot;
+            pObj.staffBreakdown[nKey][cat].nightOt += staffTimeInfo.nightOt;
+          }
 
           // Staff Array
           if (!results.staff[nKey]) {

@@ -47,7 +47,7 @@ export default function TimelineModal({
     // Fetch projects if not provided
     if (initialAllProjects.length === 0 && allProjects.length === 0) {
       const fetchProjects = async () => {
-        const { data, error } = await supabase.from('projects').select('id, project_name, status_flag, project_number, client_name, parent_project_id').order('project_name');
+        const { data, error } = await supabase.from('projects').select('id, project_name, status_flag, project_number, client_name, parent_project_id').not('project_number', 'ilike', 'TEMP-%').not('project_name', 'ilike', '%休暇%').order('project_name');
         if (!error && data) setAllProjects(data);
       };
       fetchProjects();

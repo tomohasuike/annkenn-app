@@ -1,14 +1,25 @@
 import { supabase } from '../lib/supabase';
 
-// Gemini API Key from Vite env
-const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
-
-/** タイムアウト付きfetch */
-const fetchWithTimeout = (url: string, options: RequestInit, timeoutMs: number = 15000): Promise<Response> => {
+/** Gemini API呼び出し（Edge Function経由、タイムアウト付き） */
+const callGemini = async (
+  model: string,
+  action: 'generateContent' | 'embedContent',
+  payload: any,
+  timeoutMs: number = 15000
+): Promise<any> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  return fetch(url, { ...options, signal: controller.signal })
-    .finally(() => clearTimeout(timer));
+  try {
+    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+      body: { model, action, payload },
+      // @ts-expect-error signal is supported by the underlying fetch client
+      signal: controller.signal,
+    });
+    if (error) throw error;
+    return data;
+  } finally {
+    clearTimeout(timer);
+  }
 };
 
 export interface KensackMaterial {
@@ -132,20 +143,15 @@ const extractOptionFromHistory = (n: number, history: ChatMessage[]): string | n
 };
 
 const generateConversationalReply = async (query: string, history?: ChatMessage[]): Promise<string> => {
-  if (!GEMINI_API_KEY) return 'どういたしまして！他に何かお手伝いできることはありますか？';
   const sysPrompt = `あなたは電気工事現場の頼れる資材手配アシスタント（経験30年のベテラン）です。職人との短い会話に自然に応じてください。材料の検索や手配の話題なら積極的に次の一手を提案してください。簡潔で気さくなトーンで。`;
   const contents = [
     ...(history || []).map(m => ({ role: m.role, parts: [{ text: m.content }] })),
     { role: 'user', parts: [{ text: query }] }
   ];
   try {
-    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ systemInstruction: { parts: [{ text: sysPrompt }] }, contents, generationConfig: { temperature: 0.4 } })
+    const r = await callGemini('gemini-2.5-flash', 'generateContent', {
+      systemInstruction: { parts: [{ text: sysPrompt }] }, contents, generationConfig: { temperature: 0.4 }
     }, 8000);
-    if (!res.ok) return 'どういたしまして！';
-    const r = await res.json();
     return r.candidates[0].content.parts[0].text;
   } catch { return 'どういたしまして！他に何かありますか？'; }
 };
@@ -173,8 +179,6 @@ export interface CartItem {
  * Voice input parser using Gemini AI. Takes raw transcript and structured array.
  */
 export const parseVoiceToCartItems = async (transcript: string): Promise<CartItem[]> => {
-  if (!GEMINI_API_KEY) throw new Error("Gemini API key is not configured.");
-  
   const systemPrompt = `
 あなたは電気工事の現場アシスタントです。職人がマイクで喋った「必要な手配材料の一覧メモ」から、項目ごとに情報を抽出し、配列として出力してください。
 例えば「VVFの2.0の3芯を100メートルと、プラロックのデカいやつ10個」であれば、VVFケーブルと、プラロックという2つのアイテムがあります。
@@ -186,22 +190,13 @@ export const parseVoiceToCartItems = async (transcript: string): Promise<CartIte
 ]
   `;
 
-  const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: systemPrompt }] }],
-      generationConfig: { temperature: 0.1 }
-    })
+  const result = await callGemini('gemini-2.5-flash', 'generateContent', {
+    contents: [{ parts: [{ text: systemPrompt }] }],
+    generationConfig: { temperature: 0.1 }
   });
 
-  if (!response.ok) {
-    throw new Error(`Gemini API Error: \${response.statusText}`);
-  }
-
-  const result = await response.json();
   let text = result.candidates[0].content.parts[0].text;
-  
+
   // JSON配列部分だけを強引に抽出する
   const match = text.match(/\[[\s\S]*\]/);
   if (!match) {
@@ -259,8 +254,6 @@ const searchDatabaseDirectly = async (query: string): Promise<KensackMaterial[]>
  * Cost: Very Low (One-shot, tiny output token count)
  */
 const extractParametersWithAI = async (query: string, history?: ChatMessage[]) => {
-  if (!GEMINI_API_KEY) throw new Error("Gemini API key is not configured.");
-  
   const systemPrompt = `
 あなたは電気工事材料の検索を補助するAIアシスタントです。
 ユーザーの発話テキストや曖昧な現場用語から、データベース検索用の「正式なカタログ用語・メーカー名・型番」を推論し、以下の厳格なJSONフォーマットのみを返してください。
@@ -306,23 +299,14 @@ const extractParametersWithAI = async (query: string, history?: ChatMessage[]) =
     parts: [{ text: `システム指示に基づく抽出処理対象ユーザー入力:\n${query}` }]
   });
 
-  const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents: contents,
-      generationConfig: { temperature: 0.1 }
-    })
+  const result = await callGemini('gemini-2.5-flash', 'generateContent', {
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    contents: contents,
+    generationConfig: { temperature: 0.1 }
   }, 10000); // 10秒タイムアウト
 
-  if (!response.ok) {
-    throw new Error(`Gemini API Error: ${response.statusText}`);
-  }
-
-  const result = await response.json();
   let text = result.candidates[0].content.parts[0].text;
-  
+
   // Clean up any markdown json formatting
   text = text.replace(/```json/g, "").replace(/```/g, "").trim();
   
@@ -376,24 +360,18 @@ const searchDatabaseWithAIParams = async (params: any): Promise<KensackMaterial[
 };
 
 const searchDatabaseSemantically = async (query: string, filterMfgs?: string[]): Promise<KensackMaterial[]> => {
-  if (!GEMINI_API_KEY) throw new Error("Gemini API key is not configured.");
-  
   // Generate meaning-based vector for the user's string query
-  const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  let result: any;
+  try {
+    result = await callGemini('gemini-embedding-001', 'embedContent', {
       model: "models/gemini-embedding-001",
       content: { parts: [{ text: query }] }
-    })
-  }, 8000); // 8秒タイムアウト
-  
-  if (!response.ok) {
-    console.warn("Gemini Embedding API error:", response.statusText);
+    }, 8000); // 8秒タイムアウト
+  } catch (err) {
+    console.warn("Gemini Embedding API error:", err);
     return [];
   }
-  
-  const result = await response.json();
+
   const queryEmbedding = result.embedding.values;
   
   // Search Supabase using our pgvector RPC match_materials with exact manufacturer filtering
@@ -428,7 +406,7 @@ const searchDatabaseSemantically = async (query: string, filterMfgs?: string[]):
  * 現場のベテランとして気の利いた提案文を書き出す「資材手配アシスタント」AI
  */
 const generateVeteranAssistantProposal = async (query: string, results: KensackMaterial[], history?: ChatMessage[]): Promise<string | undefined> => {
-  if (!GEMINI_API_KEY || results.length === 0) return undefined;
+  if (results.length === 0) return undefined;
 
   // 上位10件に絞り込み、LLM用の軽量なコンテキスト情報を作成
   const topMaterials = results.slice(0, 10).map(m => ({
@@ -520,18 +498,12 @@ ${JSON.stringify(topMaterials, null, 2)}
   });
 
   try {
-    const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: contents,
-        generationConfig: { temperature: 0.3 }
-      })
+    const result = await callGemini('gemini-2.5-flash', 'generateContent', {
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: contents,
+      generationConfig: { temperature: 0.3 }
     }, 15000); // 15秒タイムアウト
 
-    if (!response.ok) return undefined;
-    const result = await response.json();
     return result.candidates[0].content.parts[0].text;
   } catch (error) {
     console.warn("generateVeteranAssistantProposal error:", error);
@@ -641,8 +613,6 @@ export const executeKensackSearch = async (query: string, filterMfgs: string[] =
  * and then executes a standard backend search.
  */
 export const executeKensackVisionSearch = async (base64Data: string, mimeType: string): Promise<KensackSearchResult> => {
-  if (!GEMINI_API_KEY) throw new Error("Gemini API key is not configured.");
-
   const systemPrompt = `
 あなたは電気工事材料の解析アシスタントです。
 この画像に写っている電気工事の部材は何か？Supabaseデータベースで検索するための『検索キーワード（メーカー名、一般名称、型番の推測など）』を簡潔に出力せよ。そしてその理由も簡潔に添えよ。必ず以下の厳密なJSONフォーマットで回答すること：
@@ -653,30 +623,21 @@ export const executeKensackVisionSearch = async (base64Data: string, mimeType: s
 `;
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: systemPrompt },
-            {
-              inlineData: {
-                mimeType: mimeType,
-                data: base64Data
-              }
+    const result = await callGemini('gemini-2.5-flash', 'generateContent', {
+      contents: [{
+        parts: [
+          { text: systemPrompt },
+          {
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Data
             }
-          ]
-        }],
-        generationConfig: { temperature: 0.2 }
-      })
+          }
+        ]
+      }],
+      generationConfig: { temperature: 0.2 }
     });
 
-    if (!response.ok) {
-        throw new Error(`Gemini Vision API Error: ${response.statusText}`);
-    }
-
-    const result = await response.json();
     let text = result.candidates[0].content.parts[0].text;
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
     

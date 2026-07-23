@@ -67,6 +67,8 @@ export default function RoleAssignmentAdmin({ workers }: RoleAssignmentAdminProp
         .from('projects')
         .select('id, project_name, project_number')
         .neq('status_flag', '完工') // only active projects
+        .not('project_number', 'ilike', 'TEMP-%')
+        .not('project_name', 'ilike', '%休暇%')
         .order('project_name');
       if (!error && data) {
          setAllProjects(data);

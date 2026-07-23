@@ -19,9 +19,10 @@ function fixDriveDocUrl(url: string): string {
 type ProjectDetailsModalProps = {
   project: ProjectSummary;
   onClose: () => void;
+  selectedStaff?: string | null;
 };
 
-export default function ProjectDetailsModal({ project, onClose }: ProjectDetailsModalProps) {
+export default function ProjectDetailsModal({ project, onClose, selectedStaff }: ProjectDetailsModalProps) {
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
 
   // Handle escape key to close
@@ -145,7 +146,16 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
                         </tr>
                       </thead>
                       <tbody className="divide-y relative">
-                        {project.dailyLogs.length > 0 ? project.dailyLogs.map((log: any, i: number) => (
+                        {(() => {
+                          const normalizedSelected = selectedStaff ? selectedStaff.replace(/[\s　]+/g, "") : null;
+                          const filteredLogs = normalizedSelected
+                            ? project.dailyLogs.filter((log: any) => {
+                                const staffNorm = (log.staffs || '').replace(/[\s　]+/g, "");
+                                const partnersNorm = (log.partners || '').replace(/[\s　]+/g, "");
+                                return staffNorm.includes(normalizedSelected) || partnersNorm.includes(normalizedSelected);
+                              })
+                            : project.dailyLogs;
+                          return filteredLogs.length > 0 ? filteredLogs.map((log: any, i: number) => (
                           <tr key={i} className="hover:bg-muted/40 transition-colors group">
                             <td className="px-4 py-3 font-medium whitespace-nowrap">
                               <button 
@@ -175,7 +185,8 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
                           </tr>
                         )) : (
                           <tr><td colSpan={5} className="px-4 py-12 text-center text-muted-foreground italic">日報の記録がありません</td></tr>
-                        )}
+                        );
+                        })()}
                       </tbody>
                     </table>
                   </div>

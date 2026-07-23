@@ -125,6 +125,8 @@ export default function BillingForm() {
       const { data, error } = await supabase
         .from('projects')
         .select('id, project_name, project_number, client_name, client_company_name, status_flag, category, site_name')
+        .not('project_number', 'ilike', 'TEMP-%')
+        .not('project_name', 'ilike', '%休暇%')
         .order('created_at', { ascending: false })
       if (!error && data) {
         const mappedProjects = data.map(p => ({ 

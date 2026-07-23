@@ -164,6 +164,8 @@ export default function TomorrowScheduleForm() {
       let query = supabase
         .from('projects')
         .select('id, project_name, category, status_flag, project_number, site_name, client_name')
+        .not('project_number', 'ilike', 'TEMP-%')
+        .not('project_name', 'ilike', '%休暇%')
         .order('created_at', { ascending: false })
         
       if (!showCompletedProjects) {

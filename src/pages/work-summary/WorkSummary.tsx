@@ -56,19 +56,43 @@ export default function WorkSummary() {
   
   const displayedProjects = projects.filter(p => {
     const matchesSearch = !searchLower || p.name.toLowerCase().includes(searchLower) || (p.no && p.no.toLowerCase().includes(searchLower));
-    
-    // Normalize spaces for robust matching (e.g., matching "蓮池 智雄" with "蓮池智雄")
+
     const normalizedSelected = selectedStaff ? selectedStaff.replace(/[\s　]+/g, "") : null;
-    const matchesStaff = !normalizedSelected || p.dailyLogs.some(log => {
-      const staffNorm = log.staffs ? log.staffs.replace(/[\s　]+/g, "") : "";
-      const partnersNorm = log.partners ? log.partners.replace(/[\s　]+/g, "") : "";
-      return staffNorm.includes(normalizedSelected) || partnersNorm.includes(normalizedSelected);
-    });
+    // 人が選ばれている場合はstaffBreakdownに実績があるもののみ表示
+    const matchesStaff = !normalizedSelected || (
+      normalizedSelected in p.staffBreakdown &&
+      (() => {
+        const bd = p.staffBreakdown[normalizedSelected];
+        return (bd.kouji.normal + bd.kouji.ot + bd.kouji.nightOt +
+                bd.kanri.normal + bd.kanri.ot + bd.kanri.nightOt +
+                bd.mitsumori.normal + bd.mitsumori.ot + bd.mitsumori.nightOt) > 0;
+      })()
+    );
 
     return matchesSearch && matchesStaff;
   });
 
-  const s = data?.summary;
+  // 人が選ばれているときはその人の集計を使う
+  const selectedStaffData = selectedStaff && data
+    ? Object.values(data.staff).find(d => d.displayName === selectedStaff) ?? null
+    : null;
+
+  const s = selectedStaffData
+    ? {
+        kubunTotals: {
+          kouji: selectedStaffData.kouji.normal + selectedStaffData.kouji.ot + selectedStaffData.kouji.nightOt,
+          kanri: selectedStaffData.kanri.normal + selectedStaffData.kanri.ot + selectedStaffData.kanri.nightOt,
+          mitsumori: selectedStaffData.mitsumori.normal + selectedStaffData.mitsumori.ot + selectedStaffData.mitsumori.nightOt,
+        },
+        kubunDetails: {
+          kouji: selectedStaffData.kouji,
+          kanri: selectedStaffData.kanri,
+          mitsumori: selectedStaffData.mitsumori,
+        },
+        totalHours: 0, totalOT: 0, totalNightOT: 0,
+        totalPeople: 0, equipment: {},
+      }
+    : data?.summary;
 
   const materialsSet = new Set<string>();
   const photoLinksMap = new Map<string, { projectName: string, url: string, fileName: string }>();
@@ -148,6 +172,22 @@ export default function WorkSummary() {
           </div>
           
           <div className="flex flex-col">
+            <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">作業員選択</label>
+            <select
+              value={selectedStaff || ''}
+              onChange={e => setSelectedStaff(e.target.value || null)}
+              className="border rounded-md px-3 py-1.5 text-sm bg-background min-w-[120px] focus:ring-2 focus:ring-primary font-bold outline-none h-9"
+            >
+              <option value="">全員</option>
+              {data && Object.values(data.staff)
+                .sort((a, b) => a.displayName.localeCompare(b.displayName, 'ja'))
+                .map(d => (
+                  <option key={d.displayName} value={d.displayName}>{d.displayName}</option>
+                ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col">
             <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">集計期間</label>
             <div className="flex items-center gap-2">
               <input 
@@ -199,7 +239,7 @@ export default function WorkSummary() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-card border rounded-xl px-6 py-6 flex items-center justify-between border-t-4 border-t-blue-500 shadow-sm">
           <div>
-            <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">区分：工事 合計</p>
+            <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">{selectedStaff ? `${selectedStaff}：工事` : '区分：工事 合計'}</p>
             <p className="text-4xl md:text-5xl font-bold tracking-tight">
               {s ? s.kubunTotals.kouji.toFixed(1) : '0.0'} <span className="text-xl font-normal text-muted-foreground">h</span>
             </p>
@@ -215,7 +255,7 @@ export default function WorkSummary() {
         </div>
         <div className="bg-card border rounded-xl px-6 py-6 flex items-center justify-between border-t-4 border-t-purple-500 shadow-sm">
           <div>
-            <p className="text-xs font-bold text-purple-600 uppercase tracking-widest mb-2">区分：管理 合計</p>
+            <p className="text-xs font-bold text-purple-600 uppercase tracking-widest mb-2">{selectedStaff ? `${selectedStaff}：管理` : '区分：管理 合計'}</p>
             <p className="text-4xl md:text-5xl font-bold tracking-tight">
               {s ? s.kubunTotals.kanri.toFixed(1) : '0.0'} <span className="text-xl font-normal text-muted-foreground">h</span>
             </p>
@@ -231,7 +271,7 @@ export default function WorkSummary() {
         </div>
         <div className="bg-card border rounded-xl px-6 py-6 flex items-center justify-between border-t-4 border-t-amber-500 shadow-sm">
           <div>
-            <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-2">区分：見積・現調 合計</p>
+            <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-2">{selectedStaff ? `${selectedStaff}：見積・現調` : '区分：見積・現調 合計'}</p>
             <p className="text-4xl md:text-5xl font-bold tracking-tight">
               {s ? s.kubunTotals.mitsumori.toFixed(1) : '0.0'} <span className="text-xl font-normal text-muted-foreground">h</span>
             </p>
@@ -272,7 +312,30 @@ export default function WorkSummary() {
                     </td>
                   </tr>
                 ) : (
-                  displayedProjects.map(p => (
+                  displayedProjects.map(p => {
+                    const staffKey = selectedStaff ? selectedStaff.replace(/[\s　]+/g, "") : null;
+                    const pStaff = staffKey ? p.staffBreakdown[staffKey] ?? null : null;
+                    const bd = pStaff
+                      ? { kouji: pStaff.kouji.normal + pStaff.kouji.ot + pStaff.kouji.nightOt,
+                          kanri: pStaff.kanri.normal + pStaff.kanri.ot + pStaff.kanri.nightOt,
+                          mitsumori: pStaff.mitsumori.normal + pStaff.mitsumori.ot + pStaff.mitsumori.nightOt }
+                      : p.breakdown;
+                    const bdd = pStaff
+                      ? { kouji: pStaff.kouji, kanri: pStaff.kanri, mitsumori: pStaff.mitsumori }
+                      : p.breakdownDetails;
+                    const totalH = pStaff
+                      ? bd.kouji + bd.kanri + bd.mitsumori
+                      : p.totalHours;
+                    const normalH = pStaff
+                      ? pStaff.kouji.normal + pStaff.kanri.normal + pStaff.mitsumori.normal
+                      : p.normalHours;
+                    const otH = pStaff
+                      ? pStaff.kouji.ot + pStaff.kanri.ot + pStaff.mitsumori.ot
+                      : p.overtimeHours;
+                    const nightH = pStaff
+                      ? pStaff.kouji.nightOt + pStaff.kanri.nightOt + pStaff.mitsumori.nightOt
+                      : p.nightOvertimeHours;
+                    return (
                     <tr key={p.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-5 py-5 border-b">
                         <div className="text-[11px] text-primary font-bold mb-1 uppercase tracking-wider">{p.no || "-"}</div>
@@ -300,34 +363,34 @@ export default function WorkSummary() {
                             <div className="flex flex-col w-36 sm:w-40 bg-blue-50/50 px-3 py-1.5 rounded-lg border border-blue-100">
                               <div className="flex items-center justify-between">
                                 <span className="bg-blue-100 text-blue-800 border-blue-200 text-xs px-1.5 py-0.5 rounded-md font-bold">工事</span>
-                                <span className="font-bold text-sm text-blue-900">{p.breakdown.kouji.toFixed(1)}h</span>
+                                <span className="font-bold text-sm text-blue-900">{bd.kouji.toFixed(1)}h</span>
                               </div>
                               <div className="text-[10px] text-muted-foreground text-right mt-1 flex flex-col gap-0.5">
-                                <span>日中 {p.breakdownDetails.kouji.normal.toFixed(1)}h</span>
-                                {p.breakdownDetails.kouji.ot > 0 && <span className="text-orange-500 font-bold">残業 {p.breakdownDetails.kouji.ot.toFixed(1)}h</span>}
-                                {p.breakdownDetails.kouji.nightOt > 0 && <span className="text-indigo-500 font-bold">深夜 {p.breakdownDetails.kouji.nightOt.toFixed(1)}h</span>}
+                                <span>日中 {bdd.kouji.normal.toFixed(1)}h</span>
+                                {bdd.kouji.ot > 0 && <span className="text-orange-500 font-bold">残業 {bdd.kouji.ot.toFixed(1)}h</span>}
+                                {bdd.kouji.nightOt > 0 && <span className="text-indigo-500 font-bold">深夜 {bdd.kouji.nightOt.toFixed(1)}h</span>}
                               </div>
                             </div>
                             <div className="flex flex-col w-36 sm:w-40 bg-purple-50/50 px-3 py-1.5 rounded-lg border border-purple-100">
                               <div className="flex items-center justify-between">
                                 <span className="bg-purple-100 text-purple-800 border-purple-200 text-xs px-1.5 py-0.5 rounded-md font-bold">管理</span>
-                                <span className="font-bold text-sm text-purple-900">{p.breakdown.kanri.toFixed(1)}h</span>
+                                <span className="font-bold text-sm text-purple-900">{bd.kanri.toFixed(1)}h</span>
                               </div>
                               <div className="text-[10px] text-muted-foreground text-right mt-1 flex flex-col gap-0.5">
-                                <span>日中 {p.breakdownDetails.kanri.normal.toFixed(1)}h</span>
-                                {p.breakdownDetails.kanri.ot > 0 && <span className="text-orange-500 font-bold">残業 {p.breakdownDetails.kanri.ot.toFixed(1)}h</span>}
-                                {p.breakdownDetails.kanri.nightOt > 0 && <span className="text-indigo-500 font-bold">深夜 {p.breakdownDetails.kanri.nightOt.toFixed(1)}h</span>}
+                                <span>日中 {bdd.kanri.normal.toFixed(1)}h</span>
+                                {bdd.kanri.ot > 0 && <span className="text-orange-500 font-bold">残業 {bdd.kanri.ot.toFixed(1)}h</span>}
+                                {bdd.kanri.nightOt > 0 && <span className="text-indigo-500 font-bold">深夜 {bdd.kanri.nightOt.toFixed(1)}h</span>}
                               </div>
                             </div>
                             <div className="flex flex-col w-36 sm:w-40 bg-amber-50/50 px-3 py-1.5 rounded-lg border border-amber-100">
                               <div className="flex items-center justify-between">
                                 <span className="bg-amber-100 text-amber-800 border-amber-200 text-xs px-1.5 py-0.5 rounded-md font-bold">見積</span>
-                                <span className="font-bold text-sm text-amber-900">{p.breakdown.mitsumori.toFixed(1)}h</span>
+                                <span className="font-bold text-sm text-amber-900">{bd.mitsumori.toFixed(1)}h</span>
                               </div>
                               <div className="text-[10px] text-muted-foreground text-right mt-1 flex flex-col gap-0.5">
-                                <span>日中 {p.breakdownDetails.mitsumori.normal.toFixed(1)}h</span>
-                                {p.breakdownDetails.mitsumori.ot > 0 && <span className="text-orange-500 font-bold">残業 {p.breakdownDetails.mitsumori.ot.toFixed(1)}h</span>}
-                                {p.breakdownDetails.mitsumori.nightOt > 0 && <span className="text-indigo-500 font-bold">深夜 {p.breakdownDetails.mitsumori.nightOt.toFixed(1)}h</span>}
+                                <span>日中 {bdd.mitsumori.normal.toFixed(1)}h</span>
+                                {bdd.mitsumori.ot > 0 && <span className="text-orange-500 font-bold">残業 {bdd.mitsumori.ot.toFixed(1)}h</span>}
+                                {bdd.mitsumori.nightOt > 0 && <span className="text-indigo-500 font-bold">深夜 {bdd.mitsumori.nightOt.toFixed(1)}h</span>}
                               </div>
                             </div>
                           </div>
@@ -340,12 +403,12 @@ export default function WorkSummary() {
                           <div className="flex items-center justify-end gap-4">
                             <div className="flex flex-col items-end w-32">
                                <div className="text-3xl font-black text-primary tracking-tighter">
-                                 {p.totalHours.toFixed(1)}<span className="text-sm font-medium text-muted-foreground ml-1">h</span>
+                                 {totalH.toFixed(1)}<span className="text-sm font-medium text-muted-foreground ml-1">h</span>
                                </div>
                                <div className="text-[10px] font-medium text-muted-foreground mt-1 flex flex-wrap justify-end gap-1">
-                                 <span>日中 {p.normalHours.toFixed(1)}h</span>
-                                 {p.overtimeHours > 0 && <span className="text-orange-500 font-bold">残業 {p.overtimeHours.toFixed(1)}h</span>}
-                                 {p.nightOvertimeHours > 0 && <span className="text-indigo-500 font-bold">深夜 {p.nightOvertimeHours.toFixed(1)}h</span>}
+                                 <span>日中 {normalH.toFixed(1)}h</span>
+                                 {otH > 0 && <span className="text-orange-500 font-bold">残業 {otH.toFixed(1)}h</span>}
+                                 {nightH > 0 && <span className="text-indigo-500 font-bold">深夜 {nightH.toFixed(1)}h</span>}
                                </div>
                             </div>
                             <button 
@@ -362,7 +425,8 @@ export default function WorkSummary() {
                           </div>
                         </td>
                       </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -578,6 +642,7 @@ export default function WorkSummary() {
         <ProjectDetailsModal
           project={selectedProjectForModal}
           onClose={() => setSelectedProjectForModal(null)}
+          selectedStaff={selectedStaff}
         />
       )}
     </div>

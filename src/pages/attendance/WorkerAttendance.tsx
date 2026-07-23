@@ -64,7 +64,9 @@ export default function WorkerAttendance() {
   const fetchAllProjects = async (wId: string) => {
     try {
         const { data: projects, error: pErr } = await supabase.from('projects')
-          .select('id, project_name, status_flag, project_number, client_name, parent_project_id');
+          .select('id, project_name, status_flag, project_number, client_name, parent_project_id')
+          .not('project_number', 'ilike', 'TEMP-%')
+          .not('project_name', 'ilike', '%休暇%');
           
         if (pErr) {
             toast.error('エラー: ' + pErr.message);
@@ -420,6 +422,14 @@ export default function WorkerAttendance() {
                 project_name: ev.project_name || undefined,
                 role: ev.role || undefined
             }));
+            // 休暇のみの日は clock_in/clock_out の時刻をクリア
+            const siteWorkEvents = initialEvents.filter(e => e.type === 'site_work');
+            const allVacation = siteWorkEvents.length > 0 && siteWorkEvents.every(e =>
+                e.project_id === 'VACATION' || e.project_name?.includes('休暇')
+            );
+            if (allVacation) {
+                initialEvents = initialEvents.map(e => ({ ...e, time: '' }));
+            }
         } else {
             // 旧データ用：ヒューリスティック復元（後方互換）
             const ci = formatTime(existingRecord.clock_in_time);
@@ -491,16 +501,31 @@ export default function WorkerAttendance() {
         
         const assignedForDate = assignedProjects[dateStr] || [];
         if (assignedForDate.length > 0) {
-            initialEvents.push({ id: crypto.randomUUID(), time: '07:30', type: 'clock_in' });
-            initialEvents.push({ id: crypto.randomUUID(), time: '08:00', type: 'travel' });
-            assignedForDate.forEach(ap => {
-                initialEvents.push({
-                     id: crypto.randomUUID(), time: '08:00', type: 'site_work',
-                     project_id: ap.project_id, project_name: ap.project_name, role: '一般'
+            const isVacationOnly = assignedForDate.every((ap: any) =>
+                ap.project_id === 'VACATION' || ap.project_name?.includes('休暇')
+            );
+            if (isVacationOnly) {
+                // 休暇のみの日は時刻を入れない
+                initialEvents.push({ id: crypto.randomUUID(), time: '', type: 'clock_in' });
+                assignedForDate.forEach((ap: any) => {
+                    initialEvents.push({
+                        id: crypto.randomUUID(), time: '', type: 'site_work',
+                        project_id: ap.project_id, project_name: ap.project_name, role: '一般'
+                    });
                 });
-            });
-            initialEvents.push({ id: crypto.randomUUID(), time: '17:00', type: 'travel' });
-            initialEvents.push({ id: crypto.randomUUID(), time: '18:00', type: 'clock_out' });
+                initialEvents.push({ id: crypto.randomUUID(), time: '', type: 'clock_out' });
+            } else {
+                initialEvents.push({ id: crypto.randomUUID(), time: '07:30', type: 'clock_in' });
+                initialEvents.push({ id: crypto.randomUUID(), time: '08:00', type: 'travel' });
+                assignedForDate.forEach((ap: any) => {
+                    initialEvents.push({
+                         id: crypto.randomUUID(), time: '08:00', type: 'site_work',
+                         project_id: ap.project_id, project_name: ap.project_name, role: '一般'
+                    });
+                });
+                initialEvents.push({ id: crypto.randomUUID(), time: '17:00', type: 'travel' });
+                initialEvents.push({ id: crypto.randomUUID(), time: '18:00', type: 'clock_out' });
+            }
         } else {
             initialEvents.push({ id: crypto.randomUUID(), time: '', type: 'clock_in' });
             initialEvents.push({ id: crypto.randomUUID(), time: '', type: 'clock_out' });
@@ -594,11 +619,18 @@ export default function WorkerAttendance() {
         return ev;
     });
 
-    for (const ev of processedEvents) {
-       if (!ev.time) {
-          toast.error('時間が未入力の項目があります。');
-          return;
-       }
+    const siteWorkEvents = processedEvents.filter(e => e.type === 'site_work');
+    const isVacationOnlyDay = siteWorkEvents.length > 0 && siteWorkEvents.every(e =>
+        e.project_name?.includes('休暇')
+    );
+
+    if (!isVacationOnlyDay) {
+        for (const ev of processedEvents) {
+           if (!ev.time) {
+              toast.error('時間が未入力の項目があります。');
+              return;
+           }
+        }
     }
 
     let hasReversal = false;
@@ -853,6 +885,12 @@ export default function WorkerAttendance() {
                      return false;
                   })();
 
+                  const isVacationProject = (p: any) =>
+                      p.project_id === 'VACATION' || p.project_name?.includes('休暇');
+                  const isVacationOnlyDay =
+                      (projs.length > 0 && projs.every(isVacationProject)) ||
+                      (projs.length === 0 && siteDecls.length > 0 && siteDecls.every(isVacationProject));
+
                   const combinedRecords: any[] = [];
                   projs.forEach((p: any) => {
                       combinedRecords.push({
@@ -895,10 +933,10 @@ export default function WorkerAttendance() {
                           {dowStr}
                        </td>
                        <td className="p-2 border-r font-medium text-slate-700 text-center">
-                          {formatTime(record?.clock_in_time)}
+                          {isVacationOnlyDay ? <span className="text-slate-300">-</span> : formatTime(record?.clock_in_time)}
                        </td>
                        <td className="p-2 border-r font-medium text-slate-700 text-center">
-                          {formatTime(record?.clock_out_time)}
+                          {isVacationOnlyDay ? <span className="text-slate-300">-</span> : formatTime(record?.clock_out_time)}
                        </td>
                        
                        {/* 現場入 Column */}

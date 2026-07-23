@@ -5,7 +5,6 @@ import { ShieldCheck, Search, Lock, Unlock, FileSpreadsheet, Plus, Trash2, Save 
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { AttendanceImportModal } from '../../components/attendance/AttendanceImportModal';
-import TotImportModal from '../../components/attendance/TotImportModal';
 import TimelineModal from '../../components/attendance/TimelineModal';
 import RoleAssignmentAdmin from '../../components/attendance/RoleAssignmentAdmin';
 
@@ -30,8 +29,6 @@ interface DailyAttendance {
   memo: string | null;
   admin_memo?: string | null;
   is_locked: boolean;
-  tot_clock_in_time?: string | null;
-  tot_clock_out_time?: string | null;
   clock_in_time?: string | null;
   clock_out_time?: string | null;
   site_declarations?: { project_id: string; project_name: string; start_time: string; end_time: string; role?: string }[];
@@ -69,7 +66,7 @@ export default function AttendanceAdmin() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showImportModal, setShowImportModal] = useState(false);
-  const [showTotModal, setShowTotModal] = useState(false);
+
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
 
   // Drafts array holds edits before explicitly saving. key = dateStr
@@ -504,7 +501,7 @@ export default function AttendanceAdmin() {
               全社員 勤怠・手当管理（事務局用）
             </h2>
             <p className="text-muted-foreground text-xs sm:text-sm pt-1">
-              社員の申告状況を通月で確認し、月次締めやTOTチェックを行います
+              社員の申告状況を通月で確認し、月次締めを行います
             </p>
           </div>
 
@@ -541,12 +538,6 @@ export default function AttendanceAdmin() {
              >
                 🗑️ 1/24以前を一括消去
              </button>
-            <button
-               onClick={() => setShowTotModal(true)}
-               className="inline-flex items-center justify-center rounded-md font-medium transition-colors bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-8 px-3 gap-1 shadow-sm text-xs"
-            >
-               TOT実績取込
-            </button>
             <button
                onClick={() => setShowImportModal(true)}
                className="inline-flex items-center justify-center rounded-md font-medium transition-colors bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-8 px-3 gap-1 shadow-sm text-xs"
@@ -862,38 +853,20 @@ export default function AttendanceAdmin() {
                               {dowStr}
                            </td>
                             <td className="p-1 border-r font-medium text-slate-700 align-top pt-2 px-1 min-w-[80px]">
-                               <div className="flex flex-col gap-0.5">
-                                 <div className="flex justify-between items-center text-[11px]">
-                                    <span className="text-[9px] text-slate-400 mr-1">TOT</span>
-                                    <span className="text-slate-500">{formatInputTime(record?.tot_clock_in_time) || <span className="text-slate-300">---</span>}</span>
-                                 </div>
-                                 <div className="flex justify-between items-center border-t border-slate-100 pt-0.5 mt-0.5">
-                                    <span className="text-[9px] text-blue-400 mr-1">本人</span>
-                                    <input
-                                       type="time"
-                                       value={currentClockIn || ''}
-                                       onChange={e => handleClockInChange(e.target.value)}
-                                       className={`w-16 text-center bg-transparent outline-none focus:ring-1 focus:ring-blue-500 rounded text-[11px] font-medium p-0 m-0 ${draft?.clockIn !== undefined ? 'text-amber-600 font-bold bg-amber-50' : 'text-blue-700'}`}
-                                    />
-                                 </div>
-                               </div>
+                               <input
+                                  type="time"
+                                  value={currentClockIn || ''}
+                                  onChange={e => handleClockInChange(e.target.value)}
+                                  className={`w-16 text-center bg-transparent outline-none focus:ring-1 focus:ring-blue-500 rounded text-[11px] font-medium p-0 m-0 ${draft?.clockIn !== undefined ? 'text-amber-600 font-bold bg-amber-50' : 'text-blue-700'}`}
+                               />
                             </td>
                             <td className="p-1 border-r font-medium text-slate-700 align-top pt-2 px-1 min-w-[80px]">
-                               <div className="flex flex-col gap-0.5">
-                                 <div className="flex justify-between items-center text-[11px]">
-                                    <span className="text-[9px] text-slate-400 mr-1">TOT</span>
-                                    <span className="text-slate-500">{formatInputTime(record?.tot_clock_out_time) || <span className="text-slate-300">---</span>}</span>
-                                 </div>
-                                 <div className="flex justify-between items-center border-t border-slate-100 pt-0.5 mt-0.5">
-                                    <span className="text-[9px] text-blue-400 mr-1">本人</span>
-                                    <input
-                                       type="time"
-                                       value={currentClockOut || ''}
-                                       onChange={e => handleClockOutChange(e.target.value)}
-                                       className={`w-16 text-center bg-transparent outline-none focus:ring-1 focus:ring-blue-500 rounded text-[11px] font-medium p-0 m-0 ${draft?.clockOut !== undefined ? 'text-amber-600 font-bold bg-amber-50' : 'text-blue-700'}`}
-                                    />
-                                 </div>
-                               </div>
+                               <input
+                                  type="time"
+                                  value={currentClockOut || ''}
+                                  onChange={e => handleClockOutChange(e.target.value)}
+                                  className={`w-16 text-center bg-transparent outline-none focus:ring-1 focus:ring-blue-500 rounded text-[11px] font-medium p-0 m-0 ${draft?.clockOut !== undefined ? 'text-amber-600 font-bold bg-amber-50' : 'text-blue-700'}`}
+                               />
                             </td>
                            
                            {/* 現場入 Column */}
@@ -1288,15 +1261,6 @@ export default function AttendanceAdmin() {
         </div>
       )}
 
-      <TotImportModal
-        isOpen={showTotModal}
-        onClose={() => setShowTotModal(false)}
-        workers={workers}
-        onComplete={() => {
-           setShowTotModal(false);
-           if (selectedWorkerId) fetchWorkerData(selectedWorkerId);
-        }}
-      />
 
       <TimelineModal
         isOpen={timelineModal.isOpen}

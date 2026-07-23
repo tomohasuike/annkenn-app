@@ -95,26 +95,22 @@ ${userText}
 - カタログにある型番を提案する場合は、仕様や定価も教えてあげてください。
 - 外部の一般的な知識を使って、カタログ（データベース）に存在しない別メーカーの製品を勝手に提案してはいけません。カタログ内に該当しそうなものが無い場合は「登録されているカタログには該当するものがありませんでした」と正直に答えてください。`;
 
-      // 3. Gemini 2.5 Flash API呼び出し (フロントエンドで直接実行)
-      const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
-      if (!apiKey) throw new Error("APIキーが設定されていません");
-
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-      const res = await fetch(geminiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: systemPrompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            responseMimeType: "application/json" // JSONで確実に出力させる
+      // 3. Gemini 2.5 Flash API呼び出し (Edge Function経由)
+      const { data: aiData, error: aiError } = await supabase.functions.invoke("gemini-proxy", {
+        body: {
+          model: "gemini-2.5-flash",
+          action: "generateContent",
+          payload: {
+            contents: [{ parts: [{ text: systemPrompt }] }],
+            generationConfig: {
+              temperature: 0.2,
+              responseMimeType: "application/json" // JSONで確実に出力させる
+            }
           }
-        })
+        }
       });
 
-      if (!res.ok) throw new Error(await res.text());
-
-      const aiData = await res.json();
+      if (aiError) throw aiError;
       const aiResponseText = aiData.candidates[0].content.parts[0].text;
       
       // JSONをパース

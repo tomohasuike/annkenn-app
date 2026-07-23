@@ -418,15 +418,11 @@ export default function HeatstrokeChecker() {
       }
       setVoiceSummarizing(true)
       try {
-        const apiKey = import.meta.env.VITE_GOOGLE_API_KEY
-        if (!apiKey) throw new Error("Gemini API key not found")
-
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+        const { data, error: aiError } = await supabase.functions.invoke("gemini-proxy", {
+          body: {
+            model: "gemini-2.5-flash",
+            action: "generateContent",
+            payload: {
               contents: [{
                 parts: [{
                   text: `あなたは音声テキストのクリーニングツールです。
@@ -446,12 +442,11 @@ export default function HeatstrokeChecker() {
                 }]
               }],
               generationConfig: { temperature: 0.2, maxOutputTokens: 200 }
-            })
+            }
           }
-        )
+        })
 
-        if (!res.ok) throw new Error(`Gemini API error: ${res.statusText}`)
-        const data = await res.json()
+        if (aiError) throw aiError
         const cleaned = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || transcript
         setVoicePreview("")
         onResult(cleaned)

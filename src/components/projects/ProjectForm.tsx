@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase"
 import { useNavigate, useParams } from "react-router-dom"
 import { Loader2, ArrowLeft, Save, Trash2 } from "lucide-react"
 import { SearchableInput } from "../ui/SearchableInput"
+import { toast } from "sonner"
 
 export default function ProjectForm() {
   const { id } = useParams()
@@ -174,14 +175,15 @@ export default function ProjectForm() {
           .update(formData)
           .eq('id', id)
         if (error) throw error
+        toast.success("案件を更新しました")
+        navigate("/projects", { state: { searchFor: formData.project_number } })
       } else {
         const { error } = await supabase
           .from('projects')
           .insert([formData])
         if (error) throw error
+        navigate("/projects")
       }
-      
-      navigate("/projects")
     } catch (err: any) {
       console.error("Error saving project:", err)
       alert("保存に失敗しました: " + err.message)

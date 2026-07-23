@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../lib/supabase"
 import { Loader2, Search, Plus, Building2, Folder, Pencil, ClipboardList, CalendarPlus } from "lucide-react"
-import { Link } from "react-router-dom"
+import { Link, useLocation } from "react-router-dom"
 import { toast } from 'sonner'
 
 type Project = {
@@ -18,9 +18,17 @@ type Project = {
 }
 
 export default function Projects() {
+  const location = useLocation()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+
+  useEffect(() => {
+    const searchFor = (location.state as any)?.searchFor
+    if (searchFor) {
+      setSearch(searchFor)
+    }
+  }, [location.state])
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
 
