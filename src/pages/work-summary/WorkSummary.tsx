@@ -115,6 +115,41 @@ export default function WorkSummary() {
     totalPeople: 0, equipment,
   } : undefined;
 
+  // 協力会社別・作業員別も、区分/ステータス/検索/作業員フィルタを反映したdisplayedProjectsから再集計する
+  const displayedProjectNames = new Set(displayedProjects.map(p => p.name));
+
+  const filteredCompanies: Record<string, { total: number; projects: { date: string; projectName: string; count: number }[] }> = {};
+  if (data) {
+    Object.entries(data.companies).forEach(([name, info]) => {
+      const projectsInScope = info.projects.filter(proj => displayedProjectNames.has(proj.projectName));
+      if (projectsInScope.length > 0) {
+        filteredCompanies[name] = {
+          total: projectsInScope.reduce((sum, p) => sum + p.count, 0),
+          projects: projectsInScope,
+        };
+      }
+    });
+  }
+
+  const filteredStaff: Record<string, { displayName: string } & Record<'kouji' | 'kanri' | 'mitsumori', { normal: number; ot: number; nightOt: number }>> = {};
+  displayedProjects.forEach(p => {
+    Object.entries(p.staffBreakdown).forEach(([key, sd]) => {
+      if (!filteredStaff[key]) {
+        filteredStaff[key] = {
+          displayName: sd.displayName,
+          kouji: { normal: 0, ot: 0, nightOt: 0 },
+          kanri: { normal: 0, ot: 0, nightOt: 0 },
+          mitsumori: { normal: 0, ot: 0, nightOt: 0 },
+        };
+      }
+      (['kouji', 'kanri', 'mitsumori'] as const).forEach(cat => {
+        filteredStaff[key][cat].normal += sd[cat].normal;
+        filteredStaff[key][cat].ot += sd[cat].ot;
+        filteredStaff[key][cat].nightOt += sd[cat].nightOt;
+      });
+    });
+  });
+
   const materialsSet = new Set<string>();
   const photoLinksMap = new Map<string, { projectName: string, url: string, fileName: string }>();
   const docLinksMap = new Map<string, { projectName: string, url: string, fileName: string }>();
@@ -504,8 +539,8 @@ export default function WorkSummary() {
           <div>
             <h2 className="text-xl font-bold mb-4 px-1 flex items-center gap-2"><Building2 className="text-orange-500 w-5 h-5" /> 協力会社別</h2>
             <div className="space-y-2">
-              {data && Object.keys(data.companies).length > 0 ? (
-                 Object.entries(data.companies).sort((a,b) => b[1].total - a[1].total).map(([name, info]) => (
+              {Object.keys(filteredCompanies).length > 0 ? (
+                 Object.entries(filteredCompanies).sort((a,b) => b[1].total - a[1].total).map(([name, info]) => (
                   <div key={name} className="bg-card rounded-lg border shadow-sm hover:border-orange-500/50 transition-colors overflow-hidden">
                     <details className="group">
                       <summary className="flex justify-between items-center p-3 cursor-pointer select-none list-none marker:hidden [&::-webkit-details-marker]:hidden border-b border-transparent group-open:border-border group-open:bg-muted/10 font-bold overflow-hidden">
@@ -552,8 +587,8 @@ export default function WorkSummary() {
               )}
             </div>
             <div className="space-y-3">
-              {data && Object.keys(data.staff).length > 0 ? (
-                Object.entries(data.staff).sort((a,b) => (b[1].kouji.normal + b[1].kanri.normal) - (a[1].kouji.normal + a[1].kanri.normal)).map(([key, d]) => {
+              {Object.keys(filteredStaff).length > 0 ? (
+                Object.entries(filteredStaff).sort((a,b) => (b[1].kouji.normal + b[1].kanri.normal) - (a[1].kouji.normal + a[1].kanri.normal)).map(([key, d]) => {
                   const total = (d.kouji.normal+d.kouji.ot)+(d.kanri.normal+d.kanri.ot)+(d.mitsumori.normal+d.mitsumori.ot);
                   const totalOt = d.kouji.ot + d.kanri.ot + d.mitsumori.ot;
                   const isSelected = selectedStaff === d.displayName;
