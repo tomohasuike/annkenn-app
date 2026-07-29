@@ -266,7 +266,7 @@ export default function WorkSummary() {
           {/* 3行目: 月で選択 / 集計期間 / 全体集計 / 集計実行 */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex flex-col">
-              <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">月で選択</label>
+              <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">月で選択 <span className="normal-case font-medium text-muted-foreground/70">(→右の期間に反映)</span></label>
               <input
                 type="month"
                 value={startDate.slice(0, 7)}
@@ -283,7 +283,7 @@ export default function WorkSummary() {
             </div>
 
             <div className="flex flex-col">
-              <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">集計期間 (範囲指定)</label>
+              <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">集計期間 (実際に使われる範囲)</label>
               <div className="flex items-center gap-2">
                 <input
                   type="date"
