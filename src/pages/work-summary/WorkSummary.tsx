@@ -273,10 +273,12 @@ export default function WorkSummary() {
                 onChange={e => {
                   if (!e.target.value) return;
                   const [y, m] = e.target.value.split('-').map(Number);
-                  const first = new Date(y, m - 1, 1).toISOString().split('T')[0];
-                  const last = new Date(y, m, 0).toISOString().split('T')[0];
-                  setStartDate(first);
-                  setEndDate(last);
+                  const pad = (n: number) => String(n).padStart(2, '0');
+                  // toISOString()はUTC変換を挟むため日本時間だと日付が1日ずれる。
+                  // ローカルのDateから年月日を直接文字列化することでズレを防ぐ。
+                  const lastDay = new Date(y, m, 0).getDate();
+                  setStartDate(`${y}-${pad(m)}-01`);
+                  setEndDate(`${y}-${pad(m)}-${pad(lastDay)}`);
                 }}
                 className="border rounded-md px-2 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9"
               />
