@@ -25,6 +25,7 @@ export default function WorkSummary() {
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [projectId, setProjectId] = useState('');
   const [kubunFilter, setKubunFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [isAllTime, setIsAllTime] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
@@ -49,6 +50,7 @@ export default function WorkSummary() {
 
   const filteredProjectsDropdown = projectsList
     .filter(p => kubunFilter === 'ALL' || p.kubun === kubunFilter)
+    .filter(p => statusFilter === 'ALL' || p.status === statusFilter)
     .filter(p => !searchLower || p.name.toLowerCase().includes(searchLower) || (p.no && p.no.toLowerCase().includes(searchLower)))
     .sort((a,b) => b.no.localeCompare(a.no, undefined, {numeric: true}));
 
@@ -143,6 +145,20 @@ export default function WorkSummary() {
               <option value="一般">一般</option>
               <option value="川北">川北</option>
               <option value="BPE">BPE</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">ステータス</label>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="border rounded-md px-3 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9"
+            >
+              <option value="ALL">全てのステータス</option>
+              <option value="着工前">着工前</option>
+              <option value="着工中">着工中</option>
+              <option value="完工">完工</option>
             </select>
           </div>
 
