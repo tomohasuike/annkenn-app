@@ -55,9 +55,13 @@ export default function WorkSummary() {
     .sort((a,b) => b.no.localeCompare(a.no, undefined, {numeric: true}));
 
   const projects = data ? Object.values(data.projects).sort((a, b) => b.totalHours - a.totalHours) : [];
-  
+
+  const statusById = new Map(projectsList.map(p => [p.id, p.status]));
+
   const displayedProjects = projects.filter(p => {
     const matchesSearch = !searchLower || p.name.toLowerCase().includes(searchLower) || (p.no && p.no.toLowerCase().includes(searchLower));
+    const matchesKubun = kubunFilter === 'ALL' || p.kubun === kubunFilter;
+    const matchesStatus = statusFilter === 'ALL' || statusById.get(p.id) === statusFilter;
 
     const normalizedSelected = selectedStaff ? selectedStaff.replace(/[\s　]+/g, "") : null;
     // 人が選ばれている場合はstaffBreakdownに実績があるもののみ表示
@@ -71,30 +75,45 @@ export default function WorkSummary() {
       })()
     );
 
-    return matchesSearch && matchesStaff;
+    return matchesSearch && matchesKubun && matchesStatus && matchesStaff;
   });
 
-  // 人が選ばれているときはその人の集計を使う
-  const selectedStaffData = selectedStaff && data
-    ? Object.values(data.staff).find(d => d.displayName === selectedStaff) ?? null
-    : null;
+  // 区分・ステータス・作業員・検索の各フィルタを反映した集計を、表示中の案件(displayedProjects)から都度計算する
+  const normalizedSelectedStaff = selectedStaff ? selectedStaff.replace(/[\s　]+/g, "") : null;
 
-  const s = selectedStaffData
-    ? {
-        kubunTotals: {
-          kouji: selectedStaffData.kouji.normal + selectedStaffData.kouji.ot + selectedStaffData.kouji.nightOt,
-          kanri: selectedStaffData.kanri.normal + selectedStaffData.kanri.ot + selectedStaffData.kanri.nightOt,
-          mitsumori: selectedStaffData.mitsumori.normal + selectedStaffData.mitsumori.ot + selectedStaffData.mitsumori.nightOt,
-        },
-        kubunDetails: {
-          kouji: selectedStaffData.kouji,
-          kanri: selectedStaffData.kanri,
-          mitsumori: selectedStaffData.mitsumori,
-        },
-        totalHours: 0, totalOT: 0, totalNightOT: 0,
-        totalPeople: 0, equipment: {},
-      }
-    : data?.summary;
+  const kubunDetails = {
+    kouji: { normal: 0, ot: 0, nightOt: 0 },
+    kanri: { normal: 0, ot: 0, nightOt: 0 },
+    mitsumori: { normal: 0, ot: 0, nightOt: 0 },
+  };
+  const equipment: Record<string, number> = {};
+
+  displayedProjects.forEach(p => {
+    const source = normalizedSelectedStaff ? p.staffBreakdown[normalizedSelectedStaff] : p.breakdownDetails;
+    if (source) {
+      (['kouji', 'kanri', 'mitsumori'] as const).forEach(cat => {
+        kubunDetails[cat].normal += source[cat].normal;
+        kubunDetails[cat].ot += source[cat].ot;
+        kubunDetails[cat].nightOt += source[cat].nightOt;
+      });
+    }
+    if (!normalizedSelectedStaff) {
+      Object.entries(p.equipment).forEach(([name, count]) => {
+        equipment[name] = (equipment[name] || 0) + count;
+      });
+    }
+  });
+
+  const s = data ? {
+    kubunTotals: {
+      kouji: kubunDetails.kouji.normal + kubunDetails.kouji.ot + kubunDetails.kouji.nightOt,
+      kanri: kubunDetails.kanri.normal + kubunDetails.kanri.ot + kubunDetails.kanri.nightOt,
+      mitsumori: kubunDetails.mitsumori.normal + kubunDetails.mitsumori.ot + kubunDetails.mitsumori.nightOt,
+    },
+    kubunDetails,
+    totalHours: 0, totalOT: 0, totalNightOT: 0,
+    totalPeople: 0, equipment,
+  } : undefined;
 
   const materialsSet = new Set<string>();
   const photoLinksMap = new Map<string, { projectName: string, url: string, fileName: string }>();
