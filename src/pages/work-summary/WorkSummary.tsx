@@ -188,19 +188,36 @@ export default function WorkSummary() {
           </div>
 
           <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">集計期間</label>
+            <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">月で選択</label>
+            <input
+              type="month"
+              value={startDate.slice(0, 7)}
+              onChange={e => {
+                if (!e.target.value) return;
+                const [y, m] = e.target.value.split('-').map(Number);
+                const first = new Date(y, m - 1, 1).toISOString().split('T')[0];
+                const last = new Date(y, m, 0).toISOString().split('T')[0];
+                setStartDate(first);
+                setEndDate(last);
+              }}
+              className="border rounded-md px-2 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">集計期間 (範囲指定)</label>
             <div className="flex items-center gap-2">
-              <input 
-                type="date" 
-                value={startDate} 
-                onChange={e => setStartDate(e.target.value)} 
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
                 className="border rounded-md px-2 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9"
               />
               <span className="text-muted-foreground font-bold">~</span>
-              <input 
-                type="date" 
-                value={endDate} 
-                onChange={e => setEndDate(e.target.value)} 
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
                 className="border rounded-md px-2 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9"
               />
             </div>
