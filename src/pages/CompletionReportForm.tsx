@@ -80,6 +80,8 @@ export default function CompletionReportForm() {
       const { data, error } = await supabase
         .from('projects')
         .select('id, project_name, category, status_flag')
+        .not('project_number', 'ilike', 'TEMP-%')
+        .not('project_name', 'ilike', '%休暇%')
         .order('created_at', { ascending: false })
       
       if (error) throw error

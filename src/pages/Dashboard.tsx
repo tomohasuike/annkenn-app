@@ -144,7 +144,9 @@ export default function Dashboard() {
 
         supabase.from('projects')
           .select('id, project_name, site_name, project_number, status_flag, category, client_name')
-          .eq('status_flag', '着工中'),
+          .eq('status_flag', '着工中')
+          .not('project_number', 'ilike', 'TEMP-%')
+          .not('project_name', 'ilike', '%休暇%'),
 
         supabase.from('daily_reports').select('id, project_id')
           .gte('report_date', `${todayStr}T00:00:00+09:00`)

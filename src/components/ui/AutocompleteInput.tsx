@@ -68,7 +68,7 @@ export function AutocompleteInput({
 
            if (currentProject) {
               console.log(`[Autocomplete] Base project attributes:`, currentProject);
-              let relatedProjectsQuery = supabase.from('projects').select('id');
+              let relatedProjectsQuery = supabase.from('projects').select('id').not('project_number', 'ilike', 'TEMP-%').not('project_name', 'ilike', '%休暇%');
               
               if (currentProject.category) {
                   relatedProjectsQuery = relatedProjectsQuery.eq('category', currentProject.category);

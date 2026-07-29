@@ -185,6 +185,8 @@ export default function Billing() {
       const { data: projData, error: projError } = await supabase
         .from('projects')
         .select('*')
+        .not('project_number', 'ilike', 'TEMP-%')
+        .not('project_name', 'ilike', '%休暇%')
         .order('created_at', { ascending: false })
       
       if (projError) throw projError

@@ -221,7 +221,7 @@ export default function ReportForm() {
 
   async function fetchMasterData() {
     try {
-      const { data: pData, error: pErr } = await supabase.from('projects').select('id, project_name, category, status_flag, project_number, client_name, site_name, folder_url').order('created_at', { ascending: false })
+      const { data: pData, error: pErr } = await supabase.from('projects').select('id, project_name, category, status_flag, project_number, client_name, site_name, folder_url').not('project_number', 'ilike', 'TEMP-%').not('project_name', 'ilike', '%休暇%').order('created_at', { ascending: false })
       if (pErr) console.error("Error fetching projects:", pErr)
       
       const { data: wData } = await supabase.from('worker_master').select('id, name, type, display_order').neq('type', '事務員').neq('type', '協力会社')

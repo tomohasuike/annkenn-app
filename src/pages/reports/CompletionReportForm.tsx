@@ -93,7 +93,7 @@ export function CompletionReportForm() {
       setLoading(true);
       
       // Fetch projects for dropdown
-      const { data: projData } = await supabase.from('projects').select('id, project_name, project_number').order('project_name');
+      const { data: projData } = await supabase.from('projects').select('id, project_name, project_number').not('project_number', 'ilike', 'TEMP-%').order('project_name');
       if (projData) {
         // 工程管理用の特別な案件（VACATIONなど）を除外
         setProjects(projData.filter(p => p.project_number !== 'VACATION' && (!p.project_name || !p.project_name.includes('休暇'))).map(p => ({id: p.id, name: p.project_name || '名称未設定'})));

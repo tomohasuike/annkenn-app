@@ -149,6 +149,8 @@ export function useWorkSummary() {
       const { data: pData, error } = await supabase
         .from('projects')
         .select('id, project_name, project_number, category, status_flag')
+        .not('project_number', 'ilike', 'TEMP-%')
+        .not('project_name', 'ilike', '%休暇%')
         .order('created_at', { ascending: false });
         
       if (!error && pData) {
