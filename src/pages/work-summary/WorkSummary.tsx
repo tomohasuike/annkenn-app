@@ -183,135 +183,144 @@ export default function WorkSummary() {
           <p className="text-muted-foreground text-sm font-medium">完工案件・名寄せ・実働時間・建機/日別リスト対応</p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-3 bg-card p-4 rounded-xl border shadow-sm">
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">区分フィルタ</label>
-            <select 
-              value={kubunFilter} 
-              onChange={(e) => {
-                setKubunFilter(e.target.value);
-                setProjectId('');
-              }} 
-              className="border rounded-md px-3 py-1.5 text-sm bg-muted/50 focus:ring-2 focus:ring-primary font-bold outline-none h-9"
-            >
-              <option value="ALL">全ての区分</option>
-              <option value="役所">役所</option>
-              <option value="一般">一般</option>
-              <option value="川北">川北</option>
-              <option value="BPE">BPE</option>
-            </select>
-          </div>
+        <div className="flex flex-col gap-3 bg-card p-4 rounded-xl border shadow-sm">
+          {/* 1行目: 区分フィルタ / ステータス / 案件検索 */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">区分フィルタ</label>
+              <select
+                value={kubunFilter}
+                onChange={(e) => {
+                  setKubunFilter(e.target.value);
+                  setProjectId('');
+                }}
+                className="border rounded-md px-3 py-1.5 text-sm bg-muted/50 focus:ring-2 focus:ring-primary font-bold outline-none h-9"
+              >
+                <option value="ALL">全ての区分</option>
+                <option value="役所">役所</option>
+                <option value="一般">一般</option>
+                <option value="川北">川北</option>
+                <option value="BPE">BPE</option>
+              </select>
+            </div>
 
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">ステータス</label>
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="border rounded-md px-3 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9"
-            >
-              <option value="ALL">全てのステータス</option>
-              <option value="着工前">着工前</option>
-              <option value="着工中">着工中</option>
-              <option value="完工">完工</option>
-            </select>
-          </div>
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">ステータス</label>
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+                className="border rounded-md px-3 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9"
+              >
+                <option value="ALL">全てのステータス</option>
+                <option value="着工前">着工前</option>
+                <option value="着工中">着工中</option>
+                <option value="完工">完工</option>
+              </select>
+            </div>
 
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">案件検索</label>
-            <input 
-              type="text" 
-              placeholder="案件名や番号を入力..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="border rounded-md px-3 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9 w-[150px] md:w-[200px]"
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">案件選択</label>
-            <select 
-              value={projectId} 
-              onChange={(e) => setProjectId(e.target.value)} 
-              className="border rounded-md px-3 py-1.5 text-sm bg-background min-w-[150px] md:min-w-[200px] focus:ring-2 focus:ring-primary font-bold outline-none h-9"
-            >
-              <option value="">全ての案件を表示</option>
-              {filteredProjectsDropdown.map(p => (
-                <option key={p.id} value={p.id}>[{p.no || '未設定'}] {p.name} ({p.status})</option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">作業員選択</label>
-            <select
-              value={selectedStaff || ''}
-              onChange={e => setSelectedStaff(e.target.value || null)}
-              className="border rounded-md px-3 py-1.5 text-sm bg-background min-w-[120px] focus:ring-2 focus:ring-primary font-bold outline-none h-9"
-            >
-              <option value="">全員</option>
-              {data && Object.values(data.staff)
-                .sort((a, b) => a.displayName.localeCompare(b.displayName, 'ja'))
-                .map(d => (
-                  <option key={d.displayName} value={d.displayName}>{d.displayName}</option>
-                ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">月で選択</label>
-            <input
-              type="month"
-              value={startDate.slice(0, 7)}
-              onChange={e => {
-                if (!e.target.value) return;
-                const [y, m] = e.target.value.split('-').map(Number);
-                const first = new Date(y, m - 1, 1).toISOString().split('T')[0];
-                const last = new Date(y, m, 0).toISOString().split('T')[0];
-                setStartDate(first);
-                setEndDate(last);
-              }}
-              className="border rounded-md px-2 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9"
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">集計期間 (範囲指定)</label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">案件検索</label>
               <input
-                type="date"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-                className="border rounded-md px-2 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9"
-              />
-              <span className="text-muted-foreground font-bold">~</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-                className="border rounded-md px-2 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9"
+                type="text"
+                placeholder="案件名や番号を入力..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="border rounded-md px-3 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9 w-[150px] md:w-[200px]"
               />
             </div>
           </div>
-          
-          <div className="flex items-center gap-2 self-end mb-1 bg-background px-3 h-9 rounded-md border">
-            <input 
-              type="checkbox" 
-              id="allTimeCheck" 
-              checked={isAllTime}
-              onChange={e => setIsAllTime(e.target.checked)}
-              className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
-            />
-            <label htmlFor="allTimeCheck" className="text-xs font-bold text-foreground cursor-pointer select-none">全体集計 (全期間)</label>
+
+          {/* 2行目: 案件選択 / 作業員選択 */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">案件選択</label>
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className="border rounded-md px-3 py-1.5 text-sm bg-background min-w-[150px] md:min-w-[200px] focus:ring-2 focus:ring-primary font-bold outline-none h-9"
+              >
+                <option value="">全ての案件を表示</option>
+                {filteredProjectsDropdown.map(p => (
+                  <option key={p.id} value={p.id}>[{p.no || '未設定'}] {p.name} ({p.status})</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">作業員選択</label>
+              <select
+                value={selectedStaff || ''}
+                onChange={e => setSelectedStaff(e.target.value || null)}
+                className="border rounded-md px-3 py-1.5 text-sm bg-background min-w-[120px] focus:ring-2 focus:ring-primary font-bold outline-none h-9"
+              >
+                <option value="">全員</option>
+                {data && Object.values(data.staff)
+                  .sort((a, b) => a.displayName.localeCompare(b.displayName, 'ja'))
+                  .map(d => (
+                    <option key={d.displayName} value={d.displayName}>{d.displayName}</option>
+                  ))}
+              </select>
+            </div>
           </div>
-          
-          <div className="flex flex-col self-end">
-            <button 
-              onClick={handleSearch} 
-              disabled={loading}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 h-9 rounded-md text-sm font-bold shadow-sm transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50"
-            >
-              {loading ? '集計中...' : '集計実行'}
-            </button>
+
+          {/* 3行目: 月で選択 / 集計期間 / 全体集計 / 集計実行 */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">月で選択</label>
+              <input
+                type="month"
+                value={startDate.slice(0, 7)}
+                onChange={e => {
+                  if (!e.target.value) return;
+                  const [y, m] = e.target.value.split('-').map(Number);
+                  const first = new Date(y, m - 1, 1).toISOString().split('T')[0];
+                  const last = new Date(y, m, 0).toISOString().split('T')[0];
+                  setStartDate(first);
+                  setEndDate(last);
+                }}
+                className="border rounded-md px-2 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9"
+              />
+            </div>
+
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">集計期間 (範囲指定)</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  className="border rounded-md px-2 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9"
+                />
+                <span className="text-muted-foreground font-bold">~</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  className="border rounded-md px-2 py-1.5 text-sm bg-background focus:ring-2 focus:ring-primary font-bold outline-none h-9"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end mb-1 bg-background px-3 h-9 rounded-md border">
+              <input
+                type="checkbox"
+                id="allTimeCheck"
+                checked={isAllTime}
+                onChange={e => setIsAllTime(e.target.checked)}
+                className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
+              />
+              <label htmlFor="allTimeCheck" className="text-xs font-bold text-foreground cursor-pointer select-none">全体集計 (全期間)</label>
+            </div>
+
+            <div className="flex flex-col self-end">
+              <button
+                onClick={handleSearch}
+                disabled={loading}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 h-9 rounded-md text-sm font-bold shadow-sm transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50"
+              >
+                {loading ? '集計中...' : '集計実行'}
+              </button>
+            </div>
           </div>
         </div>
       </header>
