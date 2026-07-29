@@ -28,7 +28,6 @@ export default function WorkSummary() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [isAllTime, setIsAllTime] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [selectedProjectForModal, setSelectedProjectForModal] = useState<ProjectSummary | null>(null);
 
@@ -63,24 +62,10 @@ export default function WorkSummary() {
     const matchesKubun = kubunFilter === 'ALL' || p.kubun === kubunFilter;
     const matchesStatus = statusFilter === 'ALL' || statusById.get(p.id) === statusFilter;
 
-    const normalizedSelected = selectedStaff ? selectedStaff.replace(/[\s　]+/g, "") : null;
-    // 人が選ばれている場合はstaffBreakdownに実績があるもののみ表示
-    const matchesStaff = !normalizedSelected || (
-      normalizedSelected in p.staffBreakdown &&
-      (() => {
-        const bd = p.staffBreakdown[normalizedSelected];
-        return (bd.kouji.normal + bd.kouji.ot + bd.kouji.nightOt +
-                bd.kanri.normal + bd.kanri.ot + bd.kanri.nightOt +
-                bd.mitsumori.normal + bd.mitsumori.ot + bd.mitsumori.nightOt) > 0;
-      })()
-    );
-
-    return matchesSearch && matchesKubun && matchesStatus && matchesStaff;
+    return matchesSearch && matchesKubun && matchesStatus;
   });
 
-  // 区分・ステータス・作業員・検索の各フィルタを反映した集計を、表示中の案件(displayedProjects)から都度計算する
-  const normalizedSelectedStaff = selectedStaff ? selectedStaff.replace(/[\s　]+/g, "") : null;
-
+  // 区分・ステータス・検索の各フィルタを反映した集計を、表示中の案件(displayedProjects)から都度計算する
   const kubunDetails = {
     kouji: { normal: 0, ot: 0, nightOt: 0 },
     kanri: { normal: 0, ot: 0, nightOt: 0 },
@@ -89,19 +74,14 @@ export default function WorkSummary() {
   const equipment: Record<string, number> = {};
 
   displayedProjects.forEach(p => {
-    const source = normalizedSelectedStaff ? p.staffBreakdown[normalizedSelectedStaff] : p.breakdownDetails;
-    if (source) {
-      (['kouji', 'kanri', 'mitsumori'] as const).forEach(cat => {
-        kubunDetails[cat].normal += source[cat].normal;
-        kubunDetails[cat].ot += source[cat].ot;
-        kubunDetails[cat].nightOt += source[cat].nightOt;
-      });
-    }
-    if (!normalizedSelectedStaff) {
-      Object.entries(p.equipment).forEach(([name, count]) => {
-        equipment[name] = (equipment[name] || 0) + count;
-      });
-    }
+    (['kouji', 'kanri', 'mitsumori'] as const).forEach(cat => {
+      kubunDetails[cat].normal += p.breakdownDetails[cat].normal;
+      kubunDetails[cat].ot += p.breakdownDetails[cat].ot;
+      kubunDetails[cat].nightOt += p.breakdownDetails[cat].nightOt;
+    });
+    Object.entries(p.equipment).forEach(([name, count]) => {
+      equipment[name] = (equipment[name] || 0) + count;
+    });
   });
 
   const s = data ? {
@@ -245,22 +225,6 @@ export default function WorkSummary() {
                 ))}
               </select>
             </div>
-
-            <div className="flex flex-col">
-              <label className="text-[10px] font-bold text-muted-foreground mb-1 ml-1 uppercase tracking-wider">作業員選択</label>
-              <select
-                value={selectedStaff || ''}
-                onChange={e => setSelectedStaff(e.target.value || null)}
-                className="border rounded-md px-3 py-1.5 text-sm bg-background min-w-[120px] focus:ring-2 focus:ring-primary font-bold outline-none h-9"
-              >
-                <option value="">全員</option>
-                {data && Object.values(data.staff)
-                  .sort((a, b) => a.displayName.localeCompare(b.displayName, 'ja'))
-                  .map(d => (
-                    <option key={d.displayName} value={d.displayName}>{d.displayName}</option>
-                  ))}
-              </select>
-            </div>
           </div>
 
           {/* 3行目: 月で選択 / 集計期間 / 全体集計 / 集計実行 */}
@@ -337,7 +301,7 @@ export default function WorkSummary() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-card border rounded-xl px-6 py-6 flex items-center justify-between border-t-4 border-t-blue-500 shadow-sm">
           <div>
-            <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">{selectedStaff ? `${selectedStaff}：工事` : '区分：工事 合計'}</p>
+            <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">区分：工事 合計</p>
             <p className="text-4xl md:text-5xl font-bold tracking-tight">
               {s ? s.kubunTotals.kouji.toFixed(1) : '0.0'} <span className="text-xl font-normal text-muted-foreground">h</span>
             </p>
@@ -353,7 +317,7 @@ export default function WorkSummary() {
         </div>
         <div className="bg-card border rounded-xl px-6 py-6 flex items-center justify-between border-t-4 border-t-purple-500 shadow-sm">
           <div>
-            <p className="text-xs font-bold text-purple-600 uppercase tracking-widest mb-2">{selectedStaff ? `${selectedStaff}：管理` : '区分：管理 合計'}</p>
+            <p className="text-xs font-bold text-purple-600 uppercase tracking-widest mb-2">区分：管理 合計</p>
             <p className="text-4xl md:text-5xl font-bold tracking-tight">
               {s ? s.kubunTotals.kanri.toFixed(1) : '0.0'} <span className="text-xl font-normal text-muted-foreground">h</span>
             </p>
@@ -369,7 +333,7 @@ export default function WorkSummary() {
         </div>
         <div className="bg-card border rounded-xl px-6 py-6 flex items-center justify-between border-t-4 border-t-amber-500 shadow-sm">
           <div>
-            <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-2">{selectedStaff ? `${selectedStaff}：見積・現調` : '区分：見積・現調 合計'}</p>
+            <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-2">区分：見積・現調 合計</p>
             <p className="text-4xl md:text-5xl font-bold tracking-tight">
               {s ? s.kubunTotals.mitsumori.toFixed(1) : '0.0'} <span className="text-xl font-normal text-muted-foreground">h</span>
             </p>
@@ -406,33 +370,17 @@ export default function WorkSummary() {
                 {displayedProjects.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="p-12 text-center text-muted-foreground text-sm italic">
-                      {loading ? '集計データを取得中...' : selectedStaff ? `${selectedStaff} の稼働データは見つかりませんでした` : '指定条件の稼働データは見つかりませんでした'}
+                      {loading ? '集計データを取得中...' : '指定条件の稼働データは見つかりませんでした'}
                     </td>
                   </tr>
                 ) : (
                   displayedProjects.map(p => {
-                    const staffKey = selectedStaff ? selectedStaff.replace(/[\s　]+/g, "") : null;
-                    const pStaff = staffKey ? p.staffBreakdown[staffKey] ?? null : null;
-                    const bd = pStaff
-                      ? { kouji: pStaff.kouji.normal + pStaff.kouji.ot + pStaff.kouji.nightOt,
-                          kanri: pStaff.kanri.normal + pStaff.kanri.ot + pStaff.kanri.nightOt,
-                          mitsumori: pStaff.mitsumori.normal + pStaff.mitsumori.ot + pStaff.mitsumori.nightOt }
-                      : p.breakdown;
-                    const bdd = pStaff
-                      ? { kouji: pStaff.kouji, kanri: pStaff.kanri, mitsumori: pStaff.mitsumori }
-                      : p.breakdownDetails;
-                    const totalH = pStaff
-                      ? bd.kouji + bd.kanri + bd.mitsumori
-                      : p.totalHours;
-                    const normalH = pStaff
-                      ? pStaff.kouji.normal + pStaff.kanri.normal + pStaff.mitsumori.normal
-                      : p.normalHours;
-                    const otH = pStaff
-                      ? pStaff.kouji.ot + pStaff.kanri.ot + pStaff.mitsumori.ot
-                      : p.overtimeHours;
-                    const nightH = pStaff
-                      ? pStaff.kouji.nightOt + pStaff.kanri.nightOt + pStaff.mitsumori.nightOt
-                      : p.nightOvertimeHours;
+                    const bd = p.breakdown;
+                    const bdd = p.breakdownDetails;
+                    const totalH = p.totalHours;
+                    const normalH = p.normalHours;
+                    const otH = p.overtimeHours;
+                    const nightH = p.nightOvertimeHours;
                     return (
                     <tr key={p.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-5 py-5 border-b">
@@ -588,35 +536,21 @@ export default function WorkSummary() {
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <UserCircle className="text-green-500 w-5 h-5" /> 作業員別
               </h2>
-              {selectedStaff && (
-                <button 
-                  onClick={() => setSelectedStaff(null)}
-                  className="text-xs text-muted-foreground hover:text-primary underline flex items-center gap-1"
-                >
-                  絞り込み解除
-                </button>
-              )}
             </div>
             <div className="space-y-3">
               {Object.keys(filteredStaff).length > 0 ? (
                 Object.entries(filteredStaff).sort((a,b) => (b[1].kouji.normal + b[1].kanri.normal) - (a[1].kouji.normal + a[1].kanri.normal)).map(([key, d]) => {
                   const total = (d.kouji.normal+d.kouji.ot)+(d.kanri.normal+d.kanri.ot)+(d.mitsumori.normal+d.mitsumori.ot);
                   const totalOt = d.kouji.ot + d.kanri.ot + d.mitsumori.ot;
-                  const isSelected = selectedStaff === d.displayName;
-                  
+
                   return (
-                    <div 
-                      key={key} 
-                      onClick={() => setSelectedStaff(selectedStaff === d.displayName ? null : d.displayName)}
-                      className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                        isSelected 
-                          ? 'bg-primary/5 border-primary shadow-md ring-1 ring-primary' 
-                          : 'bg-card shadow-sm hover:shadow-md hover:border-primary/50'
-                      }`}
+                    <div
+                      key={key}
+                      className="p-4 rounded-xl border transition-all bg-card shadow-sm"
                     >
                       <div className="flex justify-between items-center font-bold border-b pb-3 border-border/50">
-                        <span className={`tracking-tight flex items-center gap-2 text-base ${isSelected ? 'text-primary' : ''}`}>
-                          <UserCircle className={`${isSelected ? 'text-primary' : 'text-muted-foreground'} w-5 h-5`} /> {d.displayName}
+                        <span className="tracking-tight flex items-center gap-2 text-base">
+                          <UserCircle className="text-muted-foreground w-5 h-5" /> {d.displayName}
                         </span>
                         <div className="text-right">
                           <span className={`${isSelected ? 'text-primary' : 'text-primary'} font-bold text-2xl tracking-tight`}>{total.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">h</span></span>
@@ -740,7 +674,6 @@ export default function WorkSummary() {
         <ProjectDetailsModal
           project={selectedProjectForModal}
           onClose={() => setSelectedProjectForModal(null)}
-          selectedStaff={selectedStaff}
         />
       )}
     </div>
