@@ -553,7 +553,7 @@ export default function WorkSummary() {
                           <UserCircle className="text-muted-foreground w-5 h-5" /> {d.displayName}
                         </span>
                         <div className="text-right">
-                          <span className={`${isSelected ? 'text-primary' : 'text-primary'} font-bold text-2xl tracking-tight`}>{total.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">h</span></span>
+                          <span className="text-primary font-bold text-2xl tracking-tight">{total.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">h</span></span>
                           <div className="text-[10px] text-muted-foreground flex justify-end gap-1 mt-1">
                             <span className="bg-muted px-1.5 py-0.5 rounded font-medium">日中 {(total - totalOt).toFixed(1)}h</span>
                             {totalOt > 0 && <span className="bg-orange-50 text-orange-600 border border-orange-100 px-1.5 py-0.5 rounded font-bold">残業 {totalOt.toFixed(1)}h</span>}
