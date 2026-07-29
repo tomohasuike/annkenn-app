@@ -186,7 +186,7 @@ export function useWorkSummary() {
           report_personnel (worker_name, worker_master(name), start_time, end_time),
           report_vehicles (vehicle_name, vehicle_master(vehicle_name)),
           report_machinery (machinery_name, vehicle_master(vehicle_name)),
-          report_materials (material_name, quantity, photo, documentation),
+          report_materials (material_name, quantity, photo, documentation, extracted_materials),
           report_subcontractors (subcontractor_name, worker_count, start_time, end_time)
         `);
 
@@ -399,7 +399,21 @@ export function useWorkSummary() {
               projectName: pName,
             });
           }
-          
+
+          // 添付資料(PDF/写真)をVisionで解析済みの品目も一覧に含める
+          if (Array.isArray(m.extracted_materials)) {
+            m.extracted_materials.forEach((ex: any) => {
+              if (!ex.name) return;
+              const qtyStr = [ex.quantity, ex.unit].filter(Boolean).join('');
+              pObj.materials.push({
+                name: ex.name,
+                quantity: qtyStr,
+                date: materialDate,
+                projectName: pName,
+              });
+            });
+          }
+
           if (m.photo) {
             try {
               const parsed = JSON.parse(m.photo);
