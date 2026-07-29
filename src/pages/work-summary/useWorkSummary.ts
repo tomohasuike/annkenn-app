@@ -20,6 +20,13 @@ export type SummaryStats = {
   kubunDetails: Record<WorkCategory, TimeDetail>;
 }
 
+export type MaterialEntry = {
+  name: string;
+  quantity: string;
+  date: string;
+  projectName: string;
+}
+
 export type DailyLog = {
   reportId: string;
   date: string;
@@ -48,7 +55,7 @@ export type ProjectSummary = {
   totalHours: number;
   breakdown: Record<WorkCategory, number>;
   breakdownDetails: Record<WorkCategory, TimeDetail>;
-  materials: string[];
+  materials: MaterialEntry[];
   photos: { url: string, fileName: string, projectName: string }[];
   docs: { url: string, fileName: string, projectName: string }[];
   companies: Record<string, number>;
@@ -370,11 +377,27 @@ export function useWorkSummary() {
         });
 
         // Materials & Photos
+        let materialDate = '不明';
+        if (row.report_date) {
+          const d = new Date(row.report_date);
+          if (!isNaN(d.getTime())) {
+            const days = ['日', '月', '火', '水', '木', '金', '土'];
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            materialDate = `${mm}/${dd}(${days[d.getDay()]})`;
+          } else {
+            materialDate = row.report_date.split('T')[0];
+          }
+        }
+
         materials.forEach((m: any) => {
-          if (m.material_name || m.documentation || m.photo) {
-            const matName = m.material_name || '(名称未設定の材料)';
-            const qtyStr = m.quantity ? ` ${m.quantity}` : '';
-            pObj.materials.push(matName + qtyStr);
+          if (m.material_name) {
+            pObj.materials.push({
+              name: m.material_name,
+              quantity: m.quantity || '',
+              date: materialDate,
+              projectName: pName,
+            });
           }
           
           if (m.photo) {
@@ -512,7 +535,6 @@ export function useWorkSummary() {
 
       // Final Deduplication
       Object.values(results.projects).forEach(p => {
-        p.materials = [...new Set(p.materials)];
         p.photos = p.photos.filter((obj, index, self) => index === self.findIndex((t) => t.url === obj.url));
         p.docs = p.docs.filter((obj, index, self) => index === self.findIndex((t) => t.url === obj.url));
         p.dailyLogs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());

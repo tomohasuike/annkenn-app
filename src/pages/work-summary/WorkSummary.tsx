@@ -130,27 +130,16 @@ export default function WorkSummary() {
     });
   });
 
-  const materialsSet = new Set<string>();
+  const materialsList: { name: string; quantity: string; date: string; projectName: string }[] = [];
   const photoLinksMap = new Map<string, { projectName: string, url: string, fileName: string }>();
   const docLinksMap = new Map<string, { projectName: string, url: string, fileName: string }>();
 
-  if (data) {
-    // 期間や作業員絞り込みの影響を避けるため、全案件 (projects) から材料を集約します
-    // ただし、案件名検索 (searchQuery) がある場合はそれに合致した案件に、
-    // または案件選択 (projectId) がある場合はその特定の案件に絞り込みます
-    const searchLower = searchQuery.toLowerCase();
-    const sourceProjects = Object.values(data.projects).filter(p => {
-      const matchesSearch = !searchLower || p.name.toLowerCase().includes(searchLower) || (p.no && p.no.toLowerCase().includes(searchLower));
-      const matchesId = !projectId || p.id === projectId;
-      return matchesSearch && matchesId;
-    });
-
-    sourceProjects.forEach(p => {
-      p.materials.forEach(m => { if (m) materialsSet.add(m.trim()); });
-      p.photos.forEach(obj => { if (obj && obj.url && !photoLinksMap.has(obj.url)) photoLinksMap.set(obj.url, obj); });
-      p.docs.forEach(obj => { if (obj && obj.url && !docLinksMap.has(obj.url)) docLinksMap.set(obj.url, obj); });
-    });
-  }
+  displayedProjects.forEach(p => {
+    p.materials.forEach(m => materialsList.push(m));
+    p.photos.forEach(obj => { if (obj && obj.url && !photoLinksMap.has(obj.url)) photoLinksMap.set(obj.url, obj); });
+    p.docs.forEach(obj => { if (obj && obj.url && !docLinksMap.has(obj.url)) docLinksMap.set(obj.url, obj); });
+  });
+  materialsList.sort((a, b) => a.projectName.localeCompare(b.projectName) || a.name.localeCompare(b.name));
 
   return (
     <div className="max-w-7xl mx-auto pb-12">
@@ -604,11 +593,17 @@ export default function WorkSummary() {
                <Package className="w-4 h-4" /> 使用材料
              </h3>
              <div className="space-y-2 text-sm overflow-y-auto pr-2 font-medium flex-1">
-               {materialsSet.size > 0 
-                 ? Array.from(materialsSet).sort().map((m, i) => (
-                     <div key={i} className="py-2.5 border-b border-muted/50 px-2 flex items-center gap-3">
-                       <span className="w-1.5 h-1.5 bg-green-500 rounded-full shrink-0"></span>
-                       <span className="font-bold">{m}</span>
+               {materialsList.length > 0
+                 ? materialsList.map((m, i) => (
+                     <div key={i} className="py-2.5 border-b border-muted/50 px-2 flex items-start gap-3">
+                       <span className="w-1.5 h-1.5 bg-green-500 rounded-full shrink-0 mt-1.5"></span>
+                       <div className="min-w-0 flex-1">
+                         <div className="flex items-baseline justify-between gap-2">
+                           <span className="font-bold truncate">{m.name}</span>
+                           {m.quantity && <span className="text-xs text-muted-foreground shrink-0">{m.quantity}</span>}
+                         </div>
+                         <div className="text-[10px] text-muted-foreground truncate mt-0.5">{m.date} ・ {m.projectName}</div>
+                       </div>
                      </div>
                    ))
                  : <p className="text-muted-foreground italic text-xs px-2">材料データはありません</p>}
