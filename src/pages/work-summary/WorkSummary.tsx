@@ -8,6 +8,7 @@ import ProjectDetailsModal from '../../components/work-summary/ProjectDetailsMod
 import { Link } from 'react-router-dom';
 import { ClipboardCheck, Download, CheckCircle2, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { supabase } from '../../lib/supabase';
 
 // Google Driveの画像用直接リンク(lh3.googleusercontent.com/d/ID)を、正規プレビューURL(drive.google.com/file/d/ID/view)へ自動コンバートする
 function fixDriveDocUrl(url: string): string {
@@ -39,6 +40,30 @@ export default function WorkSummary() {
     fetchData(startDate, endDate, projectId, isAllTime);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
+
+  // 材料チェックボタンに表示する、フィルタに関係のない全体の未確認件数
+  const [globalUncheckedCount, setGlobalUncheckedCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchGlobalUncheckedCount = async () => {
+      const { data: rows, error } = await supabase
+        .from('report_materials')
+        .select('material_name, material_checked, extracted_materials')
+        .or('material_checked.eq.false,extracted_materials.not.is.null');
+      if (error || !rows) return;
+      let count = 0;
+      rows.forEach((row: any) => {
+        if (row.material_name && !row.material_checked) count += 1;
+        if (Array.isArray(row.extracted_materials)) {
+          row.extracted_materials.forEach((ex: any) => {
+            if (ex.name && !ex.checked && !ex.deleted) count += 1;
+          });
+        }
+      });
+      setGlobalUncheckedCount(count);
+    };
+    fetchGlobalUncheckedCount();
+  }, []);
 
   const handleSearch = () => {
     if (!startDate || !endDate) {
@@ -187,9 +212,14 @@ export default function WorkSummary() {
 
         <Link
           to="/work-summary/material-check"
-          className="inline-flex items-center gap-2 bg-card border rounded-lg px-4 h-11 font-bold text-sm shadow-sm hover:bg-muted/50 transition-colors self-start"
+          className="relative inline-flex items-center gap-2 bg-card border rounded-lg px-4 h-11 font-bold text-sm shadow-sm hover:bg-muted/50 transition-colors self-start"
         >
           <ClipboardCheck className="w-4 h-4 text-primary" /> 材料チェック
+          {!!globalUncheckedCount && (
+            <span className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] font-bold rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center shadow-sm">
+              {globalUncheckedCount}
+            </span>
+          )}
         </Link>
 
         <div className="flex flex-col gap-3 bg-card p-4 rounded-xl border shadow-sm">
