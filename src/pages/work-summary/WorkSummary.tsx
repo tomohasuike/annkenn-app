@@ -7,7 +7,6 @@ import ReportDetailsModal from '../../components/reports/ReportDetailsModal';
 import ProjectDetailsModal from '../../components/work-summary/ProjectDetailsModal';
 import { Link } from 'react-router-dom';
 import { ClipboardCheck } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
 
 // Google Driveの画像用直接リンク(lh3.googleusercontent.com/d/ID)を、正規プレビューURL(drive.google.com/file/d/ID/view)へ自動コンバートする
 function fixDriveDocUrl(url: string): string {
@@ -46,41 +45,6 @@ export default function WorkSummary() {
       return;
     }
     fetchData(startDate, endDate, projectId, isAllTime);
-  };
-
-  const [togglingKey, setTogglingKey] = useState<string | null>(null);
-
-  const toggleMaterialChecked = async (m: MaterialEntry, key: string) => {
-    setTogglingKey(key);
-    try {
-      if (m.source === 'manual') {
-        const { error } = await supabase
-          .from('report_materials')
-          .update({ material_checked: !m.checked })
-          .eq('id', m.reportMaterialId);
-        if (error) throw error;
-      } else {
-        // extracted_materialsはJSON配列のため、書き込み直前に最新値を読み直してから該当要素だけ更新する
-        const { data: fresh, error: fetchErr } = await supabase
-          .from('report_materials')
-          .select('extracted_materials')
-          .eq('id', m.reportMaterialId)
-          .single();
-        if (fetchErr) throw fetchErr;
-        const list: any[] = Array.isArray(fresh?.extracted_materials) ? fresh.extracted_materials : [];
-        const updated = list.map(ex => ex.id === m.extractedItemId ? { ...ex, checked: !m.checked } : ex);
-        const { error } = await supabase
-          .from('report_materials')
-          .update({ extracted_materials: updated })
-          .eq('id', m.reportMaterialId);
-        if (error) throw error;
-      }
-      fetchData(startDate, endDate, projectId, isAllTime);
-    } catch (err: any) {
-      toast.error('更新に失敗しました: ' + err.message);
-    } finally {
-      setTogglingKey(null);
-    }
   };
 
   const searchLower = searchQuery.toLowerCase();
@@ -639,36 +603,21 @@ export default function WorkSummary() {
              </h3>
              <div className="space-y-2 text-sm overflow-y-auto pr-2 font-medium flex-1">
                {materialsList.length > 0
-                 ? materialsList.map((m, i) => {
-                     const key = `${m.reportMaterialId}-${m.extractedItemId || 'manual'}`;
-                     const isToggling = togglingKey === key;
-                     return (
-                     <div key={i} className={`py-2.5 border-b border-muted/50 px-2 flex items-start gap-3 ${!m.checked ? 'bg-amber-50/50' : ''}`}>
-                       <button
-                         onClick={() => toggleMaterialChecked(m, key)}
-                         disabled={isToggling}
-                         title={m.checked ? 'クリックで未確認に戻す' : 'クリックで確認済みにする'}
-                         className={`w-5 h-5 rounded-md border-2 shrink-0 mt-0.5 flex items-center justify-center transition-colors disabled:opacity-50 ${
-                           m.checked ? 'bg-green-500 border-green-500' : 'bg-white border-amber-400 hover:border-amber-500'
-                         }`}
-                       >
-                         {m.checked && <span className="text-white text-xs leading-none">✓</span>}
-                       </button>
+                 ? materialsList.map((m, i) => (
+                     <div key={i} className="py-2.5 border-b border-muted/50 px-2 flex items-start gap-3">
+                       <span
+                         title={m.checked ? '確認済み' : '未確認'}
+                         className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${m.checked ? 'bg-green-500' : 'bg-amber-400'}`}
+                       ></span>
                        <div className="min-w-0 flex-1">
                          <div className="flex items-baseline justify-between gap-2">
                            <span className="font-bold truncate">{m.name}</span>
                            {m.quantity && <span className="text-xs text-muted-foreground shrink-0">{m.quantity}</span>}
                          </div>
                          <div className="text-[10px] text-muted-foreground truncate mt-0.5">{m.date} ・ {m.projectName}</div>
-                         {m.checked ? (
-                           <span className="inline-block mt-1 bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-bold">確認済み</span>
-                         ) : (
-                           <span className="inline-block mt-1 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-bold">未確認</span>
-                         )}
                        </div>
                      </div>
-                     );
-                   })
+                   ))
                  : <p className="text-muted-foreground italic text-xs px-2">材料データはありません</p>}
              </div>
            </div>
