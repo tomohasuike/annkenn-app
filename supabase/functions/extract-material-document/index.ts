@@ -137,12 +137,23 @@ serve(async (req: Request) => {
       }
     }
 
-    const { error: updateError } = await supabase
+    // 同時に複数の解析リクエストが走った場合、まだ結果が書き込まれていない(NULLのままの)方だけを
+    // 勝たせることで、人間が確認済みにした結果を後発の解析が上書きしてしまう事故を防ぐ
+    const { data: updatedRows, error: updateError } = await supabase
       .from("report_materials")
       .update({ extracted_materials: allItems })
       .eq("id", report_material_id)
+      .is("extracted_materials", null)
+      .select("id")
 
     if (updateError) throw updateError
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return new Response(JSON.stringify({ success: true, skipped: true, reason: "already processed" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
 
     return new Response(JSON.stringify({ success: true, extracted: allItems }), {
       status: 200,
