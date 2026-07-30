@@ -27,6 +27,8 @@ export type MaterialEntry = {
   projectName: string;
   checked: boolean;
   source: 'manual' | 'extracted';
+  reportMaterialId: string;
+  extractedItemId?: string;
 }
 
 export type DailyLog = {
@@ -188,7 +190,7 @@ export function useWorkSummary() {
           report_personnel (worker_name, worker_master(name), start_time, end_time),
           report_vehicles (vehicle_name, vehicle_master(vehicle_name)),
           report_machinery (machinery_name, vehicle_master(vehicle_name)),
-          report_materials (material_name, quantity, photo, documentation, extracted_materials, material_checked),
+          report_materials (id, material_name, quantity, photo, documentation, extracted_materials, material_checked),
           report_subcontractors (subcontractor_name, worker_count, start_time, end_time)
         `);
 
@@ -401,6 +403,7 @@ export function useWorkSummary() {
               projectName: pName,
               checked: !!m.material_checked,
               source: 'manual',
+              reportMaterialId: m.id,
             });
           }
 
@@ -416,6 +419,8 @@ export function useWorkSummary() {
                 projectName: pName,
                 checked: !!ex.checked,
                 source: 'extracted',
+                reportMaterialId: m.id,
+                extractedItemId: ex.id,
               });
             });
           }
