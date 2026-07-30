@@ -172,6 +172,7 @@ export default function WorkSummary() {
       materialsByProject.push({ projectName: m.projectName, items: [m] });
     }
   });
+  const uncheckedMaterialsCount = materialsList.filter(m => !m.checked).length;
 
   return (
     <div className="max-w-7xl mx-auto pb-12">
@@ -629,7 +630,14 @@ export default function WorkSummary() {
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
            <div className="bg-card p-5 rounded-xl border shadow-sm flex flex-col h-[400px]">
              <h3 className="text-sm font-bold text-muted-foreground mb-4 border-b pb-2 uppercase tracking-wider flex items-center justify-between gap-2 shrink-0">
-               <span className="flex items-center gap-2"><Package className="w-4 h-4" /> 使用材料</span>
+               <span className="flex items-center gap-2 flex-wrap">
+                 <span className="flex items-center gap-2"><Package className="w-4 h-4" /> 使用材料</span>
+                 {uncheckedMaterialsCount > 0 && (
+                   <span className="normal-case inline-flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                     <AlertTriangle className="w-3 h-3" /> 未確認あり ({uncheckedMaterialsCount}件)
+                   </span>
+                 )}
+               </span>
                <button
                  onClick={() => exportMaterialsToExcel(materialsByProject)}
                  className="normal-case text-[11px] font-bold text-primary hover:text-primary/80 flex items-center gap-1 shrink-0"
