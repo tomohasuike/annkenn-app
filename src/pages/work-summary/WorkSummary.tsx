@@ -659,14 +659,12 @@ export default function WorkSummary() {
                            <span className="font-bold truncate">{m.name}</span>
                            {m.quantity && <span className="text-xs text-muted-foreground shrink-0">{m.quantity}</span>}
                          </div>
-                         <div className="text-[10px] text-muted-foreground truncate mt-0.5 flex items-center gap-1.5">
-                           <span>{m.date} ・ {m.projectName}</span>
-                           {m.checked ? (
-                             <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold shrink-0">確認済み</span>
-                           ) : (
-                             <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold shrink-0">未確認</span>
-                           )}
-                         </div>
+                         <div className="text-[10px] text-muted-foreground truncate mt-0.5">{m.date} ・ {m.projectName}</div>
+                         {m.checked ? (
+                           <span className="inline-block mt-1 bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-bold">確認済み</span>
+                         ) : (
+                           <span className="inline-block mt-1 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-bold">未確認</span>
+                         )}
                        </div>
                      </div>
                      );
