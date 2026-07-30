@@ -5,6 +5,8 @@ import { useWorkSummary } from './useWorkSummary';
 import { PieChart, Hammer, Briefcase, FileSignature, List, Truck, Building2, UserCircle, Package, Camera, FileText, Info } from 'lucide-react';
 import ReportDetailsModal from '../../components/reports/ReportDetailsModal';
 import ProjectDetailsModal from '../../components/work-summary/ProjectDetailsModal';
+import { Link } from 'react-router-dom';
+import { ClipboardCheck } from 'lucide-react';
 
 // Google Driveの画像用直接リンク(lh3.googleusercontent.com/d/ID)を、正規プレビューURL(drive.google.com/file/d/ID/view)へ自動コンバートする
 function fixDriveDocUrl(url: string): string {
@@ -151,7 +153,14 @@ export default function WorkSummary() {
           </h1>
           <p className="text-muted-foreground text-sm font-medium">完工案件・名寄せ・実働時間・建機/日別リスト対応</p>
         </div>
-        
+
+        <Link
+          to="/work-summary/material-check"
+          className="inline-flex items-center gap-2 bg-card border rounded-lg px-4 h-11 font-bold text-sm shadow-sm hover:bg-muted/50 transition-colors self-start"
+        >
+          <ClipboardCheck className="w-4 h-4 text-primary" /> 材料チェック
+        </Link>
+
         <div className="flex flex-col gap-3 bg-card p-4 rounded-xl border shadow-sm">
           {/* 1行目: 区分フィルタ / ステータス / 案件検索 */}
           <div className="flex flex-wrap items-center gap-3">

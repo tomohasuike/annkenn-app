@@ -127,7 +127,11 @@ serve(async (req: Request) => {
         const match = text.match(/\[[\s\S]*\]/)
         if (!match) continue
         const items = JSON.parse(match[0])
-        if (Array.isArray(items)) allItems.push(...items)
+        if (Array.isArray(items)) {
+          items.forEach((item: any) => {
+            allItems.push({ ...item, id: crypto.randomUUID(), checked: false, deleted: false })
+          })
+        }
       } catch (err) {
         console.error(`Failed to process ${url}:`, err)
       }

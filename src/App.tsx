@@ -14,6 +14,7 @@ import ScheduleManagement from "./pages/ScheduleManagement"
 import Billing from "./pages/Billing"
 import BillingForm from "./pages/BillingForm"
 import WorkSummary from "./pages/work-summary/WorkSummary"
+import MaterialCheck from "./pages/work-summary/MaterialCheck"
 import SafetyReportForm from "./pages/SafetyReportForm"
 import SafetyDashboard from "./pages/SafetyDashboard"
 import Settings from './pages/Settings'
@@ -34,6 +35,7 @@ import ToolsDashboard from "./pages/tools/ToolsDashboard"
 import SiteDesignDashboard from "./pages/tools/SiteDesignDashboard"
 import PowerCalc from "./pages/tools/PowerCalc"
 import LightingCalc from "./pages/tools/LightingCalc"
+import ConduitFillCalc from "./pages/tools/ConduitFillCalc"
 import { KensackEngine } from "./pages/KensackEngine"
 import TepcoForm from "./pages/tools/TepcoForm"
 
@@ -75,6 +77,7 @@ function App() {
               <Route path="billing/new" element={<BillingForm />} />
               <Route path="billing/:id" element={<BillingForm />} />
               <Route path="work-summary" element={<WorkSummary />} />
+              <Route path="work-summary/material-check" element={<MaterialCheck />} />
               <Route path="attendance" element={<WorkerAttendance />} />
               <Route path="attendance-admin" element={<AttendanceAdmin />} />
               <Route path="workers" element={<WorkersPlaceholder />} />
@@ -100,6 +103,9 @@ function App() {
 
               {/* 東電申込フォーム（独立ページ） */}
               <Route path="tepco-form" element={<TepcoForm />} />
+
+              {/* 電線管占積率計算（独立ページ・案件選択不要） */}
+              <Route path="conduit-fill-calc" element={<ConduitFillCalc />} />
             </Route>
           </Route>
         </Routes>
