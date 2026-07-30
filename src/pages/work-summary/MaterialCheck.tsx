@@ -21,6 +21,7 @@ type ExtractedItem = {
   note?: string;
   checked?: boolean;
   deleted?: boolean;
+  sourceUrl?: string;
 };
 
 type ReviewItem = {
@@ -33,6 +34,8 @@ type ReviewItem = {
   projectName: string;
   date: string;
   imageUrls: string[];
+  displayImageUrl: string | null;
+  showAllPages: boolean;
   manualEntry: { name: string; quantity: string } | null;
   allExtracted: ExtractedItem[];
 };
@@ -99,6 +102,8 @@ export default function MaterialCheck() {
             projectName,
             date: dateStr,
             imageUrls,
+            displayImageUrl: imageUrls[0] || null,
+            showAllPages: imageUrls.length > 1,
             manualEntry,
             allExtracted,
           });
@@ -107,6 +112,9 @@ export default function MaterialCheck() {
         // 資料からの抽出分(未確認・未削除のみ)
         allExtracted.forEach((ex) => {
           if (ex.checked || ex.deleted) return;
+          // どのページから読み取ったか記録がない古いデータは、該当ページを一意に特定できないため
+          // 全ページを並べて表示し、人間に選んでもらう
+          const knowsSourcePage = Boolean(ex.sourceUrl);
           items.push({
             key: `${row.id}-${ex.id}`,
             reportMaterialId: row.id,
@@ -117,6 +125,8 @@ export default function MaterialCheck() {
             projectName,
             date: dateStr,
             imageUrls,
+            displayImageUrl: ex.sourceUrl || imageUrls[0] || null,
+            showAllPages: imageUrls.length > 1 && !knowsSourcePage,
             manualEntry,
             allExtracted,
           });
@@ -248,10 +258,26 @@ export default function MaterialCheck() {
         <div className="grid grid-cols-1 md:grid-cols-2">
           {/* 元資料 */}
           <div className="bg-muted/30 flex items-center justify-center p-4 min-h-[280px] border-b md:border-b-0 md:border-r">
-            {item.imageUrls.length > 0 && !imgError ? (
-              <a href={item.imageUrls[0]} target="_blank" rel="noreferrer">
+            {item.showAllPages && item.imageUrls.length > 1 ? (
+              <div className="w-full">
+                <p className="text-[11px] text-muted-foreground text-center mb-2">複数ページの資料です。該当ページを探してください</p>
+                <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto">
+                  {item.imageUrls.map((url, i) => (
+                    <a key={i} href={url} target="_blank" rel="noreferrer" className="block">
+                      <img
+                        src={toDirectImageUrl(url)}
+                        alt={`ページ${i + 1}`}
+                        className="w-full h-auto object-contain rounded-lg shadow-sm border hover:opacity-90 transition-opacity cursor-zoom-in"
+                      />
+                      <p className="text-[10px] text-center text-muted-foreground mt-0.5">ページ{i + 1}</p>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : item.displayImageUrl && !imgError ? (
+              <a href={item.displayImageUrl} target="_blank" rel="noreferrer">
                 <img
-                  src={toDirectImageUrl(item.imageUrls[0])}
+                  src={toDirectImageUrl(item.displayImageUrl)}
                   alt="元資料"
                   onError={() => setImgError(true)}
                   className="max-h-[400px] max-w-full object-contain rounded-lg shadow-sm hover:opacity-90 transition-opacity cursor-zoom-in"

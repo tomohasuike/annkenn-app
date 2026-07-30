@@ -96,6 +96,7 @@ serve(async (req: Request) => {
 
     for (const rawUrl of urls) {
       const url = toDirectImageUrl(rawUrl)
+      const sourceUrl = rawUrl
       try {
         const imgRes = await fetch(url)
         if (!imgRes.ok) continue
@@ -129,7 +130,7 @@ serve(async (req: Request) => {
         const items = JSON.parse(match[0])
         if (Array.isArray(items)) {
           items.forEach((item: any) => {
-            allItems.push({ ...item, id: crypto.randomUUID(), checked: false, deleted: false })
+            allItems.push({ ...item, id: crypto.randomUUID(), checked: false, deleted: false, sourceUrl })
           })
         }
       } catch (err) {
