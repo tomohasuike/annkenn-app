@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import type { ProjectSummary } from './useWorkSummary';
+import type { ProjectSummary, MaterialEntry } from './useWorkSummary';
 import { useWorkSummary } from './useWorkSummary';
 import { PieChart, Hammer, Briefcase, FileSignature, List, Truck, Building2, UserCircle, Package, Camera, FileText, Info } from 'lucide-react';
 import ReportDetailsModal from '../../components/reports/ReportDetailsModal';
@@ -132,7 +132,7 @@ export default function WorkSummary() {
     });
   });
 
-  const materialsList: { name: string; quantity: string; date: string; projectName: string }[] = [];
+  const materialsList: MaterialEntry[] = [];
   const photoLinksMap = new Map<string, { projectName: string, url: string, fileName: string }>();
   const docLinksMap = new Map<string, { projectName: string, url: string, fileName: string }>();
 
@@ -604,14 +604,21 @@ export default function WorkSummary() {
              <div className="space-y-2 text-sm overflow-y-auto pr-2 font-medium flex-1">
                {materialsList.length > 0
                  ? materialsList.map((m, i) => (
-                     <div key={i} className="py-2.5 border-b border-muted/50 px-2 flex items-start gap-3">
-                       <span className="w-1.5 h-1.5 bg-green-500 rounded-full shrink-0 mt-1.5"></span>
+                     <div key={i} className={`py-2.5 border-b border-muted/50 px-2 flex items-start gap-3 ${!m.checked ? 'bg-amber-50/50' : ''}`}>
+                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${m.checked ? 'bg-green-500' : 'bg-amber-400'}`}></span>
                        <div className="min-w-0 flex-1">
                          <div className="flex items-baseline justify-between gap-2">
                            <span className="font-bold truncate">{m.name}</span>
                            {m.quantity && <span className="text-xs text-muted-foreground shrink-0">{m.quantity}</span>}
                          </div>
-                         <div className="text-[10px] text-muted-foreground truncate mt-0.5">{m.date} ・ {m.projectName}</div>
+                         <div className="text-[10px] text-muted-foreground truncate mt-0.5 flex items-center gap-1.5">
+                           <span>{m.date} ・ {m.projectName}</span>
+                           {m.checked ? (
+                             <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold shrink-0">確認済み</span>
+                           ) : (
+                             <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold shrink-0">未確認</span>
+                           )}
+                         </div>
                        </div>
                      </div>
                    ))
