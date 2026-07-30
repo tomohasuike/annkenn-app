@@ -6,7 +6,8 @@ import { PieChart, Hammer, Briefcase, FileSignature, List, Truck, Building2, Use
 import ReportDetailsModal from '../../components/reports/ReportDetailsModal';
 import ProjectDetailsModal from '../../components/work-summary/ProjectDetailsModal';
 import { Link } from 'react-router-dom';
-import { ClipboardCheck } from 'lucide-react';
+import { ClipboardCheck, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 // Google Driveの画像用直接リンク(lh3.googleusercontent.com/d/ID)を、正規プレビューURL(drive.google.com/file/d/ID/view)へ自動コンバートする
 function fixDriveDocUrl(url: string): string {
@@ -45,6 +46,25 @@ export default function WorkSummary() {
       return;
     }
     fetchData(startDate, endDate, projectId, isAllTime);
+  };
+
+  const exportMaterialsToExcel = (groups: { projectName: string; items: MaterialEntry[] }[]) => {
+    if (groups.length === 0) {
+      toast.warning('出力できる材料データがありません');
+      return;
+    }
+    const rows: (string | number)[][] = [['案件名', '品名', '数量', '日付', '確認状態']];
+    groups.forEach(group => {
+      group.items.forEach(m => {
+        rows.push([group.projectName, m.name, m.quantity, m.date, m.checked ? '確認済み' : '未確認']);
+      });
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 30 }, { wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 10 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '使用材料');
+    const todayStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `使用材料一覧_${todayStr}.xlsx`);
   };
 
   const searchLower = searchQuery.toLowerCase();
@@ -608,8 +628,15 @@ export default function WorkSummary() {
          <h2 className="text-xl font-bold flex items-center gap-2 px-1"><Package className="text-indigo-500 w-5 h-5" /> 材料・資料一覧</h2>
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
            <div className="bg-card p-5 rounded-xl border shadow-sm flex flex-col h-[400px]">
-             <h3 className="text-sm font-bold text-muted-foreground mb-4 border-b pb-2 uppercase tracking-wider flex items-center gap-2 shrink-0">
-               <Package className="w-4 h-4" /> 使用材料
+             <h3 className="text-sm font-bold text-muted-foreground mb-4 border-b pb-2 uppercase tracking-wider flex items-center justify-between gap-2 shrink-0">
+               <span className="flex items-center gap-2"><Package className="w-4 h-4" /> 使用材料</span>
+               <button
+                 onClick={() => exportMaterialsToExcel(materialsByProject)}
+                 className="normal-case text-[11px] font-bold text-primary hover:text-primary/80 flex items-center gap-1 shrink-0"
+                 title="Excelで出力"
+               >
+                 <Download className="w-3.5 h-3.5" /> Excel出力
+               </button>
              </h3>
              <div className="overflow-y-auto pr-2 flex-1">
                {materialsByProject.length > 0
