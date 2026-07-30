@@ -6,7 +6,7 @@ import { PieChart, Hammer, Briefcase, FileSignature, List, Truck, Building2, Use
 import ReportDetailsModal from '../../components/reports/ReportDetailsModal';
 import ProjectDetailsModal from '../../components/work-summary/ProjectDetailsModal';
 import { Link } from 'react-router-dom';
-import { ClipboardCheck, Download } from 'lucide-react';
+import { ClipboardCheck, Download, CheckCircle2, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 // Google Driveの画像用直接リンク(lh3.googleusercontent.com/d/ID)を、正規プレビューURL(drive.google.com/file/d/ID/view)へ自動コンバートする
@@ -638,6 +638,10 @@ export default function WorkSummary() {
                  <Download className="w-3.5 h-3.5" /> Excel出力
                </button>
              </h3>
+             <div className="flex items-center gap-3 text-[10px] text-muted-foreground mb-2 -mt-2 shrink-0">
+               <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-green-500" /> 確認済み</span>
+               <span className="flex items-center gap-1"><AlertTriangle className="w-3 h-3 text-amber-500" /> 未確認</span>
+             </div>
              <div className="overflow-y-auto pr-2 flex-1">
                {materialsByProject.length > 0
                  ? materialsByProject.map((group, gi) => (
@@ -648,10 +652,11 @@ export default function WorkSummary() {
                        <div className="space-y-2 text-sm font-medium">
                          {group.items.map((m, i) => (
                            <div key={i} className="py-2 border-b border-muted/50 px-2 flex items-start gap-3">
-                             <span
-                               title={m.checked ? '確認済み' : '未確認'}
-                               className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${m.checked ? 'bg-green-500' : 'bg-amber-400'}`}
-                             ></span>
+                             {m.checked ? (
+                               <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" title="確認済み" />
+                             ) : (
+                               <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" title="未確認" />
+                             )}
                              <div className="min-w-0 flex-1">
                                <div className="flex items-baseline justify-between gap-2">
                                  <span className="font-bold truncate">{m.name}</span>
