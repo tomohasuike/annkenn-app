@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Outlet, NavLink, useNavigate } from "react-router-dom"
-import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature, Wrench, Bot, Thermometer, Zap, LogOut } from "lucide-react"
+import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature, Wrench, Bot, Thermometer, Zap, LogOut, Cable } from "lucide-react"
 import { ThemeSwitcher } from "../ui/ThemeSwitcher"
 import logoImg from "../../assets/logo.png"
 import { supabase } from "../../lib/supabase"
@@ -151,6 +151,17 @@ export default function AppLayout() {
                   )}
                 </NavLink>
                 )}
+
+                {/* 電線管占積率計算（独立ページ） */}
+                <NavLink to="/conduit-fill-calc" className={getNavClass}>
+                  {({ isActive }) => (
+                    <>
+                      <Cable className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
+                      電線管占積率計算
+                      {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
+                    </>
+                  )}
+                </NavLink>
 
                 {/* 東京電力申込（独立ページ） */}
                 <NavLink to="/tepco-form" className={getNavClass}>
