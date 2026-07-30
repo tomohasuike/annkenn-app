@@ -29,6 +29,7 @@ export type MaterialEntry = {
   source: 'manual' | 'extracted';
   reportMaterialId: string;
   extractedItemId?: string;
+  note?: string;
 }
 
 export type DailyLog = {
@@ -421,6 +422,7 @@ export function useWorkSummary() {
                 source: 'extracted',
                 reportMaterialId: m.id,
                 extractedItemId: ex.id,
+                note: ex.note || '',
               });
             });
           }

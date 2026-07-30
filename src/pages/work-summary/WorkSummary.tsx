@@ -53,14 +53,14 @@ export default function WorkSummary() {
       toast.warning('出力できる材料データがありません');
       return;
     }
-    const rows: (string | number)[][] = [['案件名', '品名', '数量', '日付', '確認状態']];
+    const rows: (string | number)[][] = [['案件名', '品名', '数量', '日付', '発注/在庫等', '確認状態']];
     groups.forEach(group => {
       group.items.forEach(m => {
-        rows.push([group.projectName, m.name, m.quantity, m.date, m.checked ? '確認済み' : '未確認']);
+        rows.push([group.projectName, m.name, m.quantity, m.date, m.note || '', m.checked ? '確認済み' : '未確認']);
       });
     });
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 30 }, { wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 10 }];
+    ws['!cols'] = [{ wch: 30 }, { wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 10 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '使用材料');
     const todayStr = new Date().toISOString().split('T')[0];
@@ -657,7 +657,20 @@ export default function WorkSummary() {
                                  <span className="font-bold truncate">{m.name}</span>
                                  {m.quantity && <span className="text-xs text-muted-foreground shrink-0">{m.quantity}</span>}
                                </div>
-                               <div className="text-[10px] text-muted-foreground truncate mt-0.5">{m.date}</div>
+                               <div className="text-[10px] text-muted-foreground truncate mt-0.5 flex items-center gap-1.5">
+                                 <span>{m.date}</span>
+                                 {m.note && (
+                                   <span className={`px-1.5 py-0.5 rounded font-bold shrink-0 ${
+                                     m.note.includes('発注')
+                                       ? 'bg-red-100 text-red-700'
+                                       : m.note.includes('会社在庫') || m.note.includes('在庫')
+                                         ? 'bg-blue-100 text-blue-700'
+                                         : 'bg-muted text-muted-foreground'
+                                   }`}>
+                                     {m.note}
+                                   </span>
+                                 )}
+                               </div>
                              </div>
                            </div>
                          ))}
