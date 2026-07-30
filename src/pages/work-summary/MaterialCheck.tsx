@@ -173,7 +173,17 @@ export default function MaterialCheck() {
     if (!item || !item.extractedItemId) return;
     setSaving(true);
     try {
-      const updated = item.allExtracted.map(ex =>
+      // item.allExtractedは一覧取得時点のスナップショットのため、同じ資料から複数品目を
+      // 連続で処理すると古い内容で上書きしてしまう。書き込み直前にDBから最新値を読み直す。
+      const { data: fresh, error: fetchErr } = await supabase
+        .from('report_materials')
+        .select('extracted_materials')
+        .eq('id', item.reportMaterialId)
+        .single();
+      if (fetchErr) throw fetchErr;
+
+      const freshList: ExtractedItem[] = Array.isArray(fresh?.extracted_materials) ? fresh.extracted_materials : item.allExtracted;
+      const updated = freshList.map(ex =>
         ex.id === item.extractedItemId ? { ...ex, ...patch } : ex
       );
       const { error } = await supabase
