@@ -143,6 +143,16 @@ export default function WorkSummary() {
   });
   materialsList.sort((a, b) => a.projectName.localeCompare(b.projectName) || a.name.localeCompare(b.name));
 
+  const materialsByProject: { projectName: string; items: MaterialEntry[] }[] = [];
+  materialsList.forEach(m => {
+    const lastGroup = materialsByProject[materialsByProject.length - 1];
+    if (lastGroup && lastGroup.projectName === m.projectName) {
+      lastGroup.items.push(m);
+    } else {
+      materialsByProject.push({ projectName: m.projectName, items: [m] });
+    }
+  });
+
   return (
     <div className="max-w-7xl mx-auto pb-12">
       {/* Header & Controls */}
@@ -601,20 +611,29 @@ export default function WorkSummary() {
              <h3 className="text-sm font-bold text-muted-foreground mb-4 border-b pb-2 uppercase tracking-wider flex items-center gap-2 shrink-0">
                <Package className="w-4 h-4" /> 使用材料
              </h3>
-             <div className="space-y-2 text-sm overflow-y-auto pr-2 font-medium flex-1">
-               {materialsList.length > 0
-                 ? materialsList.map((m, i) => (
-                     <div key={i} className="py-2.5 border-b border-muted/50 px-2 flex items-start gap-3">
-                       <span
-                         title={m.checked ? '確認済み' : '未確認'}
-                         className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${m.checked ? 'bg-green-500' : 'bg-amber-400'}`}
-                       ></span>
-                       <div className="min-w-0 flex-1">
-                         <div className="flex items-baseline justify-between gap-2">
-                           <span className="font-bold truncate">{m.name}</span>
-                           {m.quantity && <span className="text-xs text-muted-foreground shrink-0">{m.quantity}</span>}
-                         </div>
-                         <div className="text-[10px] text-muted-foreground truncate mt-0.5">{m.date} ・ {m.projectName}</div>
+             <div className="overflow-y-auto pr-2 flex-1">
+               {materialsByProject.length > 0
+                 ? materialsByProject.map((group, gi) => (
+                     <div key={gi} className={gi > 0 ? 'mt-4' : ''}>
+                       <div className="sticky top-0 bg-card/95 backdrop-blur-sm py-1.5 px-2 rounded-md border-b-2 border-primary/30 mb-1">
+                         <span className="text-xs font-bold text-primary truncate block">{group.projectName}</span>
+                       </div>
+                       <div className="space-y-2 text-sm font-medium">
+                         {group.items.map((m, i) => (
+                           <div key={i} className="py-2 border-b border-muted/50 px-2 flex items-start gap-3">
+                             <span
+                               title={m.checked ? '確認済み' : '未確認'}
+                               className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${m.checked ? 'bg-green-500' : 'bg-amber-400'}`}
+                             ></span>
+                             <div className="min-w-0 flex-1">
+                               <div className="flex items-baseline justify-between gap-2">
+                                 <span className="font-bold truncate">{m.name}</span>
+                                 {m.quantity && <span className="text-xs text-muted-foreground shrink-0">{m.quantity}</span>}
+                               </div>
+                               <div className="text-[10px] text-muted-foreground truncate mt-0.5">{m.date}</div>
+                             </div>
+                           </div>
+                         ))}
                        </div>
                      </div>
                    ))
