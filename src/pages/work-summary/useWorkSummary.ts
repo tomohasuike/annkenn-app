@@ -30,6 +30,7 @@ export type MaterialEntry = {
   reportMaterialId: string;
   extractedItemId?: string;
   note?: string;
+  manufacturer?: string;
 }
 
 export type DailyLog = {
@@ -423,6 +424,7 @@ export function useWorkSummary() {
                 reportMaterialId: m.id,
                 extractedItemId: ex.id,
                 note: ex.note || '',
+                manufacturer: ex.manufacturer || '',
               });
             });
           }
