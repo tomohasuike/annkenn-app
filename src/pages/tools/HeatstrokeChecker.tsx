@@ -504,12 +504,12 @@ export default function HeatstrokeChecker() {
   useEffect(() => {
     if (session) {
       setSessionForm({
-        temperature: session.temperature,
-        humidity: session.humidity,
+        temperature: Number(session.temperature),
+        humidity: Number(session.humidity),
         weather: session.weather,
         wbgt_actual: session.wbgt_actual !== null ? String(session.wbgt_actual) : "",
         environment_type: session.environment_type,
-        temp_offset: session.temp_offset,
+        temp_offset: Number(session.temp_offset),
         overall_comment: session.overall_comment || "",
         safety_checks: session.safety_checks || { rest_time: false, hydration: false, shade: false, buddy_system: false, clothing: false }
       })
@@ -835,7 +835,7 @@ export default function HeatstrokeChecker() {
 
   // セッションのWBGT（確定済みの値）
   const sessionWbgt = session
-    ? (session.wbgt_actual !== null ? session.wbgt_actual : session.wbgt)
+    ? Number(session.wbgt_actual !== null ? session.wbgt_actual : session.wbgt)
     : displayWbgt
   const sessionRisk = getRiskLevel(sessionWbgt)
 
@@ -2714,19 +2714,19 @@ export default function HeatstrokeChecker() {
                     {adminSelectedSession.environment_type} / {adminSelectedSession.weather}
                   </p>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    気温: {(adminSelectedSession.temperature || 0).toFixed(1)}℃ |
-                    湿度: {(adminSelectedSession.humidity || 0).toFixed(1)}%
+                    気温: {(Number(adminSelectedSession.temperature) || 0).toFixed(1)}℃ |
+                    湿度: {(Number(adminSelectedSession.humidity) || 0).toFixed(1)}%
                   </p>
                 </div>
                 <div className="p-4 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 flex items-center justify-between">
                   <div>
                     <span className="text-[10px] text-slate-400 block uppercase">WBGT ＆ 危険度</span>
                     <p className="text-slate-800 dark:text-slate-100 font-black text-lg mt-1">
-                      🌡️ {(adminSelectedSession.wbgt || 0).toFixed(1)} ℃
+                      🌡️ {(Number(adminSelectedSession.wbgt) || 0).toFixed(1)} ℃
                     </p>
                   </div>
                   {(() => {
-                    const risk = getRiskLevel(adminSelectedSession.wbgt || 0)
+                    const risk = getRiskLevel(Number(adminSelectedSession.wbgt) || 0)
                     return <span className={`inline-block px-3 py-1 rounded-full text-xs font-black ${risk.colorClass}`}>{risk.level}</span>
                   })()}
                 </div>
