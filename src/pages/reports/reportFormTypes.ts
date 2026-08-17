@@ -2,7 +2,7 @@ export type ResourceItem = { id: string; name: string; category?: string }
 
 export type ReportData = {
   project_id: string
-  보고日時: string
+  報告日時: string
   作業区分: string
   作業開始時間: string
   作業終了時間: string

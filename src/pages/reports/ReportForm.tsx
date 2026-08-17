@@ -51,7 +51,7 @@ export default function ReportForm() {
   // Form State
   const [report, setReport] = useState<ReportData>({
     project_id: '',
-    보고日時: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+    報告日時: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     作業区分: '',
     作業開始時間: format(new Date().setHours(8, 0, 0, 0), "yyyy-MM-dd'T'HH:mm"),
     作業終了時間: format(new Date().setHours(17, 0, 0, 0), "yyyy-MM-dd'T'HH:mm"),
@@ -178,7 +178,7 @@ export default function ReportForm() {
 
                 setReport(prev => ({ 
                     ...prev, 
-                    보고日時: reportDate,
+                    報告日時: reportDate,
                     作業開始時間: format(start, "yyyy-MM-dd'T'HH:mm"),
                     作業終了時間: format(end, "yyyy-MM-dd'T'HH:mm")
                 }));
@@ -202,7 +202,7 @@ export default function ReportForm() {
                  .from('daily_reports')
                  .select('progress')
                  .eq('project_id', report.project_id)
-                 .lt('report_date', `${report.보고日時.split('T')[0]}T00:00:00+09:00`)
+                 .lt('report_date', `${report.報告日時.split('T')[0]}T00:00:00+09:00`)
                  .order('report_date', { ascending: false })
                  .limit(1)
                  .single();
@@ -337,7 +337,7 @@ export default function ReportForm() {
 
         setReport({
           project_id: rData.project_id || '',
-          보고日時: formatTime(rData.report_date) || (rData.start_time ? `${rData.start_time.substring(0, 10)}T00:00:00` : format(new Date(), "yyyy-MM-dd'T'HH:mm")),
+          報告日時: formatTime(rData.report_date) || (rData.start_time ? `${rData.start_time.substring(0, 10)}T00:00:00` : format(new Date(), "yyyy-MM-dd'T'HH:mm")),
           作業区分: rData.work_category || '',
           作業開始時間: formatTime(rData.start_time),
           作業終了時間: formatTime(rData.end_time),
@@ -1028,7 +1028,7 @@ export default function ReportForm() {
                 </div>
                 <div className="hidden sm:block text-muted-foreground/30">|</div>
                 <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground">{format(new Date(report.보고日時), 'yyyy年MM月dd日 HH:mm')}</span>
+                    <span className="font-medium text-foreground">{format(new Date(report.報告日時), 'yyyy年MM月dd日 HH:mm')}</span>
                 </div>
             </div>
         </div>
