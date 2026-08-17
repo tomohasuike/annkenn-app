@@ -241,11 +241,12 @@ export default function ProjectDetailsModal({ project, onClose, selectedStaff }:
                   </h4>
                   <div className="flex flex-col gap-2 bg-card p-4 rounded-xl border shadow-sm max-h-[250px] overflow-y-auto">
                     {project.materials.length > 0
-                        ? project.materials.map((mat: string, i: number) => (
+                        ? project.materials.map((mat, i) => (
                             <div key={i} className="flex justify-between items-center text-sm border-b pb-2 last:border-0 last:pb-0 pt-2 first:pt-0">
                               <span className="font-bold text-foreground/80 truncate mr-2 flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full shrink-0"></span> {mat}
+                                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full shrink-0"></span> {mat.name}
                               </span>
+                              {mat.quantity && <span className="text-xs text-muted-foreground shrink-0">{mat.quantity}</span>}
                             </div>
                           ))
                         : <span className="text-sm text-muted-foreground italic">材料記録なし</span>}
