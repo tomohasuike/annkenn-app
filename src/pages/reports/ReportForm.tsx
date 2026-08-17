@@ -563,7 +563,7 @@ export default function ReportForm() {
         
         const basePayload = {
             project_id: report.project_id,
-            report_date: `${report.작업開始時間.split('T')[0]}T00:00:00+09:00`,
+            report_date: `${report.作業開始時間.split('T')[0]}T00:00:00+09:00`,
             work_category: report.作業区分,
             start_time: report.作業開始時間,
             end_time: report.作業終了時間,
