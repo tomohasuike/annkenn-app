@@ -15,6 +15,7 @@ import Billing from "./pages/Billing"
 import BillingForm from "./pages/BillingForm"
 import WorkSummary from "./pages/work-summary/WorkSummary"
 import MaterialCheck from "./pages/work-summary/MaterialCheck"
+import AdminChat from "./pages/AdminChat"
 import SafetyReportForm from "./pages/SafetyReportForm"
 import SafetyDashboard from "./pages/SafetyDashboard"
 import Settings from './pages/Settings'
@@ -85,6 +86,7 @@ function App() {
               <Route path="heatstroke-checker" element={<HeatstrokeChecker />} />
               <Route path="vehicle-inspection" element={<VehicleInspection />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="admin-chat" element={<AdminChat />} />
               {/* <Route path="bookshelf" element={<Bookshelf />} /> */}
               {/* <Route path="bookshelf/:bookId" element={<BookViewer />} /> */}
               
