@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { Bot, Send, Loader2, ShieldAlert, Sparkles } from "lucide-react"
+import { Bot, Send, Loader2, ShieldAlert, Sparkles, ChevronDown, ChevronUp, HelpCircle } from "lucide-react"
 import { supabase } from "../lib/supabase"
 
 type ChatMessage = {
@@ -7,11 +7,25 @@ type ChatMessage = {
   content: string
 }
 
-const EXAMPLE_QUESTIONS = [
-  "今月の着工中案件は何件？",
-  "先月完工した案件の一覧を出して",
-  "カゴメ案件の今月の投入人工は？",
-  "請求書がまだの完工案件を教えて",
+// 4種類のテンプレートそれぞれについて、言い回しが変わっても拾えることが伝わるよう
+// 複数の言い方の例を載せている
+const EXAMPLE_GROUPS: { label: string; questions: string[] }[] = [
+  {
+    label: "① 着工中の案件数",
+    questions: ["今月の着工中案件は何件？", "今、動いてる現場って何件ある？"],
+  },
+  {
+    label: "② 完工した案件の一覧",
+    questions: ["先月完工した案件の一覧を出して", "2026年7月に完工した現場を教えて"],
+  },
+  {
+    label: "③ 案件の投入人工",
+    questions: ["カゴメ案件の今月の投入人工は？", "〇〇現場に先月何人工入った？"],
+  },
+  {
+    label: "④ 未請求の完工案件",
+    questions: ["請求書がまだの完工案件を教えて", "完工したのに請求してない案件ある？"],
+  },
 ]
 
 export default function AdminChat() {
@@ -20,6 +34,7 @@ export default function AdminChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
+  const [showExamples, setShowExamples] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -47,6 +62,7 @@ export default function AdminChat() {
     const nextMessages: ChatMessage[] = [...messages, { role: "user", content: q }]
     setMessages(nextMessages)
     setInput("")
+    if (messages.length === 0) setShowExamples(false)
     setLoading(true)
 
     try {
@@ -99,13 +115,46 @@ export default function AdminChat() {
 
   return (
     <div className="max-w-3xl mx-auto flex flex-col h-[calc(100vh-140px)]">
-      <div className="mb-4">
+      <div className="mb-3">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <Bot className="w-6 h-6 text-primary" /> AIチャット（管理者用）
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          案件データについて自然な言葉で質問できます。（例: 今月の着工中案件は何件？）
+          案件データについて自然な言葉で質問できます。多少言い回しが違っても大丈夫ですが、対応しているのは下の4種類の質問のみです。
         </p>
+      </div>
+
+      <div className="mb-3 rounded-xl border bg-card shadow-sm overflow-hidden">
+        <button
+          onClick={() => setShowExamples(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-bold text-foreground hover:bg-muted/40 transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <HelpCircle className="w-4 h-4 text-primary" /> 対応している質問の例
+          </span>
+          {showExamples ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+        {showExamples && (
+          <div className="px-4 pb-4 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {EXAMPLE_GROUPS.map(group => (
+              <div key={group.label} className="space-y-1.5">
+                <span className="text-[11px] font-bold text-muted-foreground">{group.label}</span>
+                <div className="flex flex-col gap-1.5">
+                  {group.questions.map(q => (
+                    <button
+                      key={q}
+                      onClick={() => sendQuestion(q)}
+                      disabled={loading}
+                      className="text-xs text-left px-3 py-2 rounded-lg border bg-background hover:bg-muted/60 transition-colors disabled:opacity-50"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div
@@ -113,20 +162,9 @@ export default function AdminChat() {
         className="flex-1 overflow-y-auto rounded-xl border bg-card p-4 space-y-4 shadow-sm"
       >
         {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center gap-4 text-center px-4">
+          <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-4">
             <Sparkles className="w-8 h-8 text-primary/60" />
-            <p className="text-sm text-muted-foreground">こんな質問ができます</p>
-            <div className="flex flex-col gap-2 w-full max-w-md">
-              {EXAMPLE_QUESTIONS.map(q => (
-                <button
-                  key={q}
-                  onClick={() => sendQuestion(q)}
-                  className="text-sm text-left px-4 py-2.5 rounded-lg border bg-background hover:bg-muted/60 transition-colors"
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
+            <p className="text-sm text-muted-foreground">上の質問例をタップするか、自由に質問を入力してください</p>
           </div>
         )}
 
