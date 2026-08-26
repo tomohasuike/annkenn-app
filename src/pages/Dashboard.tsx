@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ShieldCheck, HardHat, FileText, AlertTriangle, CheckCircle2, FileCheck2, Loader2, Clock, LayoutDashboard, CalendarClock, ChevronDown, ChevronUp, Truck, Wrench } from "lucide-react"
+import { ShieldCheck, HardHat, AlertTriangle, CheckCircle2, FileCheck2, Loader2, Clock, LayoutDashboard, CalendarClock, ChevronDown, ChevronUp, Truck, Wrench, TrendingUp, CalendarCheck2, Users, Receipt } from "lucide-react"
 import { supabase } from "../lib/supabase"
 import * as dateFns from "date-fns"
 
@@ -16,7 +16,6 @@ export default function Dashboard() {
   const [todaySchedules, setTodaySchedules] = useState<any[]>([]);
   const [tomorrowSchedules, setTomorrowSchedules] = useState<any[]>([]);
   const [activeProjects, setActiveProjects] = useState<any[]>([]);
-  const [recentReports, setRecentReports] = useState<any[]>([]);
   const [submittedTodayReports, setSubmittedTodayReports] = useState<Record<string, string>>({});
   const [submittedTomorrowReports, setSubmittedTomorrowReports] = useState<Record<string, string>>({});
   const [vehicleAlerts, setVehicleAlerts] = useState<{
@@ -35,6 +34,13 @@ export default function Dashboard() {
   // Billing States
   const [fiscalYearSales, setFiscalYearSales] = useState(0);
   const [overdueInvoices, setOverdueInvoices] = useState<any[]>([]);
+
+  // Admin Summary States（経営サマリー：管理者のみ）
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  const [adminSummaryLoading, setAdminSummaryLoading] = useState(true);
+  const [monthlyCompletions, setMonthlyCompletions] = useState<any[]>([]);
+  const [monthlyLaborCount, setMonthlyLaborCount] = useState(0);
+  const [unbilledCompletedProjects, setUnbilledCompletedProjects] = useState<any[]>([]);
 
   // Collapse States
   const [isWeeklyScheduleOpen, setIsWeeklyScheduleOpen] = useState(false);
@@ -83,6 +89,8 @@ export default function Dashboard() {
       const canViewBilling = permissions.includes('billing') || workerData?.is_admin;
       const workerId = workerData?.id || null;
       setCurrentWorkerId(workerId);
+      const isAdminUserFlag = !!workerData?.is_admin;
+      setIsAdminUser(isAdminUserFlag);
 
       const now = new Date();
       const todayStr = dateFns.format(now, 'yyyy-MM-dd');
@@ -111,7 +119,6 @@ export default function Dashboard() {
         projectsRes,
         todayReportsRes,
         tomorrowReportsRawRes,
-        reportsRes,
         billingRes,
         vDataRes,
         iDataRes,
@@ -157,11 +164,6 @@ export default function Dashboard() {
           project:projects(project_name, project_number, site_name, client_name, category)
         `),
 
-        supabase.from('daily_reports').select(`
-          id, project_id, report_date, created_at, work_content, reporter_name,
-          project:projects ( project_name, site_name, project_number, category, client_name )
-        `).order('created_at', { ascending: false }).limit(5),
-
         canViewBilling
           ? supabase.from('invoice_details')
               .select('id, amount, billing_date, expected_deposit_date, details_status')
@@ -198,7 +200,6 @@ export default function Dashboard() {
       setAllWorkers((activeWorkersRes.data || []).filter(w => !['社長', '事務員', '協力会社'].includes(w.type)));
       setAllWorkersWeeklySchedules(allAssignmentsRes.data || []);
       setActiveProjects(projectsRes.data || []);
-      setRecentReports(reportsRes.data || []);
 
       const submittedMap: Record<string, string> = {};
       (todayReportsRes.data || []).forEach((r: any) => { if (r.project_id) submittedMap[r.project_id] = r.id; });
@@ -255,6 +256,71 @@ export default function Dashboard() {
           }
         });
         setVehicleAlerts({ uninspected, oilOverdue });
+      }
+
+      // 経営サマリー（管理者のみ・メイン表示をブロックしないよう別途取得）
+      if (isAdminUserFlag) {
+        try {
+          const monthStartStr = dateFns.format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd');
+          const nextMonthStartStr = dateFns.format(new Date(now.getFullYear(), now.getMonth() + 1, 1), 'yyyy-MM-dd');
+
+          const [completionRes, monthlyReportsRes, completedProjectsRes] = await Promise.all([
+            supabase.from('completion_reports')
+              .select('completion_date, projects(project_number, project_name, client_name, site_name)')
+              .gte('completion_date', monthStartStr)
+              .lt('completion_date', nextMonthStartStr)
+              .order('completion_date', { ascending: false }),
+            supabase.from('daily_reports')
+              .select('id')
+              .not('end_time', 'is', null)
+              .gte('report_date', `${monthStartStr}T00:00:00+09:00`)
+              .lt('report_date', `${nextMonthStartStr}T00:00:00+09:00`),
+            supabase.from('projects')
+              .select('id, project_number, project_name, client_name, site_name')
+              .eq('status_flag', '完工'),
+          ]);
+
+          setMonthlyCompletions(completionRes.data || []);
+
+          const reportIds = (monthlyReportsRes.data || []).map((r: any) => r.id);
+          if (reportIds.length > 0) {
+            const { count } = await supabase.from('report_personnel').select('id', { count: 'exact', head: true }).in('report_id', reportIds);
+            setMonthlyLaborCount(count || 0);
+          } else {
+            setMonthlyLaborCount(0);
+          }
+
+          const completedProjects = completedProjectsRes.data || [];
+          const projectIds = completedProjects.map((p: any) => p.id);
+          const billedProjectIds = new Set<string>();
+          if (projectIds.length > 0) {
+            const { data: invs } = await supabase.from('invoices').select('id, project_id').in('project_id', projectIds);
+            const invByProject = new Map<string, string[]>();
+            (invs || []).forEach((i: any) => {
+              const arr = invByProject.get(i.project_id) || [];
+              arr.push(i.id);
+              invByProject.set(i.project_id, arr);
+            });
+            const invIds = (invs || []).map((i: any) => i.id);
+            if (invIds.length > 0) {
+              const { data: details } = await supabase.from('invoice_details')
+                .select('invoice_id, details_status')
+                .in('invoice_id', invIds)
+                .in('details_status', ['請求済', '完了', '入金済']);
+              const billedInvoiceIds = new Set((details || []).map((d: any) => d.invoice_id));
+              invByProject.forEach((invIdsForProject, projectId) => {
+                if (invIdsForProject.some(id => billedInvoiceIds.has(id))) billedProjectIds.add(projectId);
+              });
+            }
+          }
+          setUnbilledCompletedProjects(completedProjects.filter((p: any) => !billedProjectIds.has(p.id)));
+        } catch (adminErr) {
+          console.error("Error fetching admin summary:", adminErr);
+        } finally {
+          setAdminSummaryLoading(false);
+        }
+      } else {
+        setAdminSummaryLoading(false);
       }
 
     } catch (error) {
@@ -433,11 +499,11 @@ export default function Dashboard() {
       </div>
 
       {/* MAIN CONTENT SPLIT */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
-        
+      <div className={`grid grid-cols-1 ${isAdminUser ? 'lg:grid-cols-3' : ''} gap-8 pb-12`}>
+
         {/* LEFT COLUMN: Actions & Alerts */}
-        <div className="col-span-1 lg:col-span-2 space-y-8">
-          
+        <div className={`col-span-1 ${isAdminUser ? 'lg:col-span-2' : ''} space-y-8`}>
+
           {/* 作業員の週間予定 */}
           <section>
             <div 
@@ -1084,49 +1150,88 @@ export default function Dashboard() {
 
         </div>
 
-        {/* RIGHT COLUMN: Timeline & Activity */}
-        <div className="col-span-1 lg:col-span-1 border-t lg:border-t-0 lg:border-l border-slate-200 lg:pl-8 pt-8 lg:pt-0 space-y-6">
+        {/* RIGHT COLUMN: 経営サマリー（管理者のみ） */}
+        {isAdminUser && (
+        <div className="col-span-1 lg:col-span-1 border-t lg:border-t-0 lg:border-l border-slate-200 lg:pl-8 pt-8 lg:pt-0 space-y-4">
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-slate-600" />
-            最近の日報・動き
+            <TrendingUp className="w-5 h-5 text-slate-600" />
+            経営サマリー
           </h2>
-          
-          <div className="relative border-l-2 border-slate-200 ml-3 space-y-8 pb-4">
-            {recentReports.length > 0 ? (
-              recentReports.map((report) => (
-                <div key={report.id} className="relative pl-6">
-                  {/* Timeline Dot */}
-                  <div className="absolute w-3 h-3 bg-white border-2 border-blue-500 rounded-full -left-[7px] top-1.5 ring-4 ring-slate-50"></div>
-                  
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-600">
-                      {dateFns.format(new Date(report.created_at), 'MM/dd HH:mm')}
-                    </span>
-                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                      {report.reporter_name || '不明'}
-                    </span>
-                  </div>
-                  <h4 className="text-sm font-bold text-slate-800 mb-1">{getProjectDisplayName(report.project)}</h4>
-                  <p className="text-xs text-slate-600 line-clamp-2 bg-slate-50 p-2 rounded border border-slate-100">
-                    {report.work_content || '本文なし'}
-                  </p>
+
+          {adminSummaryLoading ? (
+            <div className="flex items-center justify-center py-10 text-slate-400">
+              <Loader2 className="w-5 h-5 animate-spin" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* 今月の完工件数 */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-bold text-slate-500 flex items-center gap-1.5">
+                    <CalendarCheck2 className="w-4 h-4 text-emerald-600" /> 今月の完工件数
+                  </span>
+                  <span className="text-xl font-black text-slate-800">{monthlyCompletions.length}<span className="text-sm font-medium text-slate-500 ml-0.5">件</span></span>
                 </div>
-              ))
-            ) : (
-              <div className="pl-6 text-sm text-slate-500">最近の活動履歴はありません。</div>
-            )}
-            
-          </div>
-          
-          <div className="pt-4 text-center">
-            <button onClick={() => navigate('/reports')} className="text-sm font-bold text-slate-500 hover:text-blue-600 transition-colors">
-              すべての日報を見る →
-            </button>
-          </div>
+                {monthlyCompletions.length > 0 && (
+                  <div className="space-y-1.5 mt-2 max-h-40 overflow-y-auto pr-1">
+                    {monthlyCompletions.map((c: any, i: number) => {
+                      const p = Array.isArray(c.projects) ? c.projects[0] : c.projects;
+                      return (
+                        <div key={i} className="text-xs text-slate-600 border-b border-slate-100 pb-1.5 last:border-0">
+                          <span className="font-bold text-slate-700">{p?.project_number}</span> {p?.project_name}
+                          <span className="text-slate-400 ml-1">（{c.completion_date}）</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 今月の投入人工 */}
+              <div
+                className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 cursor-pointer hover:border-blue-300 transition-colors"
+                onClick={() => navigate('/work-summary')}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-slate-500 flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-blue-600" /> 今月の総投入人工
+                  </span>
+                  <span className="text-xl font-black text-slate-800">{monthlyLaborCount}<span className="text-sm font-medium text-slate-500 ml-0.5">人工</span></span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">案件別の内訳は稼働集計へ →</p>
+              </div>
+
+              {/* 請求未了の完工案件 */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-bold text-slate-500 flex items-center gap-1.5">
+                    <Receipt className="w-4 h-4 text-orange-600" /> 請求未了の完工案件
+                  </span>
+                  <span className="text-xl font-black text-slate-800">{unbilledCompletedProjects.length}<span className="text-sm font-medium text-slate-500 ml-0.5">件</span></span>
+                </div>
+                {unbilledCompletedProjects.length > 0 ? (
+                  <div className="space-y-1.5 mt-2 max-h-40 overflow-y-auto pr-1">
+                    {unbilledCompletedProjects.map((p: any) => (
+                      <div
+                        key={p.id}
+                        className="text-xs text-slate-600 border-b border-slate-100 pb-1.5 last:border-0 cursor-pointer hover:text-blue-600"
+                        onClick={() => navigate('/billing')}
+                      >
+                        <span className="font-bold text-slate-700">{p.project_number}</span> {p.project_name}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 mt-1">未請求の完工案件はありません。</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-        
+        )}
+
       </div>
-      
+
     </div>
   )
 }
