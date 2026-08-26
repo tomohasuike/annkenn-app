@@ -64,7 +64,10 @@ export default function Dashboard() {
 
   const isVacationOrMisc = (p: any) => {
       if (!p) return false;
-      return p.category === 'その他' || p.project_number === 'VACATION' || (typeof p.project_name === 'string' && p.project_name.includes('休暇'));
+      return p.category === 'その他'
+          || p.project_number === 'VACATION'
+          || (typeof p.project_name === 'string' && p.project_name.includes('休暇'))
+          || (typeof p.project_number === 'string' && p.project_number.startsWith('999999'));
   };
 
   useEffect(() => {
@@ -276,11 +279,15 @@ export default function Dashboard() {
               .gte('report_date', `${monthStartStr}T00:00:00+09:00`)
               .lt('report_date', `${nextMonthStartStr}T00:00:00+09:00`),
             supabase.from('projects')
-              .select('id, project_number, project_name, client_name, site_name')
+              .select('id, project_number, project_name, client_name, site_name, category')
               .eq('status_flag', '完工'),
           ]);
 
-          setMonthlyCompletions(completionRes.data || []);
+          const filteredCompletions = (completionRes.data || []).filter((c: any) => {
+            const p = Array.isArray(c.projects) ? c.projects[0] : c.projects;
+            return !isVacationOrMisc(p);
+          });
+          setMonthlyCompletions(filteredCompletions);
 
           const reportIds = (monthlyReportsRes.data || []).map((r: any) => r.id);
           if (reportIds.length > 0) {
@@ -290,7 +297,7 @@ export default function Dashboard() {
             setMonthlyLaborCount(0);
           }
 
-          const completedProjects = completedProjectsRes.data || [];
+          const completedProjects = (completedProjectsRes.data || []).filter((p: any) => !isVacationOrMisc(p));
           const projectIds = completedProjects.map((p: any) => p.id);
           const billedProjectIds = new Set<string>();
           if (projectIds.length > 0) {
