@@ -310,29 +310,23 @@ export default function Dashboard() {
 
           const completedProjects = (completedProjectsRes.data || []).filter((p: any) => !isVacationOrMisc(p));
           const projectIds = completedProjects.map((p: any) => p.id);
-          const billedProjectIds = new Set<string>();
+          const projectIdSet = new Set(projectIds);
+          const hasInvoiceProjectIds = new Set<string>();
           if (projectIds.length > 0) {
-            const { data: invs } = await supabase.from('invoices').select('id, project_id').in('project_id', projectIds);
-            const invByProject = new Map<string, string[]>();
+            // 請求管理画面(Billing.tsx / getProjectBillingState)と同じ基準:
+            // invoicesテーブルにその案件の行が1件でも存在すれば「請求済・完工」または「請求中」であり、
+            // 行が1件も無い場合のみ「未請求」。project_idの他、おまとめ請求のproject_ids配列も対象に含める。
+            const { data: invs } = await supabase.from('invoices').select('project_id, project_ids');
             (invs || []).forEach((i: any) => {
-              const arr = invByProject.get(i.project_id) || [];
-              arr.push(i.id);
-              invByProject.set(i.project_id, arr);
+              if (i.project_id && projectIdSet.has(i.project_id)) hasInvoiceProjectIds.add(i.project_id);
+              if (Array.isArray(i.project_ids)) {
+                i.project_ids.forEach((pid: string) => {
+                  if (projectIdSet.has(pid)) hasInvoiceProjectIds.add(pid);
+                });
+              }
             });
-            const invIds = (invs || []).map((i: any) => i.id);
-            if (invIds.length > 0) {
-              // 請求管理画面(Billing.tsx)と同じ基準: details_statusの文字列に関わらず、
-              // 明細行(invoice_details)が1件でも存在すれば「請求作業に着手済み」とみなす
-              const { data: details } = await supabase.from('invoice_details')
-                .select('invoice_id')
-                .in('invoice_id', invIds);
-              const billedInvoiceIds = new Set((details || []).map((d: any) => d.invoice_id));
-              invByProject.forEach((invIdsForProject, projectId) => {
-                if (invIdsForProject.some(id => billedInvoiceIds.has(id))) billedProjectIds.add(projectId);
-              });
-            }
           }
-          setUnbilledCompletedProjects(completedProjects.filter((p: any) => !billedProjectIds.has(p.id)));
+          setUnbilledCompletedProjects(completedProjects.filter((p: any) => !hasInvoiceProjectIds.has(p.id)));
         } catch (adminErr) {
           console.error("Error fetching admin summary:", adminErr);
         } finally {
@@ -1228,7 +1222,7 @@ export default function Dashboard() {
                   </span>
                   <span className="text-xl font-black text-slate-800">{unbilledCompletedProjects.length}<span className="text-sm font-medium text-slate-500 ml-0.5">件</span></span>
                 </div>
-                <p className="text-[11px] text-slate-400 mb-1">請求管理に明細が1件も登録されていない案件です</p>
+                <p className="text-[11px] text-slate-400 mb-1">請求管理に請求データが1件も作成されていない案件です</p>
                 {unbilledCompletedProjects.length > 0 ? (
                   <div className="space-y-1.5 mt-2 max-h-40 overflow-y-auto pr-1">
                     {unbilledCompletedProjects.map((p: any) => (
