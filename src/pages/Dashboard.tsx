@@ -269,7 +269,7 @@ export default function Dashboard() {
 
           const [completionRes, monthlyReportsRes, completedProjectsRes] = await Promise.all([
             supabase.from('completion_reports')
-              .select('completion_date, projects(project_number, project_name, client_name, site_name)')
+              .select('project_id, completion_date, projects(project_number, project_name, client_name, site_name, category)')
               .gte('completion_date', monthStartStr)
               .lt('completion_date', nextMonthStartStr)
               .order('completion_date', { ascending: false }),
@@ -287,7 +287,18 @@ export default function Dashboard() {
             const p = Array.isArray(c.projects) ? c.projects[0] : c.projects;
             return !isVacationOrMisc(p);
           });
-          setMonthlyCompletions(filteredCompletions);
+          // 同じ案件が複数回完工報告されているケース(再検査等)があるため、
+          // 案件単位で最新の完工日のみを残す
+          const completionsByProject = new Map<string, any>();
+          filteredCompletions.forEach((c: any) => {
+            const existing = completionsByProject.get(c.project_id);
+            if (!existing || c.completion_date > existing.completion_date) {
+              completionsByProject.set(c.project_id, c);
+            }
+          });
+          setMonthlyCompletions(
+            Array.from(completionsByProject.values()).sort((a, b) => b.completion_date.localeCompare(a.completion_date))
+          );
 
           const reportIds = (monthlyReportsRes.data || []).map((r: any) => r.id);
           if (reportIds.length > 0) {
