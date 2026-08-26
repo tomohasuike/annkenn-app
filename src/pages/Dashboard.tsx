@@ -321,10 +321,11 @@ export default function Dashboard() {
             });
             const invIds = (invs || []).map((i: any) => i.id);
             if (invIds.length > 0) {
+              // 請求管理画面(Billing.tsx)と同じ基準: details_statusの文字列に関わらず、
+              // 明細行(invoice_details)が1件でも存在すれば「請求作業に着手済み」とみなす
               const { data: details } = await supabase.from('invoice_details')
-                .select('invoice_id, details_status')
-                .in('invoice_id', invIds)
-                .in('details_status', ['請求済', '完了', '入金済']);
+                .select('invoice_id')
+                .in('invoice_id', invIds);
               const billedInvoiceIds = new Set((details || []).map((d: any) => d.invoice_id));
               invByProject.forEach((invIdsForProject, projectId) => {
                 if (invIdsForProject.some(id => billedInvoiceIds.has(id))) billedProjectIds.add(projectId);
@@ -1219,14 +1220,15 @@ export default function Dashboard() {
                 <p className="text-[11px] text-slate-400 mt-1">案件別の内訳は稼働集計へ →</p>
               </div>
 
-              {/* 請求未了の完工案件 */}
+              {/* 請求未着手の完工案件 */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-bold text-slate-500 flex items-center gap-1.5">
-                    <Receipt className="w-4 h-4 text-orange-600" /> 請求未了の完工案件
+                    <Receipt className="w-4 h-4 text-orange-600" /> 請求未着手の完工案件
                   </span>
                   <span className="text-xl font-black text-slate-800">{unbilledCompletedProjects.length}<span className="text-sm font-medium text-slate-500 ml-0.5">件</span></span>
                 </div>
+                <p className="text-[11px] text-slate-400 mb-1">請求管理に明細が1件も登録されていない案件です</p>
                 {unbilledCompletedProjects.length > 0 ? (
                   <div className="space-y-1.5 mt-2 max-h-40 overflow-y-auto pr-1">
                     {unbilledCompletedProjects.map((p: any) => (
@@ -1240,7 +1242,7 @@ export default function Dashboard() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-400 mt-1">未請求の完工案件はありません。</p>
+                  <p className="text-xs text-slate-400 mt-1">請求未着手の完工案件はありません。</p>
                 )}
               </div>
             </div>
