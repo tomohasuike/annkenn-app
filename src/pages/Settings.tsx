@@ -17,6 +17,7 @@ export interface WorkerMaster {
   is_admin?: boolean
   allowed_apps?: string[]
   display_order?: number
+  is_active?: boolean
 }
 
 export interface VehicleMaster {
@@ -343,36 +344,30 @@ export default function Settings() {
   }
 
   const handleDeleteWorker = async (id: string, name: string) => {
-      if (!confirm(`本当に「${name}」を削除しますか？\n\n※ 過去の日報・勤怠データには名前が残ります。`)) return
+      // 完全削除すると過去の日報・勤怠・配員データの紐付けまで失われるため、
+      // 実際には削除せず無効化する。これ以降の配員・工程には表示されなくなるが、
+      // 過去の記録はそのまま残る。
+      if (!confirm(`「${name}」を無効化しますか？\n\n※ 今後の配員・工程管理には表示されなくなりますが、過去の日報・勤怠・配員データはそのまま残ります。`)) return
       try {
-          // 日報の担当者テーブル：名前を保持してからIDを解除
-          const { error: rpNameError } = await supabase
-              .from('report_personnel')
-              .update({ worker_name: name })
-              .eq('worker_id', id)
-              .is('worker_name', null)
-          if (rpNameError) throw rpNameError
-
-          const { error: rpError } = await supabase
-              .from('report_personnel')
-              .update({ worker_id: null })
-              .eq('worker_id', id)
-          if (rpError) throw rpError
-
-          // 案件アサイン：worker_idの参照を解除（名前カラムなし）
-          const { error: asError } = await supabase
-              .from('assignments')
-              .update({ worker_id: null })
-              .eq('worker_id', id)
-          if (asError) throw asError
-
-          const { error } = await supabase.from('worker_master').delete().eq('id', id)
+          const { error } = await supabase.from('worker_master').update({ is_active: false }).eq('id', id)
           if (error) throw error
           fetchData()
-          setModalMessage({ type: 'success', text: `「${name}」を削除しました。` })
+          setModalMessage({ type: 'success', text: `「${name}」を無効化しました。` })
       } catch (e: any) {
           console.error(e)
-          setModalMessage({ type: 'error', text: "削除に失敗しました: " + e.message })
+          setModalMessage({ type: 'error', text: "無効化に失敗しました: " + e.message })
+      }
+  }
+
+  const handleReactivateWorker = async (id: string, name: string) => {
+      try {
+          const { error } = await supabase.from('worker_master').update({ is_active: true }).eq('id', id)
+          if (error) throw error
+          fetchData()
+          setModalMessage({ type: 'success', text: `「${name}」を再度有効にしました。` })
+      } catch (e: any) {
+          console.error(e)
+          setModalMessage({ type: 'error', text: "有効化に失敗しました: " + e.message })
       }
   }
 
@@ -635,18 +630,21 @@ export default function Settings() {
                                       onDrop={(e) => handleDrop(e, worker.id)}
                                       onDragEnd={handleDragEnd}
                                       className={`transition-colors border-l-4 ${
-                                          draggedWorkerId === worker.id ? 'opacity-50 break-dash border-l-gray-400 bg-gray-50' : 
-                                          dragOverWorkerId === worker.id ? 'border-t-2 border-t-primary border-l-transparent bg-primary/5' : 
+                                          draggedWorkerId === worker.id ? 'opacity-50 break-dash border-l-gray-400 bg-gray-50' :
+                                          dragOverWorkerId === worker.id ? 'border-t-2 border-t-primary border-l-transparent bg-primary/5' :
                                           'border-l-transparent hover:bg-muted/30'
-                                      } ${draggedWorkerId !== worker.id && getRoleColorClass(worker.type)}`}
+                                      } ${draggedWorkerId !== worker.id && getRoleColorClass(worker.type)} ${worker.is_active === false ? 'opacity-50' : ''}`}
                                   >
                                       <td className={`px-4 py-3 font-medium min-w-[140px] ${getRoleColorClass(worker.type)}`}>
                                             <div className="flex items-center gap-2">
                                                 <div className="text-muted-foreground/50 hover:text-foreground cursor-grab active:cursor-grabbing p-1">
                                                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5"><path d="M5.5 4.625C6.12132 4.625 6.625 4.12132 6.625 3.5C6.625 2.87868 6.12132 2.375 5.5 2.375C4.87868 2.375 4.375 2.87868 4.375 3.5C4.375 4.12132 4.87868 4.625 5.5 4.625ZM9.5 4.625C10.1213 4.625 10.625 4.12132 10.625 3.5C10.625 2.87868 10.1213 2.375 9.5 2.375C8.87868 2.375 8.375 2.87868 8.375 3.5C8.375 4.12132 8.87868 4.625 9.5 4.625ZM10.625 7.5C10.625 8.12132 10.1213 8.625 9.5 8.625C8.87868 8.625 8.375 8.12132 8.375 7.5C8.375 6.87868 8.87868 6.375 9.5 6.375C10.1213 6.375 10.625 6.87868 10.625 7.5ZM5.5 8.625C6.12132 8.625 6.625 8.12132 6.625 7.5C6.625 6.87868 6.12132 6.375 5.5 6.375C4.87868 6.375 4.375 6.87868 4.375 7.5C4.375 8.12132 4.87868 8.625 5.5 8.625ZM10.625 11.5C10.625 12.1213 10.1213 12.625 9.5 12.625C8.87868 12.625 8.375 12.1213 8.375 11.5C8.375 10.8786 8.87868 10.375 9.5 10.375C10.1213 10.375 10.625 10.8786 10.625 11.5ZM5.5 12.625C6.12132 12.625 6.625 12.1213 6.625 11.5C6.625 10.8786 6.12132 10.375 5.5 10.375C4.87868 10.375 4.375 10.8786 4.375 11.5C4.375 12.1213 4.87868 12.625 5.5 12.625Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
                                                 </div>
-                                                <div>
+                                                <div className="flex items-center gap-1.5">
                                                     {worker.name}
+                                                    {worker.is_active === false && (
+                                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600">無効</span>
+                                                    )}
                                                 </div>
                                             </div>
                                       </td>
@@ -662,16 +660,24 @@ export default function Settings() {
                                       <td className={`px-4 py-3 text-muted-foreground ${getRoleColorClass(worker.type)}`}>{worker.email || '-'}</td>
                                       <td className={`px-4 py-3 text-right ${getRoleColorClass(worker.type)}`}>
                                           <div className="flex items-center justify-end gap-2">
-                                              <button 
+                                              <button
                                                   onClick={() => handleOpenWorkerModal(worker)}
                                                   className="p-1.5 min-w-[32px] rounded-md hover:bg-muted text-muted-foreground transition-colors" title="編集">
                                                   <Edit2 className="w-4 h-4 mx-auto" />
                                               </button>
-                                              <button 
-                                                  onClick={() => handleDeleteWorker(worker.id, worker.name)}
-                                                  className="p-1.5 min-w-[32px] rounded-md hover:bg-red-50 hover:text-red-500 text-muted-foreground transition-colors" title="削除">
-                                                  <Trash2 className="w-4 h-4 mx-auto" />
-                                              </button>
+                                              {worker.is_active === false ? (
+                                                  <button
+                                                      onClick={() => handleReactivateWorker(worker.id, worker.name)}
+                                                      className="p-1.5 min-w-[32px] rounded-md hover:bg-emerald-50 hover:text-emerald-600 text-muted-foreground transition-colors" title="有効化">
+                                                      <CheckCircle2 className="w-4 h-4 mx-auto" />
+                                                  </button>
+                                              ) : (
+                                                  <button
+                                                      onClick={() => handleDeleteWorker(worker.id, worker.name)}
+                                                      className="p-1.5 min-w-[32px] rounded-md hover:bg-red-50 hover:text-red-500 text-muted-foreground transition-colors" title="無効化">
+                                                      <Trash2 className="w-4 h-4 mx-auto" />
+                                                  </button>
+                                              )}
                                           </div>
                                       </td>
                                   </tr>

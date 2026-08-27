@@ -7,7 +7,7 @@ import { Search, ChevronLeft, ChevronRight, Plus, RefreshCw, Users, MessageSquar
 import { toast } from 'sonner'
 
 type ProjectData = { id: string; name: string; category: string; status: string; no: string | null; site: string | null; legacy_id?: string; client_name?: string | null; client_company_name?: string | null; folder_url?: string | null; parent_project_id?: string | null }
-type ResourceData = { id: string; name: string; type: 'worker' | 'vehicle'; categoryId?: 'president' | 'employee' | 'partner' | 'vehicle' | 'machine' }
+type ResourceData = { id: string; name: string; type: 'worker' | 'vehicle'; categoryId?: 'president' | 'employee' | 'partner' | 'vehicle' | 'machine'; registeredDate?: string }
 type ProjectDailyData = { id?: string; project_id: string; target_date: string; planned_count?: number | null; comment?: string | null }
 type AssignmentData = {
   id: string
@@ -191,7 +191,7 @@ export default function ScheduleManagement() {
     try {
       const [projRes, workerRes, vehicleRes] = await Promise.all([
         supabase.from('projects').select('id, project_name, category, status_flag, project_number, site_name, legacy_id, client_name, client_company_name, folder_url, parent_project_id').not('project_number', 'ilike', 'TEMP-%').order('created_at', { ascending: false }),
-        supabase.from('worker_master').select('id, name, type').eq('is_active', true).neq('type', '事務員').order('display_order', { ascending: true, nullsFirst: false }).order('id', { ascending: true }),
+        supabase.from('worker_master').select('id, name, type, created_at').eq('is_active', true).neq('type', '事務員').order('display_order', { ascending: true, nullsFirst: false }).order('id', { ascending: true }),
         supabase.from('vehicle_master').select('id, vehicle_name, category').eq('is_active', true).or('is_inspection_only.is.null,is_inspection_only.eq.false').order('created_at', { ascending: true })
       ])
 
@@ -238,7 +238,7 @@ export default function ScheduleManagement() {
            let catId: 'president' | 'employee' | 'partner' = 'employee'
            if (w.type === '社長') catId = 'president'
            if (w.type === '協力会社') catId = 'partner'
-           newResources.push({ id: w.id, name: w.name, type: 'worker', categoryId: catId })
+           newResources.push({ id: w.id, name: w.name, type: 'worker', categoryId: catId, registeredDate: w.created_at ? format(new Date(w.created_at), 'yyyy-MM-dd') : undefined })
         })
       }
       if (vehicleRes.data) {
@@ -655,7 +655,10 @@ export default function ScheduleManagement() {
 
   const getUnassignedResources = (dateStr: string, categoryId: 'president'|'employee'|'partner'|'vehicle'|'machine') => {
       // Very naive logic: if they are assigned to *any* project on this day, they are not unassigned.
-      return resources.filter(r => r.categoryId === categoryId && !assignments.some(a => 
+      return resources.filter(r => r.categoryId === categoryId
+          // 登録日より前の日付には表示しない
+          && (!r.registeredDate || r.registeredDate <= dateStr)
+          && !assignments.some(a =>
           a.assignment_date === dateStr && a.project_id !== "UNASSIGNED_POOL" &&
           ((r.type === 'worker' && a.worker_id === r.id) || (r.type === 'vehicle' && a.vehicle_id === r.id))
       ))
@@ -2236,7 +2239,7 @@ export default function ScheduleManagement() {
                    <div className="bg-white p-4 rounded border border-slate-200 shadow-sm">
                       <h4 className="text-[0.9em] font-bold text-slate-700 mb-3 flex items-center gap-1"><User className="w-4 h-4 text-blue-500" />自社人員</h4>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                         {resources.filter(w => w.type === 'worker' && (w.categoryId === 'employee' || w.categoryId === 'president')).map(w => {
+                         {resources.filter(w => w.type === 'worker' && (w.categoryId === 'employee' || w.categoryId === 'president') && (!w.registeredDate || w.registeredDate <= addAssignmentModalState.dateStr)).map(w => {
                             const { isOverlap, isAlreadyHere, allAssignments } = getResourceAvailability(w.id, false);
                             const isSelected = addAssignmentModalState.selectedWorkers.includes(w.id);
                             
