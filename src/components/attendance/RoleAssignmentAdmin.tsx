@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Trash2, Calendar, User, Briefcase, AlertCircle, RefreshCw, Search } from 'lucide-react';
+import { Plus, Trash2, Calendar, User, Briefcase, AlertCircle, RefreshCw, Search, Pencil, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 // 案件・作業員が多いため、選択肢を絞り込める検索付きセレクトボックス
@@ -90,6 +90,7 @@ export default function RoleAssignmentAdmin({ workers }: RoleAssignmentAdminProp
   const [allProjects, setAllProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     project_id: '',
     worker_id: '',
@@ -97,6 +98,23 @@ export default function RoleAssignmentAdmin({ workers }: RoleAssignmentAdminProp
     start_date: '',
     end_date: ''
   });
+
+  const resetForm = () => {
+    setEditingId(null);
+    setForm({ project_id: '', worker_id: '', role: '現場代理人', start_date: '', end_date: '' });
+  };
+
+  const startEdit = (a: ProjectRoleAssignment) => {
+    setEditingId(a.id);
+    setForm({
+      project_id: a.project_id,
+      worker_id: a.worker_id,
+      role: a.role,
+      start_date: a.start_date,
+      end_date: a.end_date,
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const fetchAssignments = async () => {
     setLoading(true);
@@ -156,6 +174,7 @@ export default function RoleAssignmentAdmin({ workers }: RoleAssignmentAdminProp
       toast.error('すべての項目を入力してください');
       return;
     }
+    const isEditing = !!editingId;
 
     const start = new Date(form.start_date);
     const end = new Date(form.end_date);
@@ -179,13 +198,15 @@ export default function RoleAssignmentAdmin({ workers }: RoleAssignmentAdminProp
     try {
       if (form.role === '現場代理人') {
         // 1案件につき現場代理人は1人まで(職長の既存ルールと同じ形)
-        const { data: overlapping, error: overlapErr } = await supabase
+        let overlapQuery = supabase
           .from('project_role_assignments')
-          .select('worker_id, worker:worker_master(name)')
+          .select('id, worker_id, worker:worker_master(name)')
           .eq('project_id', form.project_id)
           .eq('role', '現場代理人')
           .lte('start_date', form.end_date)
           .gte('end_date', form.start_date);
+        if (isEditing) overlapQuery = overlapQuery.neq('id', editingId);
+        const { data: overlapping, error: overlapErr } = await overlapQuery;
 
         if (overlapErr) throw overlapErr;
 
@@ -218,21 +239,29 @@ export default function RoleAssignmentAdmin({ workers }: RoleAssignmentAdminProp
         }
       }
 
-      const { error } = await supabase.from('project_role_assignments').insert([{
+      const payload = {
         project_id: form.project_id,
         worker_id: form.worker_id,
         role: form.role,
         start_date: form.start_date,
         end_date: form.end_date
-      }]);
+      };
 
-      if (error) throw error;
-      toast.success('役割指定を登録しました');
-      setForm({ project_id: '', worker_id: '', role: '現場代理人', start_date: '', end_date: '' });
+      if (isEditing) {
+        const { error } = await supabase.from('project_role_assignments').update(payload).eq('id', editingId);
+        if (error) throw error;
+        toast.success('役割指定を更新しました');
+      } else {
+        const { error } = await supabase.from('project_role_assignments').insert([payload]);
+        if (error) throw error;
+        toast.success('役割指定を登録しました');
+      }
+
+      resetForm();
       fetchAssignments();
     } catch (err: any) {
       console.error(err);
-      toast.error('登録に失敗しました: ' + err.message);
+      toast.error((isEditing ? '更新' : '登録') + 'に失敗しました: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -246,6 +275,7 @@ export default function RoleAssignmentAdmin({ workers }: RoleAssignmentAdminProp
       if (error) throw error;
       toast.success('削除しました');
       setAssignments(assignments.filter(a => a.id !== id));
+      if (editingId === id) resetForm();
     } catch (err: any) {
       console.error(err);
       toast.error('削除に失敗しました: ' + err.message);
@@ -259,11 +289,18 @@ export default function RoleAssignmentAdmin({ workers }: RoleAssignmentAdminProp
         {/* 新規登録フォーム */}
         <div className="w-full md:w-1/3 min-w-[300px]">
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 sticky top-6 shadow-sm">
-            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2 mb-4">
-              <Plus className="w-5 h-5 text-blue-600"/>
-              新しい役割指定を追加
+            <h3 className="font-bold text-lg text-slate-800 flex items-center justify-between gap-2 mb-4">
+              <span className="flex items-center gap-2">
+                {editingId ? <Pencil className="w-5 h-5 text-amber-600"/> : <Plus className="w-5 h-5 text-blue-600"/>}
+                {editingId ? '役割指定を編集' : '新しい役割指定を追加'}
+              </span>
+              {editingId && (
+                <button type="button" onClick={resetForm} className="text-slate-400 hover:text-slate-600 p-1" title="編集をキャンセル">
+                  <X className="w-4 h-4"/>
+                </button>
+              )}
             </h3>
-            
+
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="text-xs font-bold text-slate-600 block mb-1">対象案件</label>
@@ -327,14 +364,25 @@ export default function RoleAssignmentAdmin({ workers }: RoleAssignmentAdminProp
               </div>
               <p className="text-[10px] text-slate-500">※ 指定期間が2ヶ月未満の場合は適用できずエラーとなります。</p>
 
-              <button 
-                type="submit" 
-                disabled={isSubmitting}
-                className="w-full bg-blue-600 text-white font-bold h-11 rounded-lg shadow-sm hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 mt-2"
-              >
-                {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin"/> : <Plus className="w-4 h-4"/>}
-                この指定で登録する
-              </button>
+              <div className="flex gap-2 mt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className={`flex-1 text-white font-bold h-11 rounded-lg shadow-sm disabled:opacity-50 transition-colors flex items-center justify-center gap-2 ${editingId ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                >
+                  {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin"/> : editingId ? <Pencil className="w-4 h-4"/> : <Plus className="w-4 h-4"/>}
+                  {editingId ? 'この内容で更新する' : 'この指定で登録する'}
+                </button>
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="px-4 h-11 rounded-lg border border-slate-300 text-slate-600 font-bold hover:bg-slate-100 transition-colors"
+                  >
+                    キャンセル
+                  </button>
+                )}
+              </div>
             </form>
           </div>
         </div>
@@ -392,13 +440,22 @@ export default function RoleAssignmentAdmin({ workers }: RoleAssignmentAdminProp
                           {isExpired && <span className="text-[10px] text-red-500 font-bold ml-4">期限切れ</span>}
                        </td>
                        <td className="p-3 text-right">
-                         <button 
-                           onClick={() => handleDelete(a.id)}
-                           className="text-slate-300 hover:text-red-500 p-1.5 hover:bg-red-50 rounded"
-                           title="割り当てを削除"
-                         >
-                           <Trash2 className="w-4 h-4" />
-                         </button>
+                         <div className="flex items-center justify-end gap-1">
+                           <button
+                             onClick={() => startEdit(a)}
+                             className="text-slate-300 hover:text-amber-500 p-1.5 hover:bg-amber-50 rounded"
+                             title="この指定を編集"
+                           >
+                             <Pencil className="w-4 h-4" />
+                           </button>
+                           <button
+                             onClick={() => handleDelete(a.id)}
+                             className="text-slate-300 hover:text-red-500 p-1.5 hover:bg-red-50 rounded"
+                             title="割り当てを削除"
+                           >
+                             <Trash2 className="w-4 h-4" />
+                           </button>
+                         </div>
                        </td>
                      </tr>
                      );
