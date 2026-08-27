@@ -257,13 +257,19 @@ export default function TimelineModal({
     const targetProject = finalUpdates.project_id !== undefined ? finalUpdates.project_id : timelineEvents[index].project_id;
     
     if (targetRole === '職長' && targetProject && ('role' in updates || 'project_id' in updates)) {
+       // 同一案件で、この作業員が現場代理人に指定されている期間中は職長を兼任できない
+       const isSiteRepOnThisProject = activeRoles.some(r => r.project_id === targetProject && r.role === '現場代理人');
+       if (isSiteRepOnThisProject) {
+           toast.error('この作業員はこの案件で現場代理人に指定されています。同一案件で職長との兼任はできません。');
+           finalUpdates.role = '一般';
+       } else {
        try {
            const { data: others, error } = await supabase
                .from('daily_attendance')
                .select('worker_id, site_declarations')
                .eq('date', selectedDate)
                .neq('worker_id', workerId);
-               
+
            if (!error && others) {
                const alreadyHasForeman = others.some(row => {
                    const decs = Array.isArray(row.site_declarations) ? row.site_declarations : [];
@@ -277,6 +283,7 @@ export default function TimelineModal({
            }
        } catch (err) {
            console.error(err);
+       }
        }
     }
 

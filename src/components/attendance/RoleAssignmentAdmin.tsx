@@ -110,6 +110,47 @@ export default function RoleAssignmentAdmin({ workers }: RoleAssignmentAdminProp
 
     setIsSubmitting(true);
     try {
+      if (form.role === '現場代理人') {
+        // 1案件につき現場代理人は1人まで(職長の既存ルールと同じ形)
+        const { data: overlapping, error: overlapErr } = await supabase
+          .from('project_role_assignments')
+          .select('worker_id, worker:worker_master(name)')
+          .eq('project_id', form.project_id)
+          .eq('role', '現場代理人')
+          .lte('start_date', form.end_date)
+          .gte('end_date', form.start_date);
+
+        if (overlapErr) throw overlapErr;
+
+        if (overlapping && overlapping.length > 0) {
+          const existingName = (overlapping[0] as any).worker?.name || '別の方';
+          toast.error(`この案件にはすでに${existingName}が現場代理人として指定されています。1案件につき現場代理人は1人までです。`);
+          setIsSubmitting(false);
+          return;
+        }
+
+        // 同一案件で職長との兼任はできない
+        const { data: dailyRecords, error: dailyErr } = await supabase
+          .from('daily_attendance')
+          .select('site_declarations')
+          .eq('worker_id', form.worker_id)
+          .gte('date', form.start_date)
+          .lte('date', form.end_date);
+
+        if (dailyErr) throw dailyErr;
+
+        const isForemanOnThisProject = (dailyRecords || []).some((row: any) => {
+          const decs = Array.isArray(row.site_declarations) ? row.site_declarations : [];
+          return decs.some((d: any) => d.id === form.project_id && d.role === '職長');
+        });
+
+        if (isForemanOnThisProject) {
+          toast.error('この作業員はこの案件で職長として指定されています。同一案件で職長と現場代理人の兼任はできません。');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const { error } = await supabase.from('project_role_assignments').insert([{
         project_id: form.project_id,
         worker_id: form.worker_id,
