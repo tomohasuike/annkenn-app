@@ -1154,7 +1154,7 @@ export default function AttendanceAdmin() {
                                const siteDecls = record?.site_declarations || [];
 
                                const roleProjectIds = new Set<string>();
-                               const effectiveRoles = new Set<string>();
+                               const roleList: string[] = [];
 
                                const resolveRole = (projectId: string | undefined) => {
                                   const assigned = projectId ? activeRoles.find((r: any) => r.project_id === projectId && r.start_date <= dateStr && r.end_date >= dateStr) : null;
@@ -1168,24 +1168,31 @@ export default function AttendanceAdmin() {
                                projs.forEach((p: any) => {
                                   if (p.projectId && !roleProjectIds.has(p.projectId)) {
                                      roleProjectIds.add(p.projectId);
-                                     effectiveRoles.add(resolveRole(p.projectId));
+                                     roleList.push(resolveRole(p.projectId));
                                   }
                                });
                                siteDecls.forEach((sd: any) => {
                                   if (sd.project_id && !roleProjectIds.has(sd.project_id)) {
                                      roleProjectIds.add(sd.project_id);
-                                     effectiveRoles.add(resolveRole(sd.project_id));
+                                     roleList.push(resolveRole(sd.project_id));
                                   }
                                });
 
-                               if (effectiveRoles.has('職長')) foremanCount++;
-                               if (effectiveRoles.has('現場代理人')) siteRepCount++;
+                               // その日の案件数のうち、職長/現場代理人だった案件の割合で加算する
+                               // (例: 1日2現場でどちらか一方だけなら0.5回、全部その役割なら1回)
+                               if (roleList.length > 0) {
+                                  const foremanRatio = roleList.filter(r => r === '職長').length / roleList.length;
+                                  const siteRepRatio = roleList.filter(r => r === '現場代理人').length / roleList.length;
+                                  foremanCount += foremanRatio;
+                                  siteRepCount += siteRepRatio;
+                               }
                             });
+                            const formatCount = (n: number) => (Number.isInteger(n) ? n : n.toFixed(1));
                             return (
                                <>
                                  <span>出勤: {records.filter(r => r.clock_in_time || (r.site_declarations && r.site_declarations.length > 0)).length} 日</span>
-                                 <span>職長: {foremanCount} 回</span>
-                                 <span>現場代理人: {siteRepCount} 回</span>
+                                 <span>職長: {formatCount(foremanCount)} 回</span>
+                                 <span>現場代理人: {formatCount(siteRepCount)} 回</span>
                                </>
                             );
                          })()}
