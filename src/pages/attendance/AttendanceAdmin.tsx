@@ -1141,9 +1141,23 @@ export default function AttendanceAdmin() {
                          {records.reduce((acc, r) => acc + (r.personal_out_minutes || 0), 0)} 分
                       </td>
                       <td colSpan={2} className="p-3 border-r text-left text-slate-700 flex-col gap-1 text-xs sm:flex">
-                         <span>出勤: {records.filter(r => r.clock_in_time || (r.site_declarations && r.site_declarations.length > 0)).length} 日</span>
-                         <span>職長: {records.filter(r => r.role === '職長' || (r.site_declarations && r.site_declarations.some((sd: any) => sd.role === '職長'))).length} 回</span>
-                         <span>現場代理人: {records.filter(r => r.role === '現場代理人' || (r.site_declarations && r.site_declarations.some((sd: any) => sd.role === '現場代理人'))).length} 回</span>
+                         {(() => {
+                            // 期間指定(現場代理人等)は後からでも遡って有効になるため、
+                            // 保存済みのroleではなくactiveRolesを正として実効ロールを判定する
+                            const getEffectiveRole = (dateStr: string, sd: { project_id: string; role?: string }) => {
+                               const assigned = activeRoles.find((r: any) => r.project_id === sd.project_id && r.start_date <= dateStr && r.end_date >= dateStr);
+                               return assigned ? assigned.role : (sd.role || '一般');
+                            };
+                            const foremanCount = records.filter(r => (r.site_declarations || []).some(sd => getEffectiveRole(r.target_date, sd) === '職長')).length;
+                            const siteRepCount = records.filter(r => (r.site_declarations || []).some(sd => getEffectiveRole(r.target_date, sd) === '現場代理人')).length;
+                            return (
+                               <>
+                                 <span>出勤: {records.filter(r => r.clock_in_time || (r.site_declarations && r.site_declarations.length > 0)).length} 日</span>
+                                 <span>職長: {foremanCount} 回</span>
+                                 <span>現場代理人: {siteRepCount} 回</span>
+                               </>
+                            );
+                         })()}
 
                       </td>
                       <td colSpan={2} className="p-3 bg-red-50/50"></td>

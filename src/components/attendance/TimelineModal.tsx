@@ -267,13 +267,13 @@ export default function TimelineModal({
            const { data: others, error } = await supabase
                .from('daily_attendance')
                .select('worker_id, site_declarations')
-               .eq('date', selectedDate)
+               .eq('target_date', selectedDate)
                .neq('worker_id', workerId);
 
            if (!error && others) {
                const alreadyHasForeman = others.some(row => {
                    const decs = Array.isArray(row.site_declarations) ? row.site_declarations : [];
-                   return decs.some((dec: any) => dec.id === targetProject && dec.role === '職長');
+                   return decs.some((dec: any) => dec.project_id === targetProject && dec.role === '職長');
                });
                if (alreadyHasForeman) {
                    toast.error('この案件にはすでに別の職長がいます。１案件につき職長は１人までです。');

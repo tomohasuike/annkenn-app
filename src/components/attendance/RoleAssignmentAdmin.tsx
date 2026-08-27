@@ -229,7 +229,7 @@ export default function RoleAssignmentAdmin({ workers }: RoleAssignmentAdminProp
 
         const isForemanOnThisProject = (dailyRecords || []).some((row: any) => {
           const decs = Array.isArray(row.site_declarations) ? row.site_declarations : [];
-          return decs.some((d: any) => d.id === form.project_id && d.role === '職長');
+          return decs.some((d: any) => d.project_id === form.project_id && d.role === '職長');
         });
 
         if (isForemanOnThisProject) {
