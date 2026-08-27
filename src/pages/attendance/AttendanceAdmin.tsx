@@ -1143,6 +1143,7 @@ export default function AttendanceAdmin() {
                       <td colSpan={2} className="p-3 border-r text-left text-slate-700 flex-col gap-1 text-xs sm:flex">
                          <span>出勤: {records.filter(r => r.clock_in_time || (r.site_declarations && r.site_declarations.length > 0)).length} 日</span>
                          <span>職長: {records.filter(r => r.role === '職長' || (r.site_declarations && r.site_declarations.some((sd: any) => sd.role === '職長'))).length} 回</span>
+                         <span>現場代理人: {records.filter(r => r.role === '現場代理人' || (r.site_declarations && r.site_declarations.some((sd: any) => sd.role === '現場代理人'))).length} 回</span>
 
                       </td>
                       <td colSpan={2} className="p-3 bg-red-50/50"></td>
