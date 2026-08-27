@@ -134,8 +134,8 @@ export default function RoleAssignmentAdmin({ workers }: RoleAssignmentAdminProp
           .from('daily_attendance')
           .select('site_declarations')
           .eq('worker_id', form.worker_id)
-          .gte('date', form.start_date)
-          .lte('date', form.end_date);
+          .gte('target_date', form.start_date)
+          .lte('target_date', form.end_date);
 
         if (dailyErr) throw dailyErr;
 
