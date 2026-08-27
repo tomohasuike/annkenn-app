@@ -1,7 +1,74 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Trash2, Calendar, User, Briefcase, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Calendar, User, Briefcase, AlertCircle, RefreshCw, Search } from 'lucide-react';
 import { toast } from 'sonner';
+
+// 案件・作業員が多いため、選択肢を絞り込める検索付きセレクトボックス
+function SearchableSelect({
+  options,
+  value,
+  onChange,
+  placeholder,
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  const [query, setQuery] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const selected = options.find(o => o.value === value);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+        setQuery('');
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filtered = query.trim()
+    ? options.filter(o => o.label.toLowerCase().includes(query.trim().toLowerCase()))
+    : options;
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <div className="relative">
+        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <input
+          type="text"
+          value={isOpen ? query : (selected?.label || '')}
+          onChange={e => { setQuery(e.target.value); setIsOpen(true); }}
+          onFocus={() => { setQuery(''); setIsOpen(true); }}
+          placeholder={placeholder}
+          className="w-full h-10 pl-9 pr-3 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+        />
+      </div>
+      {isOpen && (
+        <ul className="absolute z-50 w-full mt-1 max-h-64 overflow-auto bg-white border rounded-lg shadow-md">
+          {filtered.length === 0 ? (
+            <li className="px-3 py-2 text-sm text-slate-400">該当する項目がありません</li>
+          ) : (
+            filtered.map(o => (
+              <li
+                key={o.value}
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => { onChange(o.value); setIsOpen(false); setQuery(''); }}
+                className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${o.value === value ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-700'}`}
+              >
+                {o.label}
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export interface ProjectRoleAssignment {
   id: string;
@@ -200,32 +267,22 @@ export default function RoleAssignmentAdmin({ workers }: RoleAssignmentAdminProp
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="text-xs font-bold text-slate-600 block mb-1">対象案件</label>
-                <select 
-                  className="w-full h-10 px-3 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                <SearchableSelect
+                  options={allProjects.map(p => ({ value: p.id, label: `${p.project_number ? `[${p.project_number}] ` : ''}${p.project_name}` }))}
                   value={form.project_id}
-                  onChange={e => setForm({...form, project_id: e.target.value})}
-                  required
-                >
-                  <option value="" disabled>案件を選択ください</option>
-                  {allProjects.map(p => (
-                    <option key={p.id} value={p.id}>{p.project_number ? `[${p.project_number}]` : ''} {p.project_name}</option>
-                  ))}
-                </select>
+                  onChange={v => setForm({...form, project_id: v})}
+                  placeholder="案件名・工事番号で検索..."
+                />
               </div>
 
               <div>
                 <label className="text-xs font-bold text-slate-600 block mb-1">対象作業員</label>
-                <select 
-                  className="w-full h-10 px-3 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                <SearchableSelect
+                  options={workers.map(w => ({ value: w.id, label: w.name }))}
                   value={form.worker_id}
-                  onChange={e => setForm({...form, worker_id: e.target.value})}
-                  required
-                >
-                  <option value="" disabled>作業員を選択ください</option>
-                  {workers.map(w => (
-                    <option key={w.id} value={w.id}>{w.name}</option>
-                  ))}
-                </select>
+                  onChange={v => setForm({...form, worker_id: v})}
+                  placeholder="作業員名で検索..."
+                />
               </div>
 
               <div>
