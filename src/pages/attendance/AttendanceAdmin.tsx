@@ -1142,14 +1142,45 @@ export default function AttendanceAdmin() {
                       </td>
                       <td colSpan={2} className="p-3 border-r text-left text-slate-700 flex-col gap-1 text-xs sm:flex">
                          {(() => {
-                            // 期間指定(現場代理人等)は後からでも遡って有効になるため、
-                            // 保存済みのroleではなくactiveRolesを正として実効ロールを判定する
-                            const getEffectiveRole = (dateStr: string, sd: { project_id: string; role?: string }) => {
-                               const assigned = activeRoles.find((r: any) => r.project_id === sd.project_id && r.start_date <= dateStr && r.end_date >= dateStr);
-                               return assigned ? assigned.role : (sd.role || '一般');
-                            };
-                            const foremanCount = records.filter(r => (r.site_declarations || []).some(sd => getEffectiveRole(r.target_date, sd) === '職長')).length;
-                            const siteRepCount = records.filter(r => (r.site_declarations || []).some(sd => getEffectiveRole(r.target_date, sd) === '現場代理人')).length;
+                            // 期間指定(現場代理人等)は後からでも遡って有効になり、日報連携のみで
+                            // site_declarationsが無い案件行もあるため、表示セルと同じロジックで
+                            // 日付ごとに「その日実際に有効だった役割」の集合を組み立てて集計する
+                            let foremanCount = 0;
+                            let siteRepCount = 0;
+                            displayDates.forEach(d => {
+                               const dateStr = format(d, 'yyyy-MM-dd');
+                               const record = recordMatrix[dateStr];
+                               const projs = projects[dateStr] || [];
+                               const siteDecls = record?.site_declarations || [];
+
+                               const roleProjectIds = new Set<string>();
+                               const effectiveRoles = new Set<string>();
+
+                               const resolveRole = (projectId: string | undefined) => {
+                                  const assigned = projectId ? activeRoles.find((r: any) => r.project_id === projectId && r.start_date <= dateStr && r.end_date >= dateStr) : null;
+                                  if (assigned) return assigned.role;
+                                  const specific = projectId ? siteDecls.find((s: any) => s.project_id === projectId) : null;
+                                  if (specific?.role) return specific.role;
+                                  const imported = siteDecls.find((s: any) => s.project_id === 'imported' || s.project_id === 'unassigned');
+                                  return imported?.role || record?.role || '一般';
+                               };
+
+                               projs.forEach((p: any) => {
+                                  if (p.projectId && !roleProjectIds.has(p.projectId)) {
+                                     roleProjectIds.add(p.projectId);
+                                     effectiveRoles.add(resolveRole(p.projectId));
+                                  }
+                               });
+                               siteDecls.forEach((sd: any) => {
+                                  if (sd.project_id && !roleProjectIds.has(sd.project_id)) {
+                                     roleProjectIds.add(sd.project_id);
+                                     effectiveRoles.add(resolveRole(sd.project_id));
+                                  }
+                               });
+
+                               if (effectiveRoles.has('職長')) foremanCount++;
+                               if (effectiveRoles.has('現場代理人')) siteRepCount++;
+                            });
                             return (
                                <>
                                  <span>出勤: {records.filter(r => r.clock_in_time || (r.site_declarations && r.site_declarations.length > 0)).length} 日</span>
