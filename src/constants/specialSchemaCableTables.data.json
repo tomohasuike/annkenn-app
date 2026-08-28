@@ -1,0 +1,1098 @@
+[
+  {
+    "cableType": "EBT",
+    "coreConfig": "電子ボタン電話用ケーブル 0.4-2P",
+    "sourcePrintedPage": "37",
+    "cableOuterDiameterMm": 4.0,
+    "cableCrossSectionMm2": 12.6,
+    "schemaNote": "この表は他の表と列構成の意味が異なる特殊表。各配管種別(E管・薄鋼・厚鋼・CD/PF管・VE・FEP・SGP・F2)ごとに『収容可能な本数(上段)』と『その本数を収容するために必要な呼び径(下段)』のペアが3段(小→大)で示されている。conduitの各キーは {size: 呼び径, maxCount: その呼び径に収容できる本数} を持つ。行(rows)は表内の段(1段目=最小サイズ側)に対応し、行間で本数の基準は列ごとに異なる(例: E管列は3/6/10本、FEP列は11/31/79本など、列ごとに独立した数列)。",
+    "rows": [
+      {
+        "tier": 1,
+        "conduit": {
+          "E": {
+            "size": "E19",
+            "maxCount": 3
+          },
+          "thinSteel": {
+            "size": "19",
+            "maxCount": 3
+          },
+          "thickSteel": {
+            "size": "16",
+            "maxCount": 3
+          },
+          "PF": {
+            "size": "16",
+            "maxCount": 3
+          },
+          "VE": {
+            "size": "16",
+            "maxCount": 3
+          },
+          "FEP": {
+            "size": "30",
+            "maxCount": 11
+          },
+          "SGP": {
+            "size": "25A",
+            "maxCount": 9
+          },
+          "F2": {
+            "size": "17",
+            "maxCount": 3
+          }
+        }
+      },
+      {
+        "tier": 2,
+        "conduit": {
+          "E": {
+            "size": "E25",
+            "maxCount": 6
+          },
+          "thinSteel": {
+            "size": "25",
+            "maxCount": 6
+          },
+          "thickSteel": {
+            "size": "22",
+            "maxCount": 5
+          },
+          "PF": {
+            "size": "22",
+            "maxCount": 5
+          },
+          "VE": {
+            "size": "22",
+            "maxCount": 5
+          },
+          "FEP": {
+            "size": "50",
+            "maxCount": 31
+          },
+          "SGP": {
+            "size": "32A",
+            "maxCount": 15
+          },
+          "F2": {
+            "size": "24",
+            "maxCount": 6
+          }
+        }
+      },
+      {
+        "tier": 3,
+        "conduit": {
+          "E": {
+            "size": "E31",
+            "maxCount": 10
+          },
+          "thinSteel": {
+            "size": "31",
+            "maxCount": 10
+          },
+          "thickSteel": {
+            "size": "28",
+            "maxCount": 9
+          },
+          "PF": {
+            "size": "28",
+            "maxCount": 9
+          },
+          "VE": {
+            "size": "28",
+            "maxCount": 9
+          },
+          "FEP": {
+            "size": "80",
+            "maxCount": 79
+          },
+          "SGP": {
+            "size": "40A",
+            "maxCount": 21
+          },
+          "F2": {
+            "size": "30",
+            "maxCount": 10
+          }
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "TIV",
+    "coreConfig": "通信用PVC屋内線 TIV 0.8-2C",
+    "sourcePrintedPage": "38",
+    "cableOuterDiameterMm": 4.0,
+    "cableCrossSectionMm2": 12.6,
+    "schemaNote": "この表は他の表と列構成の意味が異なる特殊表。各配管種別(E管・薄鋼・厚鋼・CD/PF管・VE・FEP・SGP・F2)ごとに『収容可能な本数(上段)』と『その本数を収容するために必要な呼び径(下段)』のペアが3段(小→大)で示されている。conduitの各キーは {size: 呼び径, maxCount: その呼び径に収容できる本数} を持つ。行(rows)は表内の段(1段目=最小サイズ側)に対応し、行間で本数の基準は列ごとに異なる(例: E管列は3/6/10本、FEP列は11/31/79本など、列ごとに独立した数列)。",
+    "rows": [
+      {
+        "tier": 1,
+        "conduit": {
+          "E": {
+            "size": "E19",
+            "maxCount": 3
+          },
+          "thinSteel": {
+            "size": "19",
+            "maxCount": 3
+          },
+          "thickSteel": {
+            "size": "16",
+            "maxCount": 3
+          },
+          "PF": {
+            "size": "16",
+            "maxCount": 3
+          },
+          "VE": {
+            "size": "16",
+            "maxCount": 3
+          },
+          "FEP": {
+            "size": "30",
+            "maxCount": 11
+          },
+          "SGP": {
+            "size": "25A",
+            "maxCount": 9
+          },
+          "F2": {
+            "size": "17",
+            "maxCount": 3
+          }
+        }
+      },
+      {
+        "tier": 2,
+        "conduit": {
+          "E": {
+            "size": "E25",
+            "maxCount": 6
+          },
+          "thinSteel": {
+            "size": "25",
+            "maxCount": 6
+          },
+          "thickSteel": {
+            "size": "22",
+            "maxCount": 5
+          },
+          "PF": {
+            "size": "22",
+            "maxCount": 5
+          },
+          "VE": {
+            "size": "22",
+            "maxCount": 5
+          },
+          "FEP": {
+            "size": "50",
+            "maxCount": 31
+          },
+          "SGP": {
+            "size": "32A",
+            "maxCount": 15
+          },
+          "F2": {
+            "size": "24",
+            "maxCount": 6
+          }
+        }
+      },
+      {
+        "tier": 3,
+        "conduit": {
+          "E": {
+            "size": "E31",
+            "maxCount": 10
+          },
+          "thinSteel": {
+            "size": "31",
+            "maxCount": 10
+          },
+          "thickSteel": {
+            "size": "28",
+            "maxCount": 9
+          },
+          "PF": {
+            "size": "28",
+            "maxCount": 9
+          },
+          "VE": {
+            "size": "28",
+            "maxCount": 9
+          },
+          "FEP": {
+            "size": "80",
+            "maxCount": 79
+          },
+          "SGP": {
+            "size": "40A",
+            "maxCount": 21
+          },
+          "F2": {
+            "size": "30",
+            "maxCount": 10
+          }
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "TIVF",
+    "coreConfig": "通信用PVC屋内線 TIVF 0.65-2C",
+    "sourcePrintedPage": "38",
+    "cableOuterDiameterMm": "1.85x3.7",
+    "cableCrossSectionMm2": 6.9,
+    "schemaNote": "この表は他の表と列構成の意味が異なる特殊表。各配管種別(E管・薄鋼・厚鋼・CD/PF管・VE・FEP・SGP・F2)ごとに『収容可能な本数(上段)』と『その本数を収容するために必要な呼び径(下段)』のペアが3段(小→大)で示されている。conduitの各キーは {size: 呼び径, maxCount: その呼び径に収容できる本数} を持つ。行(rows)は表内の段(1段目=最小サイズ側)に対応し、行間で本数の基準は列ごとに異なる(例: E管列は3/6/10本、FEP列は11/31/79本など、列ごとに独立した数列)。",
+    "rows": [
+      {
+        "tier": 1,
+        "conduit": {
+          "E": {
+            "size": "E19",
+            "maxCount": 5
+          },
+          "thinSteel": {
+            "size": "19",
+            "maxCount": 5
+          },
+          "thickSteel": {
+            "size": "16",
+            "maxCount": 6
+          },
+          "PF": {
+            "size": "16",
+            "maxCount": 5
+          },
+          "VE": {
+            "size": "16",
+            "maxCount": 7
+          },
+          "FEP": {
+            "size": "30",
+            "maxCount": 20
+          },
+          "SGP": {
+            "size": "25A",
+            "maxCount": 17
+          },
+          "F2": {
+            "size": "17",
+            "maxCount": 6
+          }
+        }
+      },
+      {
+        "tier": 2,
+        "conduit": {
+          "E": {
+            "size": "E25",
+            "maxCount": 12
+          },
+          "thinSteel": {
+            "size": "25",
+            "maxCount": 11
+          },
+          "thickSteel": {
+            "size": "22",
+            "maxCount": 10
+          },
+          "PF": {
+            "size": "22",
+            "maxCount": 10
+          },
+          "VE": {
+            "size": "22",
+            "maxCount": 10
+          },
+          "FEP": {
+            "size": "50",
+            "maxCount": 56
+          },
+          "SGP": {
+            "size": "32A",
+            "maxCount": 28
+          },
+          "F2": {
+            "size": "24",
+            "maxCount": 12
+          }
+        }
+      },
+      {
+        "tier": 3,
+        "conduit": {
+          "E": {
+            "size": "E31",
+            "maxCount": 19
+          },
+          "thinSteel": {
+            "size": "31",
+            "maxCount": 18
+          },
+          "thickSteel": {
+            "size": "28",
+            "maxCount": 18
+          },
+          "PF": {
+            "size": "28",
+            "maxCount": 17
+          },
+          "VE": {
+            "size": "28",
+            "maxCount": 17
+          },
+          "FEP": {
+            "size": "80",
+            "maxCount": 145
+          },
+          "SGP": {
+            "size": "40A",
+            "maxCount": 39
+          },
+          "F2": {
+            "size": "30",
+            "maxCount": 19
+          }
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "TIVF",
+    "coreConfig": "通信用PVC屋内線 TIVF 0.65-3C",
+    "sourcePrintedPage": "38",
+    "cableOuterDiameterMm": "1.85x5.6",
+    "cableCrossSectionMm2": 11.0,
+    "schemaNote": "この表は他の表と列構成の意味が異なる特殊表。各配管種別(E管・薄鋼・厚鋼・CD/PF管・VE・FEP・SGP・F2)ごとに『収容可能な本数(上段)』と『その本数を収容するために必要な呼び径(下段)』のペアが3段(小→大)で示されている。conduitの各キーは {size: 呼び径, maxCount: その呼び径に収容できる本数} を持つ。行(rows)は表内の段(1段目=最小サイズ側)に対応し、行間で本数の基準は列ごとに異なる(例: E管列は3/6/10本、FEP列は11/31/79本など、列ごとに独立した数列)。",
+    "rows": [
+      {
+        "tier": 1,
+        "conduit": {
+          "E": {
+            "size": "E19",
+            "maxCount": 3
+          },
+          "thinSteel": {
+            "size": "19",
+            "maxCount": 3
+          },
+          "thickSteel": {
+            "size": "16",
+            "maxCount": 3
+          },
+          "PF": {
+            "size": "16",
+            "maxCount": 3
+          },
+          "VE": {
+            "size": "16",
+            "maxCount": 4
+          },
+          "FEP": {
+            "size": "30",
+            "maxCount": 12
+          },
+          "SGP": {
+            "size": "25A",
+            "maxCount": 10
+          },
+          "F2": {
+            "size": "17",
+            "maxCount": 3
+          }
+        }
+      },
+      {
+        "tier": 2,
+        "conduit": {
+          "E": {
+            "size": "E25",
+            "maxCount": 7
+          },
+          "thinSteel": {
+            "size": "25",
+            "maxCount": 7
+          },
+          "thickSteel": {
+            "size": "22",
+            "maxCount": 6
+          },
+          "PF": {
+            "size": "22",
+            "maxCount": 6
+          },
+          "VE": {
+            "size": "22",
+            "maxCount": 6
+          },
+          "FEP": {
+            "size": "50",
+            "maxCount": 35
+          },
+          "SGP": {
+            "size": "32A",
+            "maxCount": 18
+          },
+          "F2": {
+            "size": "24",
+            "maxCount": 8
+          }
+        }
+      },
+      {
+        "tier": 3,
+        "conduit": {
+          "E": {
+            "size": "E31",
+            "maxCount": 12
+          },
+          "thinSteel": {
+            "size": "31",
+            "maxCount": 11
+          },
+          "thickSteel": {
+            "size": "28",
+            "maxCount": 11
+          },
+          "PF": {
+            "size": "28",
+            "maxCount": 11
+          },
+          "VE": {
+            "size": "28",
+            "maxCount": 11
+          },
+          "FEP": {
+            "size": "80",
+            "maxCount": 91
+          },
+          "SGP": {
+            "size": "40A",
+            "maxCount": 24
+          },
+          "F2": {
+            "size": "30",
+            "maxCount": 12
+          }
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "TIVF",
+    "coreConfig": "通信用PVC屋内線 TIVF 0.8-2C",
+    "sourcePrintedPage": "39",
+    "cableOuterDiameterMm": 2.0,
+    "cableCrossSectionMm2": 8.6,
+    "schemaNote": "この表は他の表と列構成の意味が異なる特殊表。各配管種別(E管・薄鋼・厚鋼・CD/PF管・VE・FEP・SGP・F2)ごとに『収容可能な本数(上段)』と『その本数を収容するために必要な呼び径(下段)』のペアが3段(小→大)で示されている。conduitの各キーは {size: 呼び径, maxCount: その呼び径に収容できる本数} を持つ。行(rows)は表内の段(1段目=最小サイズ側)に対応し、行間で本数の基準は列ごとに異なる(例: E管列は3/6/10本、FEP列は11/31/79本など、列ごとに独立した数列)。",
+    "rows": [
+      {
+        "tier": 1,
+        "conduit": {
+          "E": {
+            "size": "E19",
+            "maxCount": 5
+          },
+          "thinSteel": {
+            "size": "19",
+            "maxCount": 4
+          },
+          "thickSteel": {
+            "size": "16",
+            "maxCount": 4
+          },
+          "PF": {
+            "size": "16",
+            "maxCount": 4
+          },
+          "VE": {
+            "size": "16",
+            "maxCount": 5
+          },
+          "FEP": {
+            "size": "30",
+            "maxCount": 16
+          },
+          "SGP": {
+            "size": "25A",
+            "maxCount": 13
+          },
+          "F2": {
+            "size": "17",
+            "maxCount": 5
+          }
+        }
+      },
+      {
+        "tier": 2,
+        "conduit": {
+          "E": {
+            "size": "E25",
+            "maxCount": 9
+          },
+          "thinSteel": {
+            "size": "25",
+            "maxCount": 8
+          },
+          "thickSteel": {
+            "size": "22",
+            "maxCount": 8
+          },
+          "PF": {
+            "size": "22",
+            "maxCount": 8
+          },
+          "VE": {
+            "size": "22",
+            "maxCount": 8
+          },
+          "FEP": {
+            "size": "50",
+            "maxCount": 45
+          },
+          "SGP": {
+            "size": "32A",
+            "maxCount": 23
+          },
+          "F2": {
+            "size": "24",
+            "maxCount": 10
+          }
+        }
+      },
+      {
+        "tier": 3,
+        "conduit": {
+          "E": {
+            "size": "E31",
+            "maxCount": 15
+          },
+          "thinSteel": {
+            "size": "31",
+            "maxCount": 14
+          },
+          "thickSteel": {
+            "size": "28",
+            "maxCount": 14
+          },
+          "PF": {
+            "size": "28",
+            "maxCount": 14
+          },
+          "VE": {
+            "size": "28",
+            "maxCount": 14
+          },
+          "FEP": {
+            "size": "80",
+            "maxCount": 116
+          },
+          "SGP": {
+            "size": "40A",
+            "maxCount": 31
+          },
+          "F2": {
+            "size": "30",
+            "maxCount": 15
+          }
+        }
+      }
+    ],
+    "uncertainCells": [
+      "OD 2.0mm(単線径)のみ印刷。断面積8.6mm2は3C版(次表)より参考値として近似で転記。"
+    ]
+  },
+  {
+    "cableType": "TIVF",
+    "coreConfig": "通信用PVC屋内線 TIVF 0.8-3C",
+    "sourcePrintedPage": "39",
+    "cableOuterDiameterMm": 2.0,
+    "cableCrossSectionMm2": 13.0,
+    "schemaNote": "この表は他の表と列構成の意味が異なる特殊表。各配管種別(E管・薄鋼・厚鋼・CD/PF管・VE・FEP・SGP・F2)ごとに『収容可能な本数(上段)』と『その本数を収容するために必要な呼び径(下段)』のペアが3段(小→大)で示されている。conduitの各キーは {size: 呼び径, maxCount: その呼び径に収容できる本数} を持つ。行(rows)は表内の段(1段目=最小サイズ側)に対応し、行間で本数の基準は列ごとに異なる(例: E管列は3/6/10本、FEP列は11/31/79本など、列ごとに独立した数列)。",
+    "rows": [
+      {
+        "tier": 1,
+        "conduit": {
+          "E": {
+            "size": "E19",
+            "maxCount": 3
+          },
+          "thinSteel": {
+            "size": "19",
+            "maxCount": 3
+          },
+          "thickSteel": {
+            "size": "16",
+            "maxCount": 3
+          },
+          "PF": {
+            "size": "16",
+            "maxCount": 3
+          },
+          "VE": {
+            "size": "16",
+            "maxCount": 3
+          },
+          "FEP": {
+            "size": "30",
+            "maxCount": 10
+          },
+          "SGP": {
+            "size": "25A",
+            "maxCount": 9
+          },
+          "F2": {
+            "size": "17",
+            "maxCount": 3
+          }
+        }
+      },
+      {
+        "tier": 2,
+        "conduit": {
+          "E": {
+            "size": "E25",
+            "maxCount": 6
+          },
+          "thinSteel": {
+            "size": "25",
+            "maxCount": 5
+          },
+          "thickSteel": {
+            "size": "22",
+            "maxCount": 5
+          },
+          "PF": {
+            "size": "22",
+            "maxCount": 5
+          },
+          "VE": {
+            "size": "22",
+            "maxCount": 5
+          },
+          "FEP": {
+            "size": "50",
+            "maxCount": 30
+          },
+          "SGP": {
+            "size": "32A",
+            "maxCount": 15
+          },
+          "F2": {
+            "size": "24",
+            "maxCount": 6
+          }
+        }
+      },
+      {
+        "tier": 3,
+        "conduit": {
+          "E": {
+            "size": "E31",
+            "maxCount": 10
+          },
+          "thinSteel": {
+            "size": "31",
+            "maxCount": 9
+          },
+          "thickSteel": {
+            "size": "28",
+            "maxCount": 9
+          },
+          "PF": {
+            "size": "28",
+            "maxCount": 9
+          },
+          "VE": {
+            "size": "28",
+            "maxCount": 9
+          },
+          "FEP": {
+            "size": "80",
+            "maxCount": 77
+          },
+          "SGP": {
+            "size": "40A",
+            "maxCount": 20
+          },
+          "F2": {
+            "size": "30",
+            "maxCount": 10
+          }
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "MVVS",
+    "coreConfig": "マイクロホン用ビニルコード 0.5-2C",
+    "sourcePrintedPage": "40",
+    "cableOuterDiameterMm": 6.6,
+    "cableCrossSectionMm2": 34.2,
+    "schemaNote": "この表は他の表と列構成の意味が異なる特殊表。各配管種別(E管・薄鋼・厚鋼・CD/PF管・VE・FEP・SGP・F2)ごとに『収容可能な本数(上段)』と『その本数を収容するために必要な呼び径(下段)』のペアが3段(小→大)で示されている。conduitの各キーは {size: 呼び径, maxCount: その呼び径に収容できる本数} を持つ。行(rows)は表内の段(1段目=最小サイズ側)に対応し、行間で本数の基準は列ごとに異なる(例: E管列は3/6/10本、FEP列は11/31/79本など、列ごとに独立した数列)。",
+    "rows": [
+      {
+        "tier": 1,
+        "conduit": {
+          "E": {
+            "size": "E19",
+            "maxCount": 1
+          },
+          "thinSteel": {
+            "size": "19",
+            "maxCount": 1
+          },
+          "thickSteel": {
+            "size": "16",
+            "maxCount": 1
+          },
+          "PF": {
+            "size": "16",
+            "maxCount": 1
+          },
+          "VE": {
+            "size": "16",
+            "maxCount": 1
+          },
+          "FEP": {
+            "size": "30",
+            "maxCount": 4
+          },
+          "SGP": {
+            "size": "25A",
+            "maxCount": 3
+          },
+          "F2": {
+            "size": "17",
+            "maxCount": 1
+          }
+        }
+      },
+      {
+        "tier": 2,
+        "conduit": {
+          "E": {
+            "size": "E25",
+            "maxCount": 2
+          },
+          "thinSteel": {
+            "size": "25",
+            "maxCount": 2
+          },
+          "thickSteel": {
+            "size": "22",
+            "maxCount": 2
+          },
+          "PF": {
+            "size": "22",
+            "maxCount": 2
+          },
+          "VE": {
+            "size": "22",
+            "maxCount": 2
+          },
+          "FEP": {
+            "size": "50",
+            "maxCount": 11
+          },
+          "SGP": {
+            "size": "32A",
+            "maxCount": 5
+          },
+          "F2": {
+            "size": "24",
+            "maxCount": 2
+          }
+        }
+      },
+      {
+        "tier": 3,
+        "conduit": {
+          "E": {
+            "size": "E31",
+            "maxCount": 3
+          },
+          "thinSteel": {
+            "size": "31",
+            "maxCount": 3
+          },
+          "thickSteel": {
+            "size": "28",
+            "maxCount": 3
+          },
+          "PF": {
+            "size": "28",
+            "maxCount": 3
+          },
+          "VE": {
+            "size": "28",
+            "maxCount": 3
+          },
+          "FEP": {
+            "size": "80",
+            "maxCount": 29
+          },
+          "SGP": {
+            "size": "40A",
+            "maxCount": 7
+          },
+          "F2": {
+            "size": "30",
+            "maxCount": 3
+          }
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "MVVS",
+    "coreConfig": "マイクロホン用ビニルコード 0.75-2C",
+    "sourcePrintedPage": "40",
+    "cableOuterDiameterMm": 7.0,
+    "cableCrossSectionMm2": 38.5,
+    "schemaNote": "この表は他の表と列構成の意味が異なる特殊表。各配管種別(E管・薄鋼・厚鋼・CD/PF管・VE・FEP・SGP・F2)ごとに『収容可能な本数(上段)』と『その本数を収容するために必要な呼び径(下段)』のペアが3段(小→大)で示されている。conduitの各キーは {size: 呼び径, maxCount: その呼び径に収容できる本数} を持つ。行(rows)は表内の段(1段目=最小サイズ側)に対応し、行間で本数の基準は列ごとに異なる(例: E管列は3/6/10本、FEP列は11/31/79本など、列ごとに独立した数列)。",
+    "rows": [
+      {
+        "tier": 1,
+        "conduit": {
+          "E": {
+            "size": "E19",
+            "maxCount": 1
+          },
+          "thinSteel": {
+            "size": "19",
+            "maxCount": 1
+          },
+          "thickSteel": null,
+          "PF": null,
+          "VE": {
+            "size": "16",
+            "maxCount": 1
+          },
+          "FEP": {
+            "size": "30",
+            "maxCount": 3
+          },
+          "SGP": {
+            "size": "25A",
+            "maxCount": 3
+          },
+          "F2": {
+            "size": "17",
+            "maxCount": 1
+          }
+        }
+      },
+      {
+        "tier": 2,
+        "conduit": {
+          "E": {
+            "size": "E25",
+            "maxCount": 2
+          },
+          "thinSteel": {
+            "size": "25",
+            "maxCount": 2
+          },
+          "thickSteel": {
+            "size": "22",
+            "maxCount": 1
+          },
+          "PF": {
+            "size": "22",
+            "maxCount": 1
+          },
+          "VE": {
+            "size": "22",
+            "maxCount": 1
+          },
+          "FEP": {
+            "size": "50",
+            "maxCount": 10
+          },
+          "SGP": {
+            "size": "32A",
+            "maxCount": 5
+          },
+          "F2": {
+            "size": "24",
+            "maxCount": 2
+          }
+        }
+      },
+      {
+        "tier": 3,
+        "conduit": {
+          "E": {
+            "size": "E31",
+            "maxCount": 3
+          },
+          "thinSteel": {
+            "size": "31",
+            "maxCount": 3
+          },
+          "thickSteel": {
+            "size": "28",
+            "maxCount": 3
+          },
+          "PF": {
+            "size": "28",
+            "maxCount": 3
+          },
+          "VE": {
+            "size": "28",
+            "maxCount": 3
+          },
+          "FEP": {
+            "size": "80",
+            "maxCount": 26
+          },
+          "SGP": {
+            "size": "40A",
+            "maxCount": 7
+          },
+          "F2": {
+            "size": "30",
+            "maxCount": 3
+          }
+        }
+      }
+    ],
+    "uncertainCells": [
+      "1段目の厚鋼・CD管欄は原本で空欄(印刷なし)。nullとした。"
+    ]
+  },
+  {
+    "cableType": "MVVS",
+    "coreConfig": "マイクロホン用ビニルコード L-4E6",
+    "sourcePrintedPage": "40",
+    "cableOuterDiameterMm": 6.5,
+    "cableCrossSectionMm2": 33.2,
+    "schemaNote": "この表は他の表と列構成の意味が異なる特殊表。各配管種別(E管・薄鋼・厚鋼・CD/PF管・VE・FEP・SGP・F2)ごとに『収容可能な本数(上段)』と『その本数を収容するために必要な呼び径(下段)』のペアが3段(小→大)で示されている。conduitの各キーは {size: 呼び径, maxCount: その呼び径に収容できる本数} を持つ。行(rows)は表内の段(1段目=最小サイズ側)に対応し、行間で本数の基準は列ごとに異なる(例: E管列は3/6/10本、FEP列は11/31/79本など、列ごとに独立した数列)。",
+    "rows": [
+      {
+        "tier": 1,
+        "conduit": {
+          "E": {
+            "size": "E19",
+            "maxCount": 1
+          },
+          "thinSteel": {
+            "size": "19",
+            "maxCount": 1
+          },
+          "thickSteel": {
+            "size": "16",
+            "maxCount": 1
+          },
+          "PF": {
+            "size": "16",
+            "maxCount": 1
+          },
+          "VE": {
+            "size": "16",
+            "maxCount": 1
+          },
+          "FEP": {
+            "size": "30",
+            "maxCount": 4
+          },
+          "SGP": {
+            "size": "25A",
+            "maxCount": 3
+          },
+          "F2": {
+            "size": "17",
+            "maxCount": 1
+          }
+        }
+      },
+      {
+        "tier": 2,
+        "conduit": {
+          "E": {
+            "size": "E25",
+            "maxCount": 2
+          },
+          "thinSteel": {
+            "size": "25",
+            "maxCount": 2
+          },
+          "thickSteel": {
+            "size": "22",
+            "maxCount": 2
+          },
+          "PF": {
+            "size": "22",
+            "maxCount": 2
+          },
+          "VE": {
+            "size": "22",
+            "maxCount": 2
+          },
+          "FEP": {
+            "size": "50",
+            "maxCount": 11
+          },
+          "SGP": {
+            "size": "32A",
+            "maxCount": 6
+          },
+          "F2": {
+            "size": "24",
+            "maxCount": 2
+          }
+        }
+      },
+      {
+        "tier": 3,
+        "conduit": {
+          "E": {
+            "size": "E31",
+            "maxCount": 3
+          },
+          "thinSteel": {
+            "size": "31",
+            "maxCount": 3
+          },
+          "thickSteel": {
+            "size": "28",
+            "maxCount": 3
+          },
+          "PF": {
+            "size": "28",
+            "maxCount": 3
+          },
+          "VE": {
+            "size": "28",
+            "maxCount": 3
+          },
+          "FEP": {
+            "size": "80",
+            "maxCount": 30
+          },
+          "SGP": {
+            "size": "40A",
+            "maxCount": 8
+          },
+          "F2": {
+            "size": "30",
+            "maxCount": 4
+          }
+        }
+      }
+    ],
+    "uncertainCells": []
+  }
+]

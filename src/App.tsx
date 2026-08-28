@@ -106,7 +106,7 @@ function App() {
               {/* 東電申込フォーム（独立ページ） */}
               <Route path="tepco-form" element={<TepcoForm />} />
 
-              {/* 電線管占積率計算（独立ページ・案件選択不要） */}
+              {/* ケーブル用配管早見表（独立ページ・案件選択不要） */}
               <Route path="conduit-fill-calc" element={<ConduitFillCalc />} />
             </Route>
           </Route>

@@ -1,0 +1,804 @@
+[
+  {
+    "cableType": "IE",
+    "coreConfig": "ねじなし電線管(EMT)",
+    "sourcePrintedPage": "43",
+    "schemaNote": "この表はケーブルではなく電線管そのものの規格表(呼び径ごとの外径・内径・内断面積、および断面占積率20%/25%/32%/44.4%時の許容断面積)。他のケーブル種別表とは列構成が異なる。",
+    "rows": [
+      {
+        "nominalSize": "E15",
+        "outerDiameterMm": 15.9,
+        "innerDiameterMm": 13.9,
+        "innerAreaMm2": 151,
+        "fillArea20pct": 30,
+        "fillArea25pct": 38,
+        "fillArea32pct": 48,
+        "fillArea444pct": 67
+      },
+      {
+        "nominalSize": "E19",
+        "outerDiameterMm": 19.1,
+        "innerDiameterMm": 16.7,
+        "innerAreaMm2": 218,
+        "fillArea20pct": 44,
+        "fillArea25pct": 54,
+        "fillArea32pct": 70,
+        "fillArea444pct": 97
+      },
+      {
+        "nominalSize": "E25",
+        "outerDiameterMm": 25.4,
+        "innerDiameterMm": 23.0,
+        "innerAreaMm2": 415,
+        "fillArea20pct": 83,
+        "fillArea25pct": 104,
+        "fillArea32pct": 133,
+        "fillArea444pct": 184
+      },
+      {
+        "nominalSize": "E31",
+        "outerDiameterMm": 31.8,
+        "innerDiameterMm": 29.0,
+        "innerAreaMm2": 660,
+        "fillArea20pct": 132,
+        "fillArea25pct": 165,
+        "fillArea32pct": 211,
+        "fillArea444pct": 293
+      },
+      {
+        "nominalSize": "E39",
+        "outerDiameterMm": 38.1,
+        "innerDiameterMm": 35.3,
+        "innerAreaMm2": 978,
+        "fillArea20pct": 196,
+        "fillArea25pct": 245,
+        "fillArea32pct": 313,
+        "fillArea444pct": 434
+      },
+      {
+        "nominalSize": "E51",
+        "outerDiameterMm": 50.8,
+        "innerDiameterMm": 48.0,
+        "innerAreaMm2": 1808,
+        "fillArea20pct": 362,
+        "fillArea25pct": 452,
+        "fillArea32pct": 579,
+        "fillArea444pct": 803
+      },
+      {
+        "nominalSize": "E63",
+        "outerDiameterMm": 63.5,
+        "innerDiameterMm": 60.3,
+        "innerAreaMm2": 2854,
+        "fillArea20pct": 571,
+        "fillArea25pct": 714,
+        "fillArea32pct": 913,
+        "fillArea444pct": 1267
+      },
+      {
+        "nominalSize": "E75",
+        "outerDiameterMm": 76.2,
+        "innerDiameterMm": 72.6,
+        "innerAreaMm2": 4137,
+        "fillArea20pct": 827,
+        "fillArea25pct": 1034,
+        "fillArea32pct": 1324,
+        "fillArea444pct": 1837
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "IE",
+    "coreConfig": "薄鋼電線管(CP)",
+    "sourcePrintedPage": "44",
+    "schemaNote": "この表はケーブルではなく電線管そのものの規格表(呼び径ごとの外径・内径・内断面積、および断面占積率20%/25%/32%/44.4%時の許容断面積)。他のケーブル種別表とは列構成が異なる。",
+    "rows": [
+      {
+        "nominalSize": "15",
+        "outerDiameterMm": 15.9,
+        "innerDiameterMm": 13.5,
+        "innerAreaMm2": 143,
+        "fillArea20pct": 29,
+        "fillArea25pct": 36,
+        "fillArea32pct": 46,
+        "fillArea444pct": 63
+      },
+      {
+        "nominalSize": "19",
+        "outerDiameterMm": 19.1,
+        "innerDiameterMm": 15.9,
+        "innerAreaMm2": 198,
+        "fillArea20pct": 40,
+        "fillArea25pct": 50,
+        "fillArea32pct": 63,
+        "fillArea444pct": 88
+      },
+      {
+        "nominalSize": "25",
+        "outerDiameterMm": 25.4,
+        "innerDiameterMm": 22.2,
+        "innerAreaMm2": 386,
+        "fillArea20pct": 77,
+        "fillArea25pct": 97,
+        "fillArea32pct": 124,
+        "fillArea444pct": 171
+      },
+      {
+        "nominalSize": "31",
+        "outerDiameterMm": 31.8,
+        "innerDiameterMm": 28.6,
+        "innerAreaMm2": 642,
+        "fillArea20pct": 128,
+        "fillArea25pct": 161,
+        "fillArea32pct": 205,
+        "fillArea444pct": 285
+      },
+      {
+        "nominalSize": "39",
+        "outerDiameterMm": 38.1,
+        "innerDiameterMm": 34.9,
+        "innerAreaMm2": 956,
+        "fillArea20pct": 191,
+        "fillArea25pct": 239,
+        "fillArea32pct": 306,
+        "fillArea444pct": 424
+      },
+      {
+        "nominalSize": "51",
+        "outerDiameterMm": 50.8,
+        "innerDiameterMm": 47.6,
+        "innerAreaMm2": 1778,
+        "fillArea20pct": 356,
+        "fillArea25pct": 445,
+        "fillArea32pct": 569,
+        "fillArea444pct": 789
+      },
+      {
+        "nominalSize": "63",
+        "outerDiameterMm": 63.5,
+        "innerDiameterMm": 59.5,
+        "innerAreaMm2": 2779,
+        "fillArea20pct": 556,
+        "fillArea25pct": 695,
+        "fillArea32pct": 889,
+        "fillArea444pct": 1234
+      },
+      {
+        "nominalSize": "75",
+        "outerDiameterMm": 76.2,
+        "innerDiameterMm": 72.2,
+        "innerAreaMm2": 4092,
+        "fillArea20pct": 818,
+        "fillArea25pct": 1023,
+        "fillArea32pct": 1309,
+        "fillArea444pct": 1817
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "IE",
+    "coreConfig": "厚鋼電線管(CP)",
+    "sourcePrintedPage": "45",
+    "schemaNote": "この表はケーブルではなく電線管そのものの規格表(呼び径ごとの外径・内径・内断面積、および断面占積率20%/25%/32%/44.4%時の許容断面積)。他のケーブル種別表とは列構成が異なる。",
+    "rows": [
+      {
+        "nominalSize": "16",
+        "outerDiameterMm": 21.0,
+        "innerDiameterMm": 16.4,
+        "innerAreaMm2": 211,
+        "fillArea20pct": 42,
+        "fillArea25pct": 53,
+        "fillArea32pct": 68,
+        "fillArea444pct": 94
+      },
+      {
+        "nominalSize": "22",
+        "outerDiameterMm": 26.5,
+        "innerDiameterMm": 21.9,
+        "innerAreaMm2": 376,
+        "fillArea20pct": 75,
+        "fillArea25pct": 94,
+        "fillArea32pct": 120,
+        "fillArea444pct": 167
+      },
+      {
+        "nominalSize": "28",
+        "outerDiameterMm": 33.3,
+        "innerDiameterMm": 28.3,
+        "innerAreaMm2": 629,
+        "fillArea20pct": 126,
+        "fillArea25pct": 157,
+        "fillArea32pct": 201,
+        "fillArea444pct": 279
+      },
+      {
+        "nominalSize": "36",
+        "outerDiameterMm": 41.9,
+        "innerDiameterMm": 36.9,
+        "innerAreaMm2": 1069,
+        "fillArea20pct": 214,
+        "fillArea25pct": 267,
+        "fillArea32pct": 342,
+        "fillArea444pct": 475
+      },
+      {
+        "nominalSize": "42",
+        "outerDiameterMm": 47.8,
+        "innerDiameterMm": 42.8,
+        "innerAreaMm2": 1438,
+        "fillArea20pct": 288,
+        "fillArea25pct": 360,
+        "fillArea32pct": 460,
+        "fillArea444pct": 638
+      },
+      {
+        "nominalSize": "54",
+        "outerDiameterMm": 59.6,
+        "innerDiameterMm": 54.0,
+        "innerAreaMm2": 2289,
+        "fillArea20pct": 458,
+        "fillArea25pct": 572,
+        "fillArea32pct": 732,
+        "fillArea444pct": 1016
+      },
+      {
+        "nominalSize": "70",
+        "outerDiameterMm": 75.2,
+        "innerDiameterMm": 69.6,
+        "innerAreaMm2": 3802,
+        "fillArea20pct": 760,
+        "fillArea25pct": 951,
+        "fillArea32pct": 1217,
+        "fillArea444pct": 1688
+      },
+      {
+        "nominalSize": "82",
+        "outerDiameterMm": 87.9,
+        "innerDiameterMm": 82.3,
+        "innerAreaMm2": 5317,
+        "fillArea20pct": 1063,
+        "fillArea25pct": 1329,
+        "fillArea32pct": 1701,
+        "fillArea444pct": 2361
+      },
+      {
+        "nominalSize": "92",
+        "outerDiameterMm": 100.7,
+        "innerDiameterMm": 93.7,
+        "innerAreaMm2": 6892,
+        "fillArea20pct": 1378,
+        "fillArea25pct": 1723,
+        "fillArea32pct": 2205,
+        "fillArea444pct": 3060
+      },
+      {
+        "nominalSize": "104",
+        "outerDiameterMm": 113.4,
+        "innerDiameterMm": 106.4,
+        "innerAreaMm2": 8886,
+        "fillArea20pct": 1777,
+        "fillArea25pct": 2222,
+        "fillArea32pct": 2844,
+        "fillArea444pct": 3945
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "IE",
+    "coreConfig": "CD管(CD)",
+    "sourcePrintedPage": "46",
+    "schemaNote": "この表はケーブルではなく電線管そのものの規格表(呼び径ごとの外径・内径・内断面積、および断面占積率20%/25%/32%/44.4%時の許容断面積)。他のケーブル種別表とは列構成が異なる。",
+    "rows": [
+      {
+        "nominalSize": "14",
+        "outerDiameterMm": 19.0,
+        "innerDiameterMm": 14.0,
+        "innerAreaMm2": 153,
+        "fillArea20pct": 30,
+        "fillArea25pct": 38,
+        "fillArea32pct": 49,
+        "fillArea444pct": 68
+      },
+      {
+        "nominalSize": "16",
+        "outerDiameterMm": 21.0,
+        "innerDiameterMm": 16.0,
+        "innerAreaMm2": 200,
+        "fillArea20pct": 40,
+        "fillArea25pct": 50,
+        "fillArea32pct": 64,
+        "fillArea444pct": 89
+      },
+      {
+        "nominalSize": "22",
+        "outerDiameterMm": 27.5,
+        "innerDiameterMm": 22.0,
+        "innerAreaMm2": 379,
+        "fillArea20pct": 76,
+        "fillArea25pct": 95,
+        "fillArea32pct": 121,
+        "fillArea444pct": 168
+      },
+      {
+        "nominalSize": "28",
+        "outerDiameterMm": 34.0,
+        "innerDiameterMm": 28.0,
+        "innerAreaMm2": 615,
+        "fillArea20pct": 123,
+        "fillArea25pct": 154,
+        "fillArea32pct": 197,
+        "fillArea444pct": 273
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "IE",
+    "coreConfig": "硬質ビニル電線管・波付硬質ビニル電線管(VE・HIVE)",
+    "sourcePrintedPage": "47",
+    "schemaNote": "この表はケーブルではなく電線管そのものの規格表(呼び径ごとの外径・内径・内断面積、および断面占積率20%/25%/32%/44.4%時の許容断面積)。他のケーブル種別表とは列構成が異なる。",
+    "rows": [
+      {
+        "nominalSize": "14",
+        "outerDiameterMm": 18.0,
+        "innerDiameterMm": 14.0,
+        "innerAreaMm2": 153,
+        "fillArea20pct": 31,
+        "fillArea25pct": 38,
+        "fillArea32pct": 49,
+        "fillArea444pct": 68
+      },
+      {
+        "nominalSize": "16",
+        "outerDiameterMm": 22.0,
+        "innerDiameterMm": 18.0,
+        "innerAreaMm2": 254,
+        "fillArea20pct": 51,
+        "fillArea25pct": 64,
+        "fillArea32pct": 81,
+        "fillArea444pct": 113
+      },
+      {
+        "nominalSize": "22",
+        "outerDiameterMm": 26.0,
+        "innerDiameterMm": 22.0,
+        "innerAreaMm2": 379,
+        "fillArea20pct": 76,
+        "fillArea25pct": 95,
+        "fillArea32pct": 121,
+        "fillArea444pct": 168
+      },
+      {
+        "nominalSize": "28",
+        "outerDiameterMm": 34.0,
+        "innerDiameterMm": 28.0,
+        "innerAreaMm2": 615,
+        "fillArea20pct": 123,
+        "fillArea25pct": 154,
+        "fillArea32pct": 197,
+        "fillArea444pct": 273
+      },
+      {
+        "nominalSize": "36",
+        "outerDiameterMm": 42.0,
+        "innerDiameterMm": 35.0,
+        "innerAreaMm2": 961,
+        "fillArea20pct": 192,
+        "fillArea25pct": 240,
+        "fillArea32pct": 308,
+        "fillArea444pct": 427
+      },
+      {
+        "nominalSize": "42",
+        "outerDiameterMm": 48.0,
+        "innerDiameterMm": 40.0,
+        "innerAreaMm2": 1256,
+        "fillArea20pct": 251,
+        "fillArea25pct": 314,
+        "fillArea32pct": 402,
+        "fillArea444pct": 558
+      },
+      {
+        "nominalSize": "54",
+        "outerDiameterMm": 60.0,
+        "innerDiameterMm": 51.0,
+        "innerAreaMm2": 2041,
+        "fillArea20pct": 408,
+        "fillArea25pct": 510,
+        "fillArea32pct": 653,
+        "fillArea444pct": 906
+      },
+      {
+        "nominalSize": "70",
+        "outerDiameterMm": 76.0,
+        "innerDiameterMm": 67.0,
+        "innerAreaMm2": 3523,
+        "fillArea20pct": 705,
+        "fillArea25pct": 881,
+        "fillArea32pct": 1127,
+        "fillArea444pct": 1564
+      },
+      {
+        "nominalSize": "82",
+        "outerDiameterMm": 89.0,
+        "innerDiameterMm": 77.2,
+        "innerAreaMm2": 4678,
+        "fillArea20pct": 936,
+        "fillArea25pct": 1170,
+        "fillArea32pct": 1497,
+        "fillArea444pct": 2077
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "IE",
+    "coreConfig": "波付硬質ポリエチレン管(FEP)",
+    "sourcePrintedPage": "48",
+    "schemaNote": "この表はケーブルではなく電線管そのものの規格表(呼び径ごとの外径・内径・内断面積、および断面占積率20%/25%/32%/44.4%時の許容断面積)。他のケーブル種別表とは列構成が異なる。",
+    "rows": [
+      {
+        "nominalSize": "30",
+        "outerDiameterMm": 41,
+        "innerDiameterMm": 30,
+        "innerAreaMm2": 706,
+        "fillArea20pct": 141,
+        "fillArea25pct": 177,
+        "fillArea32pct": 226,
+        "fillArea444pct": 313
+      },
+      {
+        "nominalSize": "50",
+        "outerDiameterMm": 65,
+        "innerDiameterMm": 50,
+        "innerAreaMm2": 1962,
+        "fillArea20pct": 392,
+        "fillArea25pct": 491,
+        "fillArea32pct": 628,
+        "fillArea444pct": 871
+      },
+      {
+        "nominalSize": "80",
+        "outerDiameterMm": 105,
+        "innerDiameterMm": 80,
+        "innerAreaMm2": 5024,
+        "fillArea20pct": 1005,
+        "fillArea25pct": 1256,
+        "fillArea32pct": 1608,
+        "fillArea444pct": 2231
+      },
+      {
+        "nominalSize": "100",
+        "outerDiameterMm": 135,
+        "innerDiameterMm": 100,
+        "innerAreaMm2": 7850,
+        "fillArea20pct": 1570,
+        "fillArea25pct": 1963,
+        "fillArea32pct": 2512,
+        "fillArea444pct": 3485
+      },
+      {
+        "nominalSize": "125",
+        "outerDiameterMm": 160,
+        "innerDiameterMm": 125,
+        "innerAreaMm2": 12265,
+        "fillArea20pct": 2453,
+        "fillArea25pct": 3066,
+        "fillArea32pct": 3925,
+        "fillArea444pct": 5446
+      },
+      {
+        "nominalSize": "150",
+        "outerDiameterMm": 190,
+        "innerDiameterMm": 150,
+        "innerAreaMm2": 17662,
+        "fillArea20pct": 3532,
+        "fillArea25pct": 4416,
+        "fillArea32pct": 5652,
+        "fillArea444pct": 7842
+      },
+      {
+        "nominalSize": "200",
+        "outerDiameterMm": 250,
+        "innerDiameterMm": 200,
+        "innerAreaMm2": 31400,
+        "fillArea20pct": 6280,
+        "fillArea25pct": 7850,
+        "fillArea32pct": 10048,
+        "fillArea444pct": 13942
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "IE",
+    "coreConfig": "配管用炭素鋼鋼管(SGP)",
+    "sourcePrintedPage": "49",
+    "schemaNote": "この表はケーブルではなく電線管そのものの規格表(呼び径ごとの外径・内径・内断面積、および断面占積率20%/25%/32%/44.4%時の許容断面積)。他のケーブル種別表とは列構成が異なる。",
+    "rows": [
+      {
+        "nominalSize": "25A",
+        "outerDiameterMm": 34.0,
+        "innerDiameterMm": 27.6,
+        "innerAreaMm2": 597,
+        "fillArea20pct": 119,
+        "fillArea25pct": 149,
+        "fillArea32pct": 191,
+        "fillArea444pct": 265
+      },
+      {
+        "nominalSize": "32A",
+        "outerDiameterMm": 42.7,
+        "innerDiameterMm": 35.7,
+        "innerAreaMm2": 1000,
+        "fillArea20pct": 200,
+        "fillArea25pct": 250,
+        "fillArea32pct": 320,
+        "fillArea444pct": 444
+      },
+      {
+        "nominalSize": "40A",
+        "outerDiameterMm": 48.6,
+        "innerDiameterMm": 41.6,
+        "innerAreaMm2": 1358,
+        "fillArea20pct": 272,
+        "fillArea25pct": 340,
+        "fillArea32pct": 435,
+        "fillArea444pct": 603
+      },
+      {
+        "nominalSize": "50A",
+        "outerDiameterMm": 60.5,
+        "innerDiameterMm": 52.9,
+        "innerAreaMm2": 2196,
+        "fillArea20pct": 439,
+        "fillArea25pct": 549,
+        "fillArea32pct": 703,
+        "fillArea444pct": 975
+      },
+      {
+        "nominalSize": "65A",
+        "outerDiameterMm": 76.3,
+        "innerDiameterMm": 67.9,
+        "innerAreaMm2": 3619,
+        "fillArea20pct": 724,
+        "fillArea25pct": 905,
+        "fillArea32pct": 1158,
+        "fillArea444pct": 1607
+      },
+      {
+        "nominalSize": "80A",
+        "outerDiameterMm": 89.1,
+        "innerDiameterMm": 80.7,
+        "innerAreaMm2": 5112,
+        "fillArea20pct": 1022,
+        "fillArea25pct": 1278,
+        "fillArea32pct": 1636,
+        "fillArea444pct": 2270
+      },
+      {
+        "nominalSize": "90A",
+        "outerDiameterMm": 101.6,
+        "innerDiameterMm": 93.2,
+        "innerAreaMm2": 6818,
+        "fillArea20pct": 1364,
+        "fillArea25pct": 1705,
+        "fillArea32pct": 2182,
+        "fillArea444pct": 3027
+      },
+      {
+        "nominalSize": "100A",
+        "outerDiameterMm": 114.3,
+        "innerDiameterMm": 105.3,
+        "innerAreaMm2": 8704,
+        "fillArea20pct": 1741,
+        "fillArea25pct": 2176,
+        "fillArea32pct": 2785,
+        "fillArea444pct": 3865
+      },
+      {
+        "nominalSize": "125A",
+        "outerDiameterMm": 139.8,
+        "innerDiameterMm": 130.8,
+        "innerAreaMm2": 13430,
+        "fillArea20pct": 2686,
+        "fillArea25pct": 3358,
+        "fillArea32pct": 4298,
+        "fillArea444pct": 5963
+      },
+      {
+        "nominalSize": "150A",
+        "outerDiameterMm": 165.2,
+        "innerDiameterMm": 155.2,
+        "innerAreaMm2": 18908,
+        "fillArea20pct": 3782,
+        "fillArea25pct": 4727,
+        "fillArea32pct": 6051,
+        "fillArea444pct": 8395
+      },
+      {
+        "nominalSize": "200A",
+        "outerDiameterMm": 216.3,
+        "innerDiameterMm": 204.7,
+        "innerAreaMm2": 32893,
+        "fillArea20pct": 6579,
+        "fillArea25pct": 8223,
+        "fillArea32pct": 10528,
+        "fillArea444pct": 14604
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "IE",
+    "coreConfig": "2種金属可とう電線管(F2)",
+    "sourcePrintedPage": "50",
+    "schemaNote": "この表はケーブルではなく電線管そのものの規格表(呼び径ごとの外径・内径・内断面積、および断面占積率20%/25%/32%/44.4%時の許容断面積)。他のケーブル種別表とは列構成が異なる。",
+    "rows": [
+      {
+        "nominalSize": "15",
+        "outerDiameterMm": 19.0,
+        "innerDiameterMm": 14.1,
+        "innerAreaMm2": 156,
+        "fillArea20pct": 31,
+        "fillArea25pct": 39,
+        "fillArea32pct": 50,
+        "fillArea444pct": 69
+      },
+      {
+        "nominalSize": "17",
+        "outerDiameterMm": 21.5,
+        "innerDiameterMm": 16.6,
+        "innerAreaMm2": 216,
+        "fillArea20pct": 43,
+        "fillArea25pct": 54,
+        "fillArea32pct": 69,
+        "fillArea444pct": 96
+      },
+      {
+        "nominalSize": "24",
+        "outerDiameterMm": 28.8,
+        "innerDiameterMm": 23.8,
+        "innerAreaMm2": 444,
+        "fillArea20pct": 89,
+        "fillArea25pct": 111,
+        "fillArea32pct": 142,
+        "fillArea444pct": 197
+      },
+      {
+        "nominalSize": "30",
+        "outerDiameterMm": 34.9,
+        "innerDiameterMm": 29.3,
+        "innerAreaMm2": 673,
+        "fillArea20pct": 135,
+        "fillArea25pct": 168,
+        "fillArea32pct": 215,
+        "fillArea444pct": 299
+      },
+      {
+        "nominalSize": "38",
+        "outerDiameterMm": 42.9,
+        "innerDiameterMm": 37.1,
+        "innerAreaMm2": 1080,
+        "fillArea20pct": 216,
+        "fillArea25pct": 270,
+        "fillArea32pct": 346,
+        "fillArea444pct": 480
+      },
+      {
+        "nominalSize": "50",
+        "outerDiameterMm": 54.9,
+        "innerDiameterMm": 49.1,
+        "innerAreaMm2": 1892,
+        "fillArea20pct": 378,
+        "fillArea25pct": 473,
+        "fillArea32pct": 605,
+        "fillArea444pct": 840
+      },
+      {
+        "nominalSize": "63",
+        "outerDiameterMm": 69.1,
+        "innerDiameterMm": 62.6,
+        "innerAreaMm2": 3076,
+        "fillArea20pct": 615,
+        "fillArea25pct": 769,
+        "fillArea32pct": 984,
+        "fillArea444pct": 1366
+      },
+      {
+        "nominalSize": "76",
+        "outerDiameterMm": 82.9,
+        "innerDiameterMm": 76.0,
+        "innerAreaMm2": 4534,
+        "fillArea20pct": 907,
+        "fillArea25pct": 1134,
+        "fillArea32pct": 1451,
+        "fillArea444pct": 2013
+      },
+      {
+        "nominalSize": "83",
+        "outerDiameterMm": 88.1,
+        "innerDiameterMm": 81.0,
+        "innerAreaMm2": 5150,
+        "fillArea20pct": 1030,
+        "fillArea25pct": 1288,
+        "fillArea32pct": 1648,
+        "fillArea444pct": 2287
+      },
+      {
+        "nominalSize": "101",
+        "outerDiameterMm": 107.3,
+        "innerDiameterMm": 100.2,
+        "innerAreaMm2": 7881,
+        "fillArea20pct": 1576,
+        "fillArea25pct": 1970,
+        "fillArea32pct": 2522,
+        "fillArea444pct": 3499
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "IE",
+    "coreConfig": "フロアーダクト",
+    "sourcePrintedPage": "51",
+    "schemaNote": "他のIE表と列構成が異なり、外径は幅x高の矩形寸法(mm)で示され、25%/32%/44.4%欄はもとから印刷されておらず(空欄)、20%欄のみ存在する。",
+    "rows": [
+      {
+        "nominalSize": "F4",
+        "outerDimensionMm": "41.3x35.0",
+        "innerDiameterMm": null,
+        "innerAreaMm2": 1140,
+        "fillArea20pct": 228
+      },
+      {
+        "nominalSize": "F5",
+        "outerDimensionMm": "50.0x25.0",
+        "innerDiameterMm": null,
+        "innerAreaMm2": 960,
+        "fillArea20pct": 192
+      },
+      {
+        "nominalSize": "F7",
+        "outerDimensionMm": "73.0x35.0",
+        "innerDiameterMm": null,
+        "innerAreaMm2": 2130,
+        "fillArea20pct": 426
+      },
+      {
+        "nominalSize": "FC6",
+        "outerDimensionMm": "60.0x24.0",
+        "innerDiameterMm": null,
+        "innerAreaMm2": 1070,
+        "fillArea20pct": 214
+      },
+      {
+        "nominalSize": "FC8",
+        "outerDimensionMm": "80.0x24.0",
+        "innerDiameterMm": null,
+        "innerAreaMm2": 1190,
+        "fillArea20pct": 238
+      },
+      {
+        "nominalSize": "FF5",
+        "outerDimensionMm": "50.0x25.0",
+        "innerDiameterMm": null,
+        "innerAreaMm2": 800,
+        "fillArea20pct": 160
+      },
+      {
+        "nominalSize": "FF6",
+        "outerDimensionMm": "55.0x24.0",
+        "innerDiameterMm": null,
+        "innerAreaMm2": 960,
+        "fillArea20pct": 192
+      }
+    ],
+    "uncertainCells": [
+      "原本ではouterDimensionMmの小数第1位表記が「41.3ﾟx35.0ﾟ」のように単位記号が不鮮明だが、mm表記として転記した。"
+    ]
+  }
+]

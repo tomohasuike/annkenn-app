@@ -1,0 +1,6273 @@
+[
+  {
+    "cableType": "CV",
+    "coreConfig": "1C",
+    "sourcePrintedPage": "1",
+    "rows": [
+      {
+        "sizeLabel": "2",
+        "cableOuterDiameterMm": 6.4,
+        "cableCrossSectionMm2": 32.2,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "3.5",
+        "cableOuterDiameterMm": 7.0,
+        "cableCrossSectionMm2": 38.5,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "5.5",
+        "cableOuterDiameterMm": 8.0,
+        "cableCrossSectionMm2": 50.3,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "8",
+        "cableOuterDiameterMm": 8.4,
+        "cableCrossSectionMm2": 55.4,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": "25A",
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "14",
+        "cableOuterDiameterMm": 9.4,
+        "cableCrossSectionMm2": 69.4,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": null,
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "22",
+        "cableOuterDiameterMm": 11,
+        "cableCrossSectionMm2": 95,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "38",
+        "cableOuterDiameterMm": 13,
+        "cableCrossSectionMm2": 133,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": null,
+          "thickSteel": null,
+          "PF": null,
+          "VE": "22",
+          "FEP": null,
+          "SGP": null,
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "60",
+        "cableOuterDiameterMm": 15.5,
+        "cableCrossSectionMm2": 186,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": null,
+          "SGP": null,
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "100",
+        "cableOuterDiameterMm": 19,
+        "cableCrossSectionMm2": 284,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": null,
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": null,
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "150",
+        "cableOuterDiameterMm": 22,
+        "cableCrossSectionMm2": 380,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": null,
+          "SGP": null,
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "200",
+        "cableOuterDiameterMm": 26,
+        "cableCrossSectionMm2": 531,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": null,
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "250",
+        "cableOuterDiameterMm": 28,
+        "cableCrossSectionMm2": 616,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": null,
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "325",
+        "cableOuterDiameterMm": 31,
+        "cableCrossSectionMm2": 755,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": null,
+          "thickSteel": "54",
+          "PF": null,
+          "VE": null,
+          "FEP": null,
+          "SGP": null,
+          "F2": null
+        }
+      }
+    ],
+    "uncertainCells": [],
+    "voltageClass": "600V"
+  },
+  {
+    "cableType": "CV",
+    "coreConfig": "2C",
+    "sourcePrintedPage": "2",
+    "rows": [
+      {
+        "sizeLabel": "2",
+        "cableOuterDiameterMm": 10.5,
+        "cableCrossSectionMm2": 86.6,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "3.5",
+        "cableOuterDiameterMm": 11.5,
+        "cableCrossSectionMm2": 104,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "5.5",
+        "cableOuterDiameterMm": 13.5,
+        "cableCrossSectionMm2": 144,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "8",
+        "cableOuterDiameterMm": 14.5,
+        "cableCrossSectionMm2": 166,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "14",
+        "cableOuterDiameterMm": 16.5,
+        "cableCrossSectionMm2": 214,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": null,
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "22",
+        "cableOuterDiameterMm": 19.5,
+        "cableCrossSectionMm2": 299,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "38",
+        "cableOuterDiameterMm": 24,
+        "cableCrossSectionMm2": 453,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": null,
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "60",
+        "cableOuterDiameterMm": 29,
+        "cableCrossSectionMm2": 661,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": null,
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "100",
+        "cableOuterDiameterMm": 37,
+        "cableCrossSectionMm2": 1075,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "50",
+          "SGP": "65A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "150",
+        "cableOuterDiameterMm": 43,
+        "cableCrossSectionMm2": 1452,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": null,
+          "PF": null,
+          "VE": null,
+          "FEP": "80",
+          "SGP": null,
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "200",
+        "cableOuterDiameterMm": 50,
+        "cableCrossSectionMm2": 1963,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "82",
+          "PF": null,
+          "VE": "82",
+          "FEP": null,
+          "SGP": "80A",
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "250",
+        "cableOuterDiameterMm": 54,
+        "cableCrossSectionMm2": 2290,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": null,
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "90A",
+          "F2": "83"
+        }
+      },
+      {
+        "sizeLabel": "325",
+        "cableOuterDiameterMm": 60,
+        "cableCrossSectionMm2": 2826,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "92",
+          "PF": null,
+          "VE": null,
+          "FEP": null,
+          "SGP": null,
+          "F2": "101"
+        }
+      }
+    ],
+    "uncertainCells": [
+      "coreConfig 2C row200(50,1963): FEP is null based on visible line before row150's merged FEP=80 block ended; if FEP=80 merge actually extends into row200 this should be '80' instead of null - low confidence on exact merge boundary.",
+      "coreConfig 2C row150(43,1452) FEP=80 and row250(54,2290) FEP=100: exact single-row vs multi-row merge span not fully re-verified with narrow crop (verified for FEP=30 rows1-6 and FEP=50 rows7-9 only)."
+    ],
+    "voltageClass": "600V"
+  },
+  {
+    "cableType": "CV",
+    "coreConfig": "3C",
+    "sourcePrintedPage": "3",
+    "rows": [
+      {
+        "sizeLabel": "2",
+        "cableOuterDiameterMm": 11,
+        "cableCrossSectionMm2": 95,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "3.5",
+        "cableOuterDiameterMm": 12.5,
+        "cableCrossSectionMm2": 123,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "5.5",
+        "cableOuterDiameterMm": 14.5,
+        "cableCrossSectionMm2": 166,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "8",
+        "cableOuterDiameterMm": 15.5,
+        "cableCrossSectionMm2": 189,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "14",
+        "cableOuterDiameterMm": 17.5,
+        "cableCrossSectionMm2": 241,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "22",
+        "cableOuterDiameterMm": 21,
+        "cableCrossSectionMm2": 347,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "38",
+        "cableOuterDiameterMm": 25,
+        "cableCrossSectionMm2": 491,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "60",
+        "cableOuterDiameterMm": 31,
+        "cableCrossSectionMm2": 755,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "100",
+        "cableOuterDiameterMm": 40,
+        "cableCrossSectionMm2": 1256,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "150",
+        "cableOuterDiameterMm": 46,
+        "cableCrossSectionMm2": 1662,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "82",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "200",
+        "cableOuterDiameterMm": 54,
+        "cableCrossSectionMm2": 2290,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "82",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "90A",
+          "F2": "101"
+        }
+      },
+      {
+        "sizeLabel": "250",
+        "cableOuterDiameterMm": 58,
+        "cableCrossSectionMm2": 2640,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "92",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "90A",
+          "F2": "101"
+        }
+      },
+      {
+        "sizeLabel": "325",
+        "cableOuterDiameterMm": 65,
+        "cableCrossSectionMm2": 3317,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "104",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "100A",
+          "F2": "101"
+        }
+      }
+    ],
+    "uncertainCells": [],
+    "voltageClass": "600V"
+  },
+  {
+    "cableType": "CV",
+    "coreConfig": "4C",
+    "sourcePrintedPage": "4",
+    "rows": [
+      {
+        "sizeLabel": "2",
+        "cableOuterDiameterMm": 12,
+        "cableCrossSectionMm2": 114,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "3.5",
+        "cableOuterDiameterMm": 13.5,
+        "cableCrossSectionMm2": 144,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "5.5",
+        "cableOuterDiameterMm": 16,
+        "cableCrossSectionMm2": 201,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "8",
+        "cableOuterDiameterMm": 16.5,
+        "cableCrossSectionMm2": 214,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "14",
+        "cableOuterDiameterMm": 19,
+        "cableCrossSectionMm2": 284,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "22",
+        "cableOuterDiameterMm": 23,
+        "cableCrossSectionMm2": 416,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "40",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "38",
+        "cableOuterDiameterMm": 28,
+        "cableCrossSectionMm2": 616,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "54",
+          "FEP": "40",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "60",
+        "cableOuterDiameterMm": 35,
+        "cableCrossSectionMm2": 962,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "70",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "100",
+        "cableOuterDiameterMm": 44,
+        "cableCrossSectionMm2": 1520,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "150",
+        "cableOuterDiameterMm": 51,
+        "cableCrossSectionMm2": 2042,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "82",
+          "PF": null,
+          "VE": "82",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "83"
+        }
+      },
+      {
+        "sizeLabel": "200",
+        "cableOuterDiameterMm": 60,
+        "cableCrossSectionMm2": 2826,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "92",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "90A",
+          "F2": "101"
+        }
+      },
+      {
+        "sizeLabel": "250",
+        "cableOuterDiameterMm": 65,
+        "cableCrossSectionMm2": 3317,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "104",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "100A",
+          "F2": "101"
+        }
+      },
+      {
+        "sizeLabel": "325",
+        "cableOuterDiameterMm": 72,
+        "cableCrossSectionMm2": 4069,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": null,
+          "PF": null,
+          "VE": null,
+          "FEP": "125",
+          "SGP": "125A",
+          "F2": null
+        }
+      }
+    ],
+    "uncertainCells": [
+      "4C table FEP column row22-38 (merged group): printed value '50' is struck through by hand with '40' written below it as a correction; transcribed the corrected value '40'. Original struck value was '50'.",
+      "4C table FEP column row100-150 (merged group): printed value '65' is struck through by hand with '80' written below/beside it as a correction (diagonal connector line drawn from 65 to 80); transcribed the corrected value '80'. Original struck value was '65'.",
+      "4C table FEP column row60: value '50' appears as handwritten text (not typeset print) with no strikethrough; transcribed as '50' but flagging that it is handwritten rather than original print, in case it represents a later addition rather than an original table value."
+    ],
+    "voltageClass": "600V"
+  },
+  {
+    "cableType": "CV",
+    "coreConfig": "T",
+    "sourcePrintedPage": "5",
+    "rows": [
+      {
+        "sizeLabel": "8",
+        "cableOuterDiameterMm": 19,
+        "cableCrossSectionMm2": 284,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "14",
+        "cableOuterDiameterMm": 22,
+        "cableCrossSectionMm2": 380,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "22",
+        "cableOuterDiameterMm": 26,
+        "cableCrossSectionMm2": 531,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "38",
+        "cableOuterDiameterMm": 28,
+        "cableCrossSectionMm2": 616,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "60",
+        "cableOuterDiameterMm": 34,
+        "cableCrossSectionMm2": 908,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "70",
+          "FEP": "65",
+          "SGP": "50A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "100",
+        "cableOuterDiameterMm": 42,
+        "cableCrossSectionMm2": 1385,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "150",
+        "cableOuterDiameterMm": 48,
+        "cableCrossSectionMm2": 1809,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "82",
+          "PF": null,
+          "VE": "82",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "83"
+        }
+      },
+      {
+        "sizeLabel": "200",
+        "cableOuterDiameterMm": 55,
+        "cableCrossSectionMm2": 2375,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "92",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "90A",
+          "F2": "101"
+        }
+      },
+      {
+        "sizeLabel": "250",
+        "cableOuterDiameterMm": 60,
+        "cableCrossSectionMm2": 2826,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "92",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "90A",
+          "F2": "101"
+        }
+      },
+      {
+        "sizeLabel": "325",
+        "cableOuterDiameterMm": 66,
+        "cableCrossSectionMm2": 3420,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "104",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "100A",
+          "F2": "101"
+        }
+      }
+    ],
+    "uncertainCells": [
+      "CV-T (page 5) row size=60 (cableCrossSectionMm2=908), FEP column: printed value '65' has a hand-drawn diagonal strike/correction line running from it down to the merged '80' cell covering rows 100 and 150. Read as-is (65 for row 60, 80 merged across rows 100+150), which produces a monotonic sequence consistent with the rest of the table, but the hand annotation suggests this boundary may have been manually corrected on the original document — worth visually re-checking against the source if precision matters.",
+      "CV-T (page 5) row size=150 (cableCrossSectionMm2=1809), F2 column value '83': the digits appear handwritten (different stroke/font style than the surrounding machine-printed digits), not part of the original print. Recorded as shown but flagged for verification.",
+      "CV-T (page 5) row size=100 (cableCrossSectionMm2=1385), SGP column value '65A': a small handwritten '?' mark appears directly beneath this cell in the source scan, suggesting the document's preparer flagged uncertainty about this value. The printed value '65A' was recorded as-is."
+    ],
+    "voltageClass": "600V"
+  },
+  {
+    "cableType": "CV",
+    "coreConfig": "D",
+    "sourcePrintedPage": "6",
+    "rows": [
+      {
+        "sizeLabel": "8",
+        "cableOuterDiameterMm": 17,
+        "cableCrossSectionMm2": 227,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "14",
+        "cableOuterDiameterMm": 19,
+        "cableCrossSectionMm2": 284,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "22",
+        "cableOuterDiameterMm": 22,
+        "cableCrossSectionMm2": 380,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "38",
+        "cableOuterDiameterMm": 26,
+        "cableCrossSectionMm2": 531,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "60",
+        "cableOuterDiameterMm": 31,
+        "cableCrossSectionMm2": 755,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "100",
+        "cableOuterDiameterMm": 39,
+        "cableCrossSectionMm2": 1194,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "150",
+        "cableOuterDiameterMm": 44,
+        "cableCrossSectionMm2": 1520,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "200",
+        "cableOuterDiameterMm": 51,
+        "cableCrossSectionMm2": 2042,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "82",
+          "PF": null,
+          "VE": "82",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "83"
+        }
+      },
+      {
+        "sizeLabel": "250",
+        "cableOuterDiameterMm": 56,
+        "cableCrossSectionMm2": 2462,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "92",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "90A",
+          "F2": "101"
+        }
+      },
+      {
+        "sizeLabel": "325",
+        "cableOuterDiameterMm": 62,
+        "cableCrossSectionMm2": 3018,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "92",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "100A",
+          "F2": "101"
+        }
+      }
+    ],
+    "uncertainCells": [],
+    "voltageClass": "600V"
+  },
+  {
+    "cableType": "CV",
+    "coreConfig": "Q",
+    "sourcePrintedPage": "7",
+    "voltageClass": "600V",
+    "rows": [
+      {
+        "sizeLabel": "8",
+        "cableOuterDiameterMm": 18.5,
+        "cableCrossSectionMm2": 269,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "14",
+        "cableOuterDiameterMm": 21,
+        "cableCrossSectionMm2": 347,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": null,
+          "SGP": "40A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "22",
+        "cableOuterDiameterMm": 24,
+        "cableCrossSectionMm2": 453,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "38",
+        "cableOuterDiameterMm": 28,
+        "cableCrossSectionMm2": 616,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "60",
+        "cableOuterDiameterMm": 34,
+        "cableCrossSectionMm2": 908,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "70",
+          "FEP": "50",
+          "SGP": "65A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "100",
+        "cableOuterDiameterMm": 42,
+        "cableCrossSectionMm2": 1385,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "82",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "150",
+        "cableOuterDiameterMm": 48,
+        "cableCrossSectionMm2": 1809,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "82",
+          "PF": null,
+          "VE": "82",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "200",
+        "cableOuterDiameterMm": 55,
+        "cableCrossSectionMm2": 2375,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "92",
+          "PF": null,
+          "VE": null,
+          "FEP": "80",
+          "SGP": "90A",
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "250",
+        "cableOuterDiameterMm": 60,
+        "cableCrossSectionMm2": 2826,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "104",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "100A",
+          "F2": "101"
+        }
+      },
+      {
+        "sizeLabel": "325",
+        "cableOuterDiameterMm": 66,
+        "cableCrossSectionMm2": 3420,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "104",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "100A",
+          "F2": "101"
+        }
+      }
+    ],
+    "uncertainCells": [
+      "Table1 (CV-Q), CD管/PF column, row size=200 (cableCrossSectionMm2=2375): a small dashed/tick mark appears near the left border of this cell in the scan. Zoomed inspection (3x) shows it aligns with a broken/dashed vertical grid line artifact, not text, so it was read as null (part of the larger null merge spanning rows 22 through 325). Low confidence risk, but worth a human re-check against the original document if precision is critical."
+    ]
+  },
+  {
+    "cableType": "CV",
+    "coreConfig": "1C",
+    "sourcePrintedPage": "8",
+    "voltageClass": "6KV",
+    "rows": [
+      {
+        "sizeLabel": "8",
+        "cableOuterDiameterMm": 16.5,
+        "cableCrossSectionMm2": 214,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "14",
+        "cableOuterDiameterMm": 17.5,
+        "cableCrossSectionMm2": 241,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "22",
+        "cableOuterDiameterMm": 18.5,
+        "cableCrossSectionMm2": 269,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "38",
+        "cableOuterDiameterMm": 21,
+        "cableCrossSectionMm2": 347,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "60",
+        "cableOuterDiameterMm": 23,
+        "cableCrossSectionMm2": 416,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "100",
+        "cableOuterDiameterMm": 26,
+        "cableCrossSectionMm2": 531,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "150",
+        "cableOuterDiameterMm": 29,
+        "cableCrossSectionMm2": 661,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "200",
+        "cableOuterDiameterMm": 32,
+        "cableCrossSectionMm2": 804,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "250",
+        "cableOuterDiameterMm": 35,
+        "cableCrossSectionMm2": 962,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "50A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "325",
+        "cableOuterDiameterMm": 38,
+        "cableCrossSectionMm2": 1134,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "63"
+        }
+      }
+    ],
+    "uncertainCells": [
+      "Table2 (6KV CV1C), a faint dot/tick mark appears near the 薄鋼(thinSteel) column at row size=22 and near the crossSectionMm2 value '962' at row size=250. Zoomed inspection suggests these are scan noise/artifacts rather than data, and no column value was derived from them. Low confidence risk, but worth a human re-check against the original document if precision is critical."
+    ]
+  },
+  {
+    "cableType": "CV",
+    "coreConfig": "3C",
+    "voltageClass": "6KV",
+    "sourcePrintedPage": "9",
+    "rows": [
+      {
+        "sizeLabel": "8",
+        "cableOuterDiameterMm": 32,
+        "cableCrossSectionMm2": 804,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "14",
+        "cableOuterDiameterMm": 34,
+        "cableCrossSectionMm2": 908,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "50A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "22",
+        "cableOuterDiameterMm": 37,
+        "cableCrossSectionMm2": 1075,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "38",
+        "cableOuterDiameterMm": 41,
+        "cableCrossSectionMm2": 1320,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "60",
+        "cableOuterDiameterMm": 46,
+        "cableCrossSectionMm2": 1662,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "82",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "100",
+        "cableOuterDiameterMm": 52,
+        "cableCrossSectionMm2": 2123,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "82",
+          "PF": null,
+          "VE": null,
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "83"
+        }
+      },
+      {
+        "sizeLabel": "150",
+        "cableOuterDiameterMm": 58,
+        "cableCrossSectionMm2": 2641,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "92",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "90A",
+          "F2": "101"
+        }
+      },
+      {
+        "sizeLabel": "200",
+        "cableOuterDiameterMm": 66,
+        "cableCrossSectionMm2": 3420,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "104",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "100A",
+          "F2": "101"
+        }
+      },
+      {
+        "sizeLabel": "250",
+        "cableOuterDiameterMm": 71,
+        "cableCrossSectionMm2": 3958,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": null,
+          "PF": null,
+          "VE": null,
+          "FEP": "125",
+          "SGP": "125A",
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "325",
+        "cableOuterDiameterMm": 77,
+        "cableCrossSectionMm2": 4655,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": null,
+          "PF": null,
+          "VE": null,
+          "FEP": "125",
+          "SGP": "125A",
+          "F2": null
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "CV",
+    "coreConfig": "T",
+    "voltageClass": "6KV",
+    "sourcePrintedPage": "10",
+    "rows": [
+      {
+        "sizeLabel": "8",
+        "cableOuterDiameterMm": 36,
+        "cableCrossSectionMm2": 1018,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "14",
+        "cableOuterDiameterMm": 39,
+        "cableCrossSectionMm2": 1194,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "22",
+        "cableOuterDiameterMm": 42,
+        "cableCrossSectionMm2": 1385,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "38",
+        "cableOuterDiameterMm": 46,
+        "cableCrossSectionMm2": 1662,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "82",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "60",
+        "cableOuterDiameterMm": 50,
+        "cableCrossSectionMm2": 1963,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "82",
+          "PF": null,
+          "VE": "82",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "100",
+        "cableOuterDiameterMm": 57,
+        "cableCrossSectionMm2": 2551,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "92",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "90A",
+          "F2": "101"
+        }
+      },
+      {
+        "sizeLabel": "150",
+        "cableOuterDiameterMm": 65,
+        "cableCrossSectionMm2": 3317,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": "104",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "100A",
+          "F2": "101"
+        }
+      },
+      {
+        "sizeLabel": "200",
+        "cableOuterDiameterMm": 72,
+        "cableCrossSectionMm2": 4070,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": null,
+          "PF": null,
+          "VE": null,
+          "FEP": "125",
+          "SGP": "125A",
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "250",
+        "cableOuterDiameterMm": 76,
+        "cableCrossSectionMm2": 4535,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": null,
+          "PF": null,
+          "VE": null,
+          "FEP": "125",
+          "SGP": "125A",
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "325",
+        "cableOuterDiameterMm": 85,
+        "cableCrossSectionMm2": 5672,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": null,
+          "PF": null,
+          "VE": null,
+          "FEP": "150",
+          "SGP": "125A",
+          "F2": null
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "VVF",
+    "coreConfig": "600Vビニル絶縁ビニルシースケーブル(平形)",
+    "sourcePrintedPage": "11",
+    "rows": [
+      {
+        "sizeLabel": "1.6-2C",
+        "cableOuterDiameterMm": "6.2x9.4",
+        "cableCrossSectionMm2": 52.5,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": null,
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "1.6-3C",
+        "cableOuterDiameterMm": "6.2x13.0",
+        "cableCrossSectionMm2": 72.5,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "2.0-2C",
+        "cableOuterDiameterMm": "6.6x10.5",
+        "cableCrossSectionMm2": 62.4,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": null,
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "2.0-3C",
+        "cableOuterDiameterMm": "6.6x14.0",
+        "cableCrossSectionMm2": 83.2,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "2.6-2C",
+        "cableOuterDiameterMm": "7.6x12.5",
+        "cableCrossSectionMm2": 85.5,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "2.6-3C",
+        "cableOuterDiameterMm": "7.6x17.0",
+        "cableCrossSectionMm2": 117,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "3.2-2C",
+        "cableOuterDiameterMm": "8.6x14.5",
+        "cableCrossSectionMm2": 113,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "3.2-3C",
+        "cableOuterDiameterMm": "8.6x20.0",
+        "cableCrossSectionMm2": 155,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": null,
+          "SGP": null,
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "1.6-2Cx2",
+        "cableOuterDiameterMm": null,
+        "cableCrossSectionMm2": null,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": null,
+          "SGP": null,
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "1.6-2C+3C",
+        "cableOuterDiameterMm": null,
+        "cableCrossSectionMm2": null,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": null,
+          "SGP": null,
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "1.6-3Cx2",
+        "cableOuterDiameterMm": null,
+        "cableCrossSectionMm2": null,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "1.6-2Cx2+3C",
+        "cableOuterDiameterMm": null,
+        "cableCrossSectionMm2": null,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "1.6-3Cx2+2C",
+        "cableOuterDiameterMm": null,
+        "cableCrossSectionMm2": null,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "1.6-3Cx3",
+        "cableOuterDiameterMm": null,
+        "cableCrossSectionMm2": null,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "28",
+          "PF": null,
+          "VE": null,
+          "FEP": null,
+          "SGP": "32A",
+          "F2": "38"
+        }
+      }
+    ],
+    "uncertainCells": [
+      "1.6-2C行: ケーブル外径欄に印刷値「6.2x9.4」の下に手書きで「58.28」らしき数値が併記されているが、判読に自信が持てないため印刷値のみ採用し手書き注記は転記していない。",
+      "1.6-3C行: 同様にケーブル外径欄下に手書きで「80.6」または「90.6」らしき数値あり。印刷値のみ採用。",
+      "2.0-2C行: 同様に「69.3」らしき手書き数値あり。印刷値のみ採用。",
+      "2.0-3C行: 同様に「92.X」(末尾不鮮明、92.8等の可能性)の手書き数値あり。印刷値のみ採用。",
+      "1.6-3Cx2+2C行: ケーブル断面積欄が「24.8/116.56/359」という3段の手書き数値で覆われており、印刷値が判読不能なためnullとした。",
+      "1.6-3Cx3行のSGP欄は印刷が「3?A」のように不鮮明。他表の同一E39グループ(薄鋼39/厚鋼28/F2 38)のパターンから「32A」と推定した。"
+    ]
+  },
+  {
+    "cableType": "SV",
+    "coreConfig": "600V・SV 3C (丸形)",
+    "sourcePrintedPage": "13",
+    "rows": [
+      {
+        "sizeLabel": "2",
+        "cableOuterDiameterMm": 11,
+        "cableCrossSectionMm2": 95,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": null,
+          "thickSteel": null,
+          "PF": null,
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "3.5",
+        "cableOuterDiameterMm": 12.5,
+        "cableCrossSectionMm2": 123,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "5.5",
+        "cableOuterDiameterMm": 14.5,
+        "cableCrossSectionMm2": 166,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "8",
+        "cableOuterDiameterMm": 16,
+        "cableCrossSectionMm2": 201,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "14",
+        "cableOuterDiameterMm": 19,
+        "cableCrossSectionMm2": 284,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "22",
+        "cableOuterDiameterMm": 23,
+        "cableCrossSectionMm2": 416,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "38",
+        "cableOuterDiameterMm": 28,
+        "cableCrossSectionMm2": 616,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "60",
+        "cableOuterDiameterMm": 33,
+        "cableCrossSectionMm2": 855,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "100",
+        "cableOuterDiameterMm": 40,
+        "cableCrossSectionMm2": 1256,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "50",
+          "SGP": "65A",
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "150",
+        "cableOuterDiameterMm": 47,
+        "cableCrossSectionMm2": 1735,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "82",
+          "PF": null,
+          "VE": "82",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "200",
+        "cableOuterDiameterMm": 53,
+        "cableCrossSectionMm2": 2206,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "82",
+          "PF": null,
+          "VE": null,
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "83"
+        }
+      },
+      {
+        "sizeLabel": "250",
+        "cableOuterDiameterMm": 58,
+        "cableCrossSectionMm2": 2641,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "92",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "90A",
+          "F2": "101"
+        }
+      },
+      {
+        "sizeLabel": "325",
+        "cableOuterDiameterMm": 65,
+        "cableCrossSectionMm2": 3317,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "104",
+          "PF": null,
+          "VE": null,
+          "FEP": "100",
+          "SGP": "100A",
+          "F2": null
+        }
+      }
+    ],
+    "uncertainCells": [
+      "1行目(2mm2)は印刷上、薄鋼・厚鋼・CD管欄が空欄(E管とVE・F2のみ記載)。他表と異なるため注意。",
+      "VE欄は150(82)を最後に200/250/325行では空欄。VE管の実在最大呼び径を超えるための欠落と解釈しnullとした(単純な結合セルの続きではない可能性)。",
+      "CD管欄は8(28)を最後に以降すべて空欄。CD管の実在最大サイズ(28)を超えるための欠落と解釈。"
+    ]
+  },
+  {
+    "cableType": "CVV",
+    "coreConfig": "制御用ビニル絶縁ビニルシースケーブル 1.25mm2",
+    "sourcePrintedPage": "15",
+    "rows": [
+      {
+        "sizeLabel": "1.25-2C",
+        "cableOuterDiameterMm": 9.4,
+        "cableCrossSectionMm2": 69.4,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-3C",
+        "cableOuterDiameterMm": 9.9,
+        "cableCrossSectionMm2": 77.0,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-4C",
+        "cableOuterDiameterMm": 11,
+        "cableCrossSectionMm2": 95.0,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-5C",
+        "cableOuterDiameterMm": 11.5,
+        "cableCrossSectionMm2": 104,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-6C",
+        "cableOuterDiameterMm": 12.5,
+        "cableCrossSectionMm2": 123,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": null,
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-7C",
+        "cableOuterDiameterMm": 12.5,
+        "cableCrossSectionMm2": 123,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-8C",
+        "cableOuterDiameterMm": 13.5,
+        "cableCrossSectionMm2": 144,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-10C",
+        "cableOuterDiameterMm": 15.5,
+        "cableCrossSectionMm2": 189,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-12C",
+        "cableOuterDiameterMm": 16,
+        "cableCrossSectionMm2": 201,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-15C",
+        "cableOuterDiameterMm": 17,
+        "cableCrossSectionMm2": 227,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-20C",
+        "cableOuterDiameterMm": 19,
+        "cableCrossSectionMm2": 284,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-30C",
+        "cableOuterDiameterMm": 23,
+        "cableCrossSectionMm2": 416,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "CVV",
+    "coreConfig": "制御用ビニル絶縁ビニルシースケーブル 2mm2",
+    "sourcePrintedPage": "16",
+    "rows": [
+      {
+        "sizeLabel": "2-2C",
+        "cableOuterDiameterMm": 10.5,
+        "cableCrossSectionMm2": 86.6,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-3C",
+        "cableOuterDiameterMm": 11,
+        "cableCrossSectionMm2": 95.0,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-4C",
+        "cableOuterDiameterMm": 12,
+        "cableCrossSectionMm2": 114,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-5C",
+        "cableOuterDiameterMm": 13,
+        "cableCrossSectionMm2": 133,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-6C",
+        "cableOuterDiameterMm": 14,
+        "cableCrossSectionMm2": 154,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-7C",
+        "cableOuterDiameterMm": 14,
+        "cableCrossSectionMm2": 154,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-8C",
+        "cableOuterDiameterMm": 15,
+        "cableCrossSectionMm2": 177,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-10C",
+        "cableOuterDiameterMm": 17.5,
+        "cableCrossSectionMm2": 241,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-12C",
+        "cableOuterDiameterMm": 18,
+        "cableCrossSectionMm2": 255,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-15C",
+        "cableOuterDiameterMm": 19,
+        "cableCrossSectionMm2": 284,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-20C",
+        "cableOuterDiameterMm": 22,
+        "cableCrossSectionMm2": 380,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "25A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-30C",
+        "cableOuterDiameterMm": 26,
+        "cableCrossSectionMm2": 531,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "50"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "CVV",
+    "coreConfig": "制御用ビニル絶縁ビニルシースケーブル 3.5mm2",
+    "sourcePrintedPage": "17",
+    "rows": [
+      {
+        "sizeLabel": "3.5-2C",
+        "cableOuterDiameterMm": 11.5,
+        "cableCrossSectionMm2": 104,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "-3C",
+        "cableOuterDiameterMm": 12.5,
+        "cableCrossSectionMm2": 123,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "-4C",
+        "cableOuterDiameterMm": 13.5,
+        "cableCrossSectionMm2": 144,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": null,
+          "SGP": null,
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "-5C",
+        "cableOuterDiameterMm": 14.5,
+        "cableCrossSectionMm2": 166,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": null,
+          "SGP": null,
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "-6C",
+        "cableOuterDiameterMm": 15.5,
+        "cableCrossSectionMm2": 189,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-7C",
+        "cableOuterDiameterMm": 15.5,
+        "cableCrossSectionMm2": 189,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": null,
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-8C",
+        "cableOuterDiameterMm": 17,
+        "cableCrossSectionMm2": 227,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": null,
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-10C",
+        "cableOuterDiameterMm": 19.5,
+        "cableCrossSectionMm2": 299,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": null,
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-12C",
+        "cableOuterDiameterMm": 21,
+        "cableCrossSectionMm2": 347,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-15C",
+        "cableOuterDiameterMm": 22,
+        "cableCrossSectionMm2": 380,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-20C",
+        "cableOuterDiameterMm": 25,
+        "cableCrossSectionMm2": 491,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-30C",
+        "cableOuterDiameterMm": 30,
+        "cableCrossSectionMm2": 707,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "CVV",
+    "coreConfig": "制御用ビニル絶縁ビニルシースケーブル 5.5mm2",
+    "sourcePrintedPage": "18",
+    "rows": [
+      {
+        "sizeLabel": "5.5-2C",
+        "cableOuterDiameterMm": 13.5,
+        "cableCrossSectionMm2": 144,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": null,
+          "SGP": null,
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-3C",
+        "cableOuterDiameterMm": 14.5,
+        "cableCrossSectionMm2": 166,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": null,
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-4C",
+        "cableOuterDiameterMm": 16,
+        "cableCrossSectionMm2": 201,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-5C",
+        "cableOuterDiameterMm": 17,
+        "cableCrossSectionMm2": 227,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-6C",
+        "cableOuterDiameterMm": 18.5,
+        "cableCrossSectionMm2": 269,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-7C",
+        "cableOuterDiameterMm": 18.5,
+        "cableCrossSectionMm2": 269,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-8C",
+        "cableOuterDiameterMm": 21,
+        "cableCrossSectionMm2": 347,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-10C",
+        "cableOuterDiameterMm": 24,
+        "cableCrossSectionMm2": 453,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "42",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-12C",
+        "cableOuterDiameterMm": 25,
+        "cableCrossSectionMm2": 491,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-15C",
+        "cableOuterDiameterMm": 27,
+        "cableCrossSectionMm2": 573,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-20C",
+        "cableOuterDiameterMm": 31,
+        "cableCrossSectionMm2": 755,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-30C",
+        "cableOuterDiameterMm": null,
+        "cableCrossSectionMm2": null,
+        "conduit": {
+          "E": null,
+          "thinSteel": null,
+          "thickSteel": null,
+          "PF": null,
+          "VE": null,
+          "FEP": null,
+          "SGP": null,
+          "F2": null
+        }
+      }
+    ],
+    "uncertainCells": [
+      "-30C行は原本に数値が全く印刷されておらず、この表(5.5mm2)には規格が存在しないと判断してすべてnullとした。"
+    ]
+  },
+  {
+    "cableType": "FP",
+    "coreConfig": "耐火ケーブル F P 2C",
+    "sourcePrintedPage": "19",
+    "rows": [
+      {
+        "sizeLabel": "1.6",
+        "cableOuterDiameterMm": 12,
+        "cableCrossSectionMm2": 114,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": null,
+          "SGP": null,
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "2.0",
+        "cableOuterDiameterMm": 12.5,
+        "cableCrossSectionMm2": 123,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": null,
+          "SGP": null,
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "2",
+        "cableOuterDiameterMm": 12.5,
+        "cableCrossSectionMm2": 123,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "3.5",
+        "cableOuterDiameterMm": 13.5,
+        "cableCrossSectionMm2": 144,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "5.5",
+        "cableOuterDiameterMm": 15.5,
+        "cableCrossSectionMm2": 189,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "8",
+        "cableOuterDiameterMm": 16,
+        "cableCrossSectionMm2": 201,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "14",
+        "cableOuterDiameterMm": 18.5,
+        "cableCrossSectionMm2": 269,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "22",
+        "cableOuterDiameterMm": 22,
+        "cableCrossSectionMm2": 380,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "38",
+        "cableOuterDiameterMm": 26,
+        "cableCrossSectionMm2": 531,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "60",
+        "cableOuterDiameterMm": 31,
+        "cableCrossSectionMm2": 755,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "100",
+        "cableOuterDiameterMm": 39,
+        "cableCrossSectionMm2": 1194,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "50",
+          "SGP": "65A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "150",
+        "cableOuterDiameterMm": 45,
+        "cableCrossSectionMm2": 1590,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "82",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "200",
+        "cableOuterDiameterMm": 52,
+        "cableCrossSectionMm2": 2123,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "82",
+          "PF": null,
+          "VE": "82",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "83"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "FP",
+    "coreConfig": "耐火ケーブル F P 3C",
+    "sourcePrintedPage": "20",
+    "rows": [
+      {
+        "sizeLabel": "1.6",
+        "cableOuterDiameterMm": 12.5,
+        "cableCrossSectionMm2": 123,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": null,
+          "SGP": null,
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "2.0",
+        "cableOuterDiameterMm": 13.5,
+        "cableCrossSectionMm2": 144,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": null,
+          "SGP": null,
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "2",
+        "cableOuterDiameterMm": 13,
+        "cableCrossSectionMm2": 133,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "3.5",
+        "cableOuterDiameterMm": 14.5,
+        "cableCrossSectionMm2": 166,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "5.5",
+        "cableOuterDiameterMm": 16.5,
+        "cableCrossSectionMm2": 214,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "8",
+        "cableOuterDiameterMm": 17,
+        "cableCrossSectionMm2": 227,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "14",
+        "cableOuterDiameterMm": 19.5,
+        "cableCrossSectionMm2": 299,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "22",
+        "cableOuterDiameterMm": 23,
+        "cableCrossSectionMm2": 416,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "38",
+        "cableOuterDiameterMm": 27,
+        "cableCrossSectionMm2": 573,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "60",
+        "cableOuterDiameterMm": 33,
+        "cableCrossSectionMm2": 855,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "100",
+        "cableOuterDiameterMm": 42,
+        "cableCrossSectionMm2": 1385,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "150",
+        "cableOuterDiameterMm": 48,
+        "cableCrossSectionMm2": 1809,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "82",
+          "PF": null,
+          "VE": "82",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "200",
+        "cableOuterDiameterMm": 56,
+        "cableCrossSectionMm2": 2462,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "92",
+          "PF": null,
+          "VE": "82",
+          "FEP": "100",
+          "SGP": "90A",
+          "F2": "101"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "FP",
+    "coreConfig": "耐火ケーブル F P 4C",
+    "sourcePrintedPage": "21",
+    "rows": [
+      {
+        "sizeLabel": "1.6",
+        "cableOuterDiameterMm": 13.5,
+        "cableCrossSectionMm2": 144,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": null,
+          "SGP": null,
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "2.0",
+        "cableOuterDiameterMm": 14.5,
+        "cableCrossSectionMm2": 166,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": null,
+          "SGP": null,
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "2",
+        "cableOuterDiameterMm": 14,
+        "cableCrossSectionMm2": 154,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "3.5",
+        "cableOuterDiameterMm": 15.5,
+        "cableCrossSectionMm2": 189,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "5.5",
+        "cableOuterDiameterMm": 18,
+        "cableCrossSectionMm2": 255,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "8",
+        "cableOuterDiameterMm": 19,
+        "cableCrossSectionMm2": 284,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "14",
+        "cableOuterDiameterMm": 22,
+        "cableCrossSectionMm2": 380,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "22",
+        "cableOuterDiameterMm": 26,
+        "cableCrossSectionMm2": 531,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "38",
+        "cableOuterDiameterMm": 30,
+        "cableCrossSectionMm2": 707,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "60",
+        "cableOuterDiameterMm": 37,
+        "cableCrossSectionMm2": 1075,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "100",
+        "cableOuterDiameterMm": 47,
+        "cableCrossSectionMm2": 1735,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "82",
+          "PF": null,
+          "VE": "82",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "76"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "FP",
+    "coreConfig": "耐火ケーブル F P 多心",
+    "sourcePrintedPage": "22",
+    "rows": [
+      {
+        "sizeLabel": "1.2-2C",
+        "cableOuterDiameterMm": 11,
+        "cableCrossSectionMm2": 95,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-3C",
+        "cableOuterDiameterMm": 11.5,
+        "cableCrossSectionMm2": 104,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-4C",
+        "cableOuterDiameterMm": 12.5,
+        "cableCrossSectionMm2": 123,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-5C",
+        "cableOuterDiameterMm": 14.5,
+        "cableCrossSectionMm2": 166,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-6C",
+        "cableOuterDiameterMm": 15.5,
+        "cableCrossSectionMm2": 189,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-7C",
+        "cableOuterDiameterMm": 15.5,
+        "cableCrossSectionMm2": 189,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-8C",
+        "cableOuterDiameterMm": 17,
+        "cableCrossSectionMm2": 227,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-10C",
+        "cableOuterDiameterMm": 19,
+        "cableCrossSectionMm2": 284,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-12C",
+        "cableOuterDiameterMm": 21,
+        "cableCrossSectionMm2": 347,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-15C",
+        "cableOuterDiameterMm": 22,
+        "cableCrossSectionMm2": 380,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-20C",
+        "cableOuterDiameterMm": 25,
+        "cableCrossSectionMm2": 491,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-30C",
+        "cableOuterDiameterMm": 30,
+        "cableCrossSectionMm2": 707,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "HP",
+    "coreConfig": "耐熱ケーブル H P 0.9mm2芯線",
+    "sourcePrintedPage": "23",
+    "rows": [
+      {
+        "sizeLabel": "0.9-2C",
+        "cableOuterDiameterMm": 5.6,
+        "cableCrossSectionMm2": 24.7,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-3C",
+        "cableOuterDiameterMm": 5.9,
+        "cableCrossSectionMm2": 27.4,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-4C",
+        "cableOuterDiameterMm": 6.3,
+        "cableCrossSectionMm2": 31.2,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-3P",
+        "cableOuterDiameterMm": 8.5,
+        "cableCrossSectionMm2": 56.8,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-5P",
+        "cableOuterDiameterMm": 10.5,
+        "cableCrossSectionMm2": 86.6,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-7P",
+        "cableOuterDiameterMm": 11,
+        "cableCrossSectionMm2": 95.0,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-10P",
+        "cableOuterDiameterMm": 13,
+        "cableCrossSectionMm2": 133,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-15P",
+        "cableOuterDiameterMm": 15.5,
+        "cableCrossSectionMm2": 189,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-20P",
+        "cableOuterDiameterMm": 19,
+        "cableCrossSectionMm2": 284,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 22,
+        "cableCrossSectionMm2": 380,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-40P",
+        "cableOuterDiameterMm": 26,
+        "cableCrossSectionMm2": 531,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 28,
+        "cableCrossSectionMm2": 616,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "54",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 38,
+        "cableCrossSectionMm2": 1194,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "63"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "HP",
+    "coreConfig": "耐熱ケーブル H P 1.2mm2芯線",
+    "sourcePrintedPage": "24",
+    "rows": [
+      {
+        "sizeLabel": "1.2-2C",
+        "cableOuterDiameterMm": 6.2,
+        "cableCrossSectionMm2": 30.2,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-3C",
+        "cableOuterDiameterMm": 6.5,
+        "cableCrossSectionMm2": 33.2,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-4C",
+        "cableOuterDiameterMm": 7.0,
+        "cableCrossSectionMm2": 38.5,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-3P",
+        "cableOuterDiameterMm": 9.6,
+        "cableCrossSectionMm2": 72.4,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-5P",
+        "cableOuterDiameterMm": 12,
+        "cableCrossSectionMm2": 114,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-7P",
+        "cableOuterDiameterMm": 13,
+        "cableCrossSectionMm2": 133,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-10P",
+        "cableOuterDiameterMm": 15,
+        "cableCrossSectionMm2": 177,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-15P",
+        "cableOuterDiameterMm": 15.5,
+        "cableCrossSectionMm2": 189,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-20P",
+        "cableOuterDiameterMm": 19,
+        "cableCrossSectionMm2": 284,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 25,
+        "cableCrossSectionMm2": 491,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-40P",
+        "cableOuterDiameterMm": 30,
+        "cableCrossSectionMm2": 707,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 32,
+        "cableCrossSectionMm2": 804,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 44,
+        "cableCrossSectionMm2": 1520,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "100",
+          "SGP": "90A",
+          "F2": "76"
+        }
+      }
+    ],
+    "uncertainCells": [
+      "-10P行はCD管欄も薄鋼/厚鋼と同時に28へ更新される特殊なグルーピング(通常のE31グループの1行前で3列同時に上がる)。",
+      "-50P行で薄鋼のみ63(E63相当)へ先行し、厚鋼等はE51グループの値(42→54ではなく54を維持)のまま。印刷どおりに転記。",
+      "この表(1.2mm)にはE39グループが登場せず、E31→E51へ直接移行している(他のHP/AE表と異なる)。印刷どおり。"
+    ]
+  },
+  {
+    "cableType": "AE",
+    "coreConfig": "警報用ケーブル A E 0.65mm",
+    "sourcePrintedPage": "25",
+    "rows": [
+      {
+        "sizeLabel": "0.65-2C",
+        "cableOuterDiameterMm": "3.7x5.3",
+        "cableCrossSectionMm2": 22.1,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "-3C",
+        "cableOuterDiameterMm": "3.7x7.0",
+        "cableCrossSectionMm2": 38.5,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": null
+        }
+      },
+      {
+        "sizeLabel": "-4C",
+        "cableOuterDiameterMm": 4.5,
+        "cableCrossSectionMm2": 15.9,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-3P",
+        "cableOuterDiameterMm": 5.0,
+        "cableCrossSectionMm2": 19.7,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-5P",
+        "cableOuterDiameterMm": 8.0,
+        "cableCrossSectionMm2": 50.3,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-10P",
+        "cableOuterDiameterMm": 10,
+        "cableCrossSectionMm2": 78.5,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-15P",
+        "cableOuterDiameterMm": 12,
+        "cableCrossSectionMm2": 114,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-20P",
+        "cableOuterDiameterMm": 13,
+        "cableCrossSectionMm2": 133,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 15,
+        "cableCrossSectionMm2": 177,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 18,
+        "cableCrossSectionMm2": 255,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "30"
+        }
+      }
+    ],
+    "uncertainCells": [
+      "-4C行はケーブル断面積15.9mm2で-3C行(38.5mm2)より小さい。平形2C/3Cと丸形4C以降で構造が異なるためと思われるが、原本どおり転記した(単調増加でない箇所)。",
+      "-100P行はサイズ・数値とも印刷が空欄(この芯数では規格なし)。"
+    ]
+  },
+  {
+    "cableType": "AE",
+    "coreConfig": "警報用ケーブル A E 0.9mm",
+    "sourcePrintedPage": "26",
+    "rows": [
+      {
+        "sizeLabel": "0.9-2C",
+        "cableOuterDiameterMm": "3.5x5.0",
+        "cableCrossSectionMm2": 20.5,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-3C",
+        "cableOuterDiameterMm": 5.0,
+        "cableCrossSectionMm2": 19.7,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-4C",
+        "cableOuterDiameterMm": 5.5,
+        "cableCrossSectionMm2": 23.8,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-3P",
+        "cableOuterDiameterMm": 6.0,
+        "cableCrossSectionMm2": 28.3,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-5P",
+        "cableOuterDiameterMm": 9.0,
+        "cableCrossSectionMm2": 63.6,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-10P",
+        "cableOuterDiameterMm": 11,
+        "cableCrossSectionMm2": 95.0,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-15P",
+        "cableOuterDiameterMm": 13,
+        "cableCrossSectionMm2": 133,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-20P",
+        "cableOuterDiameterMm": 15,
+        "cableCrossSectionMm2": 177,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 18,
+        "cableCrossSectionMm2": 255,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 24,
+        "cableCrossSectionMm2": 453,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "38"
+        }
+      }
+    ],
+    "uncertainCells": [
+      "-3C行の断面積(19.7)は-2C(20.5)よりわずかに小さい。原本どおり転記。",
+      "-50P行はE51ラベルに対し厚鋼が36と、他表のE51標準値(42)より小さい。原本どおり転記(印字不鮮明ではなく明瞭に36)。",
+      "-100P行は空欄(規格なし)。"
+    ]
+  },
+  {
+    "cableType": "AE",
+    "coreConfig": "警報用ケーブル A E 1.2mm",
+    "sourcePrintedPage": "27",
+    "rows": [
+      {
+        "sizeLabel": "1.2-2C",
+        "cableOuterDiameterMm": "4.0x6.0",
+        "cableCrossSectionMm2": 28.1,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-3C",
+        "cableOuterDiameterMm": 6.0,
+        "cableCrossSectionMm2": 28.3,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-4C",
+        "cableOuterDiameterMm": 6.5,
+        "cableCrossSectionMm2": 33.2,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-3P",
+        "cableOuterDiameterMm": 7.5,
+        "cableCrossSectionMm2": 44.2,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-5P",
+        "cableOuterDiameterMm": 11,
+        "cableCrossSectionMm2": 95.0,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-10P",
+        "cableOuterDiameterMm": 15,
+        "cableCrossSectionMm2": 177,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-15P",
+        "cableOuterDiameterMm": 17,
+        "cableCrossSectionMm2": 227,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-20P",
+        "cableOuterDiameterMm": 21,
+        "cableCrossSectionMm2": 347,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 25,
+        "cableCrossSectionMm2": 491,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 30,
+        "cableCrossSectionMm2": 707,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "50"
+        }
+      }
+    ],
+    "uncertainCells": [
+      "この表(1.2mm)ではE25グループが-5P行のみで、-10Pから直ちにE31になる(他のAE表よりE25範囲が狭い)。原本どおり。",
+      "-100P行は空欄(規格なし)。"
+    ]
+  },
+  {
+    "cableType": "CPEV",
+    "coreConfig": "市内用ポリエチレン絶縁ビニルシースケーブル 0.65mm",
+    "sourcePrintedPage": "28",
+    "rows": [
+      {
+        "sizeLabel": "0.65-3P",
+        "cableOuterDiameterMm": 9.0,
+        "cableCrossSectionMm2": 63.6,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-5P",
+        "cableOuterDiameterMm": 10,
+        "cableCrossSectionMm2": 78.5,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-7P",
+        "cableOuterDiameterMm": 10,
+        "cableCrossSectionMm2": 78.5,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-10P",
+        "cableOuterDiameterMm": 12,
+        "cableCrossSectionMm2": 114,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-15P",
+        "cableOuterDiameterMm": 13,
+        "cableCrossSectionMm2": 133,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-20P",
+        "cableOuterDiameterMm": 15,
+        "cableCrossSectionMm2": 177,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-25P",
+        "cableOuterDiameterMm": 16,
+        "cableCrossSectionMm2": 201,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 17,
+        "cableCrossSectionMm2": 227,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 21,
+        "cableCrossSectionMm2": 347,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-75P",
+        "cableOuterDiameterMm": 26,
+        "cableCrossSectionMm2": 531,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "80",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 29,
+        "cableCrossSectionMm2": 661,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "54",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "50"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "CPEV",
+    "coreConfig": "市内用ポリエチレン絶縁ビニルシースケーブル 0.9mm",
+    "sourcePrintedPage": "29",
+    "rows": [
+      {
+        "sizeLabel": "0.9-3P",
+        "cableOuterDiameterMm": 10,
+        "cableCrossSectionMm2": 78.5,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-5P",
+        "cableOuterDiameterMm": 12,
+        "cableCrossSectionMm2": 114,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-7P",
+        "cableOuterDiameterMm": 13,
+        "cableCrossSectionMm2": 133,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-10P",
+        "cableOuterDiameterMm": 14,
+        "cableCrossSectionMm2": 154,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-15P",
+        "cableOuterDiameterMm": 17,
+        "cableCrossSectionMm2": 227,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-20P",
+        "cableOuterDiameterMm": 19,
+        "cableCrossSectionMm2": 284,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-25P",
+        "cableOuterDiameterMm": 21,
+        "cableCrossSectionMm2": 347,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 23,
+        "cableCrossSectionMm2": 416,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 28,
+        "cableCrossSectionMm2": 616,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "54",
+          "FEP": "50",
+          "SGP": "65A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-75P",
+        "cableOuterDiameterMm": 34,
+        "cableCrossSectionMm2": 908,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 39,
+        "cableCrossSectionMm2": 1194,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "63"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "CPEV",
+    "coreConfig": "市内用ポリエチレン絶縁ビニルシースケーブル 1.2mm",
+    "sourcePrintedPage": "30",
+    "rows": [
+      {
+        "sizeLabel": "1.2-3P",
+        "cableOuterDiameterMm": 12,
+        "cableCrossSectionMm2": 114,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-5P",
+        "cableOuterDiameterMm": 14,
+        "cableCrossSectionMm2": 154,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-7P",
+        "cableOuterDiameterMm": 15,
+        "cableCrossSectionMm2": 177,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-10P",
+        "cableOuterDiameterMm": 18,
+        "cableCrossSectionMm2": 255,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "40A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-15P",
+        "cableOuterDiameterMm": 21,
+        "cableCrossSectionMm2": 347,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-20P",
+        "cableOuterDiameterMm": 24,
+        "cableCrossSectionMm2": 453,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-25P",
+        "cableOuterDiameterMm": 26,
+        "cableCrossSectionMm2": 531,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 28,
+        "cableCrossSectionMm2": 616,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "54",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 36,
+        "cableCrossSectionMm2": 1018,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "63"
+        }
+      },
+      {
+        "sizeLabel": "-75P",
+        "cableOuterDiameterMm": 44,
+        "cableCrossSectionMm2": 1520,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "100",
+          "SGP": "90A",
+          "F2": "76"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 50,
+        "cableCrossSectionMm2": 1963,
+        "conduit": {
+          "E": "E75",
+          "thinSteel": "75",
+          "thickSteel": "82",
+          "PF": null,
+          "VE": "82",
+          "FEP": "100",
+          "SGP": "100A",
+          "F2": "76"
+        }
+      }
+    ],
+    "uncertainCells": [
+      "この表(1.2mm)にはE19グループが存在せず、最小サイズから直ちにE25となる。原本どおり。"
+    ]
+  },
+  {
+    "cableType": "PEV",
+    "coreConfig": "構内用ケーブル P E V 0.4mm",
+    "sourcePrintedPage": "31",
+    "rows": [
+      {
+        "sizeLabel": "0.4-10P",
+        "cableOuterDiameterMm": 8.0,
+        "cableCrossSectionMm2": 50.3,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-20P",
+        "cableOuterDiameterMm": 10,
+        "cableCrossSectionMm2": 78.5,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 11,
+        "cableCrossSectionMm2": 95.0,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 13.5,
+        "cableCrossSectionMm2": 144,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 17,
+        "cableCrossSectionMm2": 227,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-200P",
+        "cableOuterDiameterMm": 23,
+        "cableCrossSectionMm2": 416,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "38"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "PEV",
+    "coreConfig": "構内用ケーブル P E V 0.5mm",
+    "sourcePrintedPage": "31",
+    "rows": [
+      {
+        "sizeLabel": "0.5-10P",
+        "cableOuterDiameterMm": 9.0,
+        "cableCrossSectionMm2": 63.6,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": null,
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-20P",
+        "cableOuterDiameterMm": 11.5,
+        "cableCrossSectionMm2": 104,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 13,
+        "cableCrossSectionMm2": 133,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 15.5,
+        "cableCrossSectionMm2": 189,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 20.5,
+        "cableCrossSectionMm2": 330,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-200P",
+        "cableOuterDiameterMm": 28,
+        "cableCrossSectionMm2": 616,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "54",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "50"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "PEV",
+    "coreConfig": "構内用ケーブル P E V 0.65mm",
+    "sourcePrintedPage": "32",
+    "rows": [
+      {
+        "sizeLabel": "0.65-10P",
+        "cableOuterDiameterMm": 10.5,
+        "cableCrossSectionMm2": 86.6,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-20P",
+        "cableOuterDiameterMm": 14,
+        "cableCrossSectionMm2": 154,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 15,
+        "cableCrossSectionMm2": 177,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 18.5,
+        "cableCrossSectionMm2": 269,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "30"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "CCP",
+    "coreConfig": "市内CCPケーブル C C P 0.4mm",
+    "sourcePrintedPage": "33",
+    "rows": [
+      {
+        "sizeLabel": "0.4-10P",
+        "cableOuterDiameterMm": 8.5,
+        "cableCrossSectionMm2": 56.8,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 11.5,
+        "cableCrossSectionMm2": 104,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 14,
+        "cableCrossSectionMm2": 154,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 17,
+        "cableCrossSectionMm2": 227,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-200P",
+        "cableOuterDiameterMm": 23,
+        "cableCrossSectionMm2": 416,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "38"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "CCP",
+    "coreConfig": "市内CCPケーブル C C P 0.5mm",
+    "sourcePrintedPage": "33",
+    "rows": [
+      {
+        "sizeLabel": "0.5-10P",
+        "cableOuterDiameterMm": 9.5,
+        "cableCrossSectionMm2": 70.9,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 13.5,
+        "cableCrossSectionMm2": 144,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 16,
+        "cableCrossSectionMm2": 201,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 20.5,
+        "cableCrossSectionMm2": 330,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-200P",
+        "cableOuterDiameterMm": 28,
+        "cableCrossSectionMm2": 616,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "54",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "50"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "CCP",
+    "coreConfig": "市内CCPケーブル C C P 0.65mm",
+    "sourcePrintedPage": "34",
+    "rows": [
+      {
+        "sizeLabel": "0.65-10P",
+        "cableOuterDiameterMm": 11,
+        "cableCrossSectionMm2": 95.0,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 15.5,
+        "cableCrossSectionMm2": 189,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 19,
+        "cableCrossSectionMm2": 284,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 25.5,
+        "cableCrossSectionMm2": 511,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "80",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-200P",
+        "cableOuterDiameterMm": 34.5,
+        "cableCrossSectionMm2": 935,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "63"
+        }
+      }
+    ],
+    "uncertainCells": [
+      "0.65-10P行は「E19」ラベルに対し薄鋼が25(通常E25相当)という組合せで印刷されている。他のCCP/CCP-AP系0.5~0.9mm帯で複数回見られる現象で、誤植の可能性もあるが原本どおり転記した。"
+    ]
+  },
+  {
+    "cableType": "CCP",
+    "coreConfig": "市内CCPケーブル C C P 0.9mm",
+    "sourcePrintedPage": "34",
+    "rows": [
+      {
+        "sizeLabel": "0.9-10P",
+        "cableOuterDiameterMm": 13.5,
+        "cableCrossSectionMm2": 144,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 21,
+        "cableCrossSectionMm2": 347,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 26,
+        "cableCrossSectionMm2": 531,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "80",
+          "SGP": null,
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 34,
+        "cableCrossSectionMm2": 908,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "54",
+          "PF": null,
+          "VE": "70",
+          "FEP": null,
+          "SGP": "80A",
+          "F2": "63"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "CCP-AP",
+    "coreConfig": "市内CCP-APケーブル 0.4mm",
+    "sourcePrintedPage": "35",
+    "rows": [
+      {
+        "sizeLabel": "0.4-10P",
+        "cableOuterDiameterMm": 10,
+        "cableCrossSectionMm2": 78.5,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 13,
+        "cableCrossSectionMm2": 133,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 15,
+        "cableCrossSectionMm2": 177,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 18.5,
+        "cableCrossSectionMm2": 269,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-200P",
+        "cableOuterDiameterMm": 24,
+        "cableCrossSectionMm2": 453,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "38"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "CCP-AP",
+    "coreConfig": "市内CCP-APケーブル 0.5mm",
+    "sourcePrintedPage": "35",
+    "rows": [
+      {
+        "sizeLabel": "0.5-10P",
+        "cableOuterDiameterMm": 11,
+        "cableCrossSectionMm2": 95.0,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 15,
+        "cableCrossSectionMm2": 177,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 17,
+        "cableCrossSectionMm2": 227,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 22,
+        "cableCrossSectionMm2": 380,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-200P",
+        "cableOuterDiameterMm": 28.5,
+        "cableCrossSectionMm2": 638,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "54",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "50"
+        }
+      }
+    ],
+    "uncertainCells": [
+      "0.5-10P、-30P行は「E19」「E25」ラベルに対し薄鋼が25/31という、CCP0.65mm表と同様の1段ずれた組合せで印刷されている。原本どおり転記。"
+    ]
+  },
+  {
+    "cableType": "CCP-AP",
+    "coreConfig": "市内CCP-APケーブル 0.65mm",
+    "sourcePrintedPage": "36",
+    "rows": [
+      {
+        "sizeLabel": "0.65-10P",
+        "cableOuterDiameterMm": 12.5,
+        "cableCrossSectionMm2": 123,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 17,
+        "cableCrossSectionMm2": 227,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "50",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 20.5,
+        "cableCrossSectionMm2": 330,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 27,
+        "cableCrossSectionMm2": 573,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "54",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-200P",
+        "cableOuterDiameterMm": 36,
+        "cableCrossSectionMm2": 1018,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "63"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "CCP-AP",
+    "coreConfig": "市内CCP-APケーブル 0.9mm",
+    "sourcePrintedPage": "36",
+    "rows": [
+      {
+        "sizeLabel": "0.9-10P",
+        "cableOuterDiameterMm": 15,
+        "cableCrossSectionMm2": 177,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "-30P",
+        "cableOuterDiameterMm": 22,
+        "cableCrossSectionMm2": 380,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "-50P",
+        "cableOuterDiameterMm": 27,
+        "cableCrossSectionMm2": 573,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "54",
+          "FEP": "80",
+          "SGP": "65A",
+          "F2": "50"
+        }
+      },
+      {
+        "sizeLabel": "-100P",
+        "cableOuterDiameterMm": 36,
+        "cableCrossSectionMm2": 1018,
+        "conduit": {
+          "E": "E63",
+          "thinSteel": "63",
+          "thickSteel": "70",
+          "PF": null,
+          "VE": "70",
+          "FEP": "80",
+          "SGP": "80A",
+          "F2": "63"
+        }
+      }
+    ],
+    "uncertainCells": [
+      "0.9-10P行も「E25」ラベルに対し薄鋼31という1段ずれの組合せ。原本どおり転記。"
+    ]
+  },
+  {
+    "cableType": "ECX",
+    "coreConfig": "高周波同軸ケーブル ECX 3C-2V",
+    "sourcePrintedPage": "41-42",
+    "rows": [
+      {
+        "sizeLabel": "1本",
+        "cableOuterDiameterMm": 5.4,
+        "cableCrossSectionMm2": 22.9,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "2本",
+        "cableOuterDiameterMm": 5.4,
+        "cableCrossSectionMm2": 22.9,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "3本",
+        "cableOuterDiameterMm": 5.4,
+        "cableCrossSectionMm2": 22.9,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "ECX",
+    "coreConfig": "高周波同軸ケーブル ECX 5C-2V",
+    "sourcePrintedPage": "41-42",
+    "rows": [
+      {
+        "sizeLabel": "1本",
+        "cableOuterDiameterMm": 7.4,
+        "cableCrossSectionMm2": 43.0,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": null,
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "2本",
+        "cableOuterDiameterMm": 7.4,
+        "cableCrossSectionMm2": 43.0,
+        "conduit": {
+          "E": "E19",
+          "thinSteel": "19",
+          "thickSteel": "16",
+          "PF": "16",
+          "VE": "16",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "17"
+        }
+      },
+      {
+        "sizeLabel": "3本",
+        "cableOuterDiameterMm": 7.4,
+        "cableCrossSectionMm2": 43.0,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "ECX",
+    "coreConfig": "高周波同軸ケーブル ECX 7C-2V",
+    "sourcePrintedPage": "41-42",
+    "rows": [
+      {
+        "sizeLabel": "1本",
+        "cableOuterDiameterMm": 10.4,
+        "cableCrossSectionMm2": 84.9,
+        "conduit": {
+          "E": "E25",
+          "thinSteel": "25",
+          "thickSteel": "22",
+          "PF": "22",
+          "VE": "22",
+          "FEP": "30",
+          "SGP": "25A",
+          "F2": "24"
+        }
+      },
+      {
+        "sizeLabel": "2本",
+        "cableOuterDiameterMm": 10.4,
+        "cableCrossSectionMm2": 84.9,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "3本",
+        "cableOuterDiameterMm": 10.4,
+        "cableCrossSectionMm2": 84.9,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "38"
+        }
+      }
+    ],
+    "uncertainCells": []
+  },
+  {
+    "cableType": "ECX",
+    "coreConfig": "高周波同軸ケーブル ECX 10C-2V",
+    "sourcePrintedPage": "41-42",
+    "rows": [
+      {
+        "sizeLabel": "1本",
+        "cableOuterDiameterMm": 13.0,
+        "cableCrossSectionMm2": 133,
+        "conduit": {
+          "E": "E31",
+          "thinSteel": "31",
+          "thickSteel": "28",
+          "PF": "28",
+          "VE": "28",
+          "FEP": "30",
+          "SGP": "32A",
+          "F2": "30"
+        }
+      },
+      {
+        "sizeLabel": "2本",
+        "cableOuterDiameterMm": 13.0,
+        "cableCrossSectionMm2": 133,
+        "conduit": {
+          "E": "E39",
+          "thinSteel": "39",
+          "thickSteel": "36",
+          "PF": null,
+          "VE": "36",
+          "FEP": "50",
+          "SGP": "40A",
+          "F2": "38"
+        }
+      },
+      {
+        "sizeLabel": "3本",
+        "cableOuterDiameterMm": 13.0,
+        "cableCrossSectionMm2": 133,
+        "conduit": {
+          "E": "E51",
+          "thinSteel": "51",
+          "thickSteel": "42",
+          "PF": null,
+          "VE": "42",
+          "FEP": "50",
+          "SGP": "50A",
+          "F2": "50"
+        }
+      }
+    ],
+    "uncertainCells": [
+      "この表(ECX)は他の「本数×呼び径」ペア形式(EBT/TIV/TIVF/MVVS)と異なり、sizeLabelが『1本/2本/3本』(同一ケーブルの並設本数)を表す通常形式の表。conduitは他表と同じ1呼び径のみ。"
+    ]
+  }
+]
