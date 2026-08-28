@@ -13,6 +13,7 @@ import TomorrowScheduleForm from "./pages/TomorrowScheduleForm"
 import ScheduleManagement from "./pages/ScheduleManagement"
 import Billing from "./pages/Billing"
 import BillingForm from "./pages/BillingForm"
+import Customers from "./pages/Customers"
 import WorkSummary from "./pages/work-summary/WorkSummary"
 import MaterialCheck from "./pages/work-summary/MaterialCheck"
 import AdminChat from "./pages/AdminChat"
@@ -77,6 +78,7 @@ function App() {
               <Route path="billing" element={<Billing />} />
               <Route path="billing/new" element={<BillingForm />} />
               <Route path="billing/:id" element={<BillingForm />} />
+              <Route path="customers" element={<Customers />} />
               <Route path="work-summary" element={<WorkSummary />} />
               <Route path="work-summary/material-check" element={<MaterialCheck />} />
               <Route path="attendance" element={<WorkerAttendance />} />
