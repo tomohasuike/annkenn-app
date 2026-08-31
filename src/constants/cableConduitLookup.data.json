@@ -808,7 +808,7 @@
           "thinSteel": null,
           "thickSteel": null,
           "PF": null,
-          "VE": null,
+          "VE": "125",
           "FEP": "125",
           "SGP": "125A",
           "F2": null
@@ -1176,7 +1176,7 @@
           "PF": null,
           "VE": "36",
           "FEP": null,
-          "SGP": "40A",
+          "SGP": "32A",
           "F2": "38"
         }
       },
@@ -2570,7 +2570,7 @@
           "PF": null,
           "VE": "36",
           "FEP": "50",
-          "SGP": "25A",
+          "SGP": "32A",
           "F2": "38"
         }
       },
@@ -2680,7 +2680,7 @@
           "E": "E31",
           "thinSteel": "31",
           "thickSteel": "28",
-          "PF": null,
+          "PF": "28",
           "VE": "28",
           "FEP": "30",
           "SGP": "25A",
@@ -2695,7 +2695,7 @@
           "E": "E31",
           "thinSteel": "31",
           "thickSteel": "28",
-          "PF": null,
+          "PF": "28",
           "VE": "28",
           "FEP": "30",
           "SGP": "25A",
@@ -3856,7 +3856,7 @@
           "thinSteel": "31",
           "thickSteel": "28",
           "PF": "28",
-          "VE": "22",
+          "VE": "36",
           "FEP": "30",
           "SGP": "32A",
           "F2": "24"
@@ -4092,7 +4092,7 @@
           "VE": "42",
           "FEP": "50",
           "SGP": "50A",
-          "F2": "30"
+          "F2": "50"
         }
       },
       {
@@ -4819,8 +4819,8 @@
           "thickSteel": "16",
           "PF": "16",
           "VE": "16",
-          "FEP": null,
-          "SGP": null,
+          "FEP": "30",
+          "SGP": "25A",
           "F2": "17"
         }
       },
@@ -5265,8 +5265,8 @@
           "thickSteel": "16",
           "PF": "16",
           "VE": "16",
-          "FEP": null,
-          "SGP": null,
+          "FEP": "30",
+          "SGP": "25A",
           "F2": "17"
         }
       },
@@ -5363,7 +5363,7 @@
           "thickSteel": "16",
           "PF": "16",
           "VE": "16",
-          "FEP": null,
+          "FEP": "30",
           "SGP": "25A",
           "F2": "17"
         }
@@ -5431,7 +5431,7 @@
           "thickSteel": "16",
           "PF": "16",
           "VE": "16",
-          "FEP": null,
+          "FEP": "30",
           "SGP": "25A",
           "F2": "17"
         }
@@ -5713,7 +5713,7 @@
           "PF": null,
           "VE": "42",
           "FEP": "80",
-          "SGP": null,
+          "SGP": "50A",
           "F2": "50"
         }
       },
@@ -5727,7 +5727,7 @@
           "thickSteel": "54",
           "PF": null,
           "VE": "70",
-          "FEP": null,
+          "FEP": "80",
           "SGP": "80A",
           "F2": "63"
         }
@@ -5750,7 +5750,7 @@
           "thickSteel": "16",
           "PF": "16",
           "VE": "16",
-          "FEP": null,
+          "FEP": "30",
           "SGP": "25A",
           "F2": "17"
         }
@@ -5843,7 +5843,7 @@
         "cableOuterDiameterMm": 15,
         "cableCrossSectionMm2": 177,
         "conduit": {
-          "E": "E25",
+          "E": "E31",
           "thinSteel": "31",
           "thickSteel": "28",
           "PF": "28",
