@@ -38,6 +38,7 @@ import SiteDesignDashboard from "./pages/tools/SiteDesignDashboard"
 import PowerCalc from "./pages/tools/PowerCalc"
 import LightingCalc from "./pages/tools/LightingCalc"
 import ConduitFillCalc from "./pages/tools/ConduitFillCalc"
+import TrainingVideos from "./pages/tools/TrainingVideos"
 import { KensackEngine } from "./pages/KensackEngine"
 import TepcoForm from "./pages/tools/TepcoForm"
 
@@ -110,6 +111,9 @@ function App() {
 
               {/* ケーブル用配管早見表（独立ページ・案件選択不要） */}
               <Route path="conduit-fill-calc" element={<ConduitFillCalc />} />
+
+              {/* 作業手順動画（独立ページ・案件選択不要） */}
+              <Route path="training-videos" element={<TrainingVideos />} />
             </Route>
           </Route>
         </Routes>

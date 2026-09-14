@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase"
-import { Users, Truck, ShieldCheck, Loader2, Save, Plus, Trash2, Edit2, AlertTriangle, Settings as SettingsIcon, CheckCircle2 } from "lucide-react"
+import { Users, Truck, ShieldCheck, Loader2, Save, Plus, Trash2, Edit2, AlertTriangle, Settings as SettingsIcon, CheckCircle2, Video } from "lucide-react"
+import TrainingVideoSettings from "../components/settings/TrainingVideoSettings"
 
 // Types
 export interface WorkerMaster {
@@ -64,7 +65,7 @@ const FIELD_APPS = [
 const APPS = [...MANAGEMENT_APPS, ...FIELD_APPS]
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState<'users' | 'workers' | 'vehicles' | 'app-settings'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'workers' | 'vehicles' | 'app-settings' | 'training-videos'>('users')
   const [permissionTab, setPermissionTab] = useState<'management' | 'field'>('management')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -476,6 +477,13 @@ export default function Settings() {
             <SettingsIcon className="w-4 h-4" />
             安否確認設定
           </button>
+          <button 
+            className={`py-4 px-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors flex items-center gap-2 ${activeTab === 'training-videos' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30'}`}
+            onClick={() => setActiveTab('training-videos')}
+          >
+            <Video className="w-4 h-4" />
+            作業手順動画
+          </button>
         </div>
 
         <div className="p-6">
@@ -745,6 +753,9 @@ export default function Settings() {
                   </div>
               </div>
           )}
+
+          {/* TRAINING VIDEOS TAB */}
+          {activeTab === 'training-videos' && <TrainingVideoSettings />}
 
           {/* APP SETTINGS TAB */}
           {activeTab === 'app-settings' && (
