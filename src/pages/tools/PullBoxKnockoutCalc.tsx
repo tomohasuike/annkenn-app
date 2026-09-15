@@ -130,10 +130,10 @@ export default function PullBoxKnockoutCalc() {
     }`;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-16">
+    <div className="w-full max-w-6xl mx-auto space-y-6 pb-16 min-w-0">
       {/* ヘッダー */}
       <div className="flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <Target className="w-6 h-6 text-blue-500" />
             プルボックス穴あけ
