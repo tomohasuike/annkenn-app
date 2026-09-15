@@ -9,7 +9,7 @@
 // 自動配置は行わず「参考値・要問い合わせ」として穴一覧のみを出す。
 
 import { useMemo, useState } from 'react';
-import { Boxes, Plus, X, AlertTriangle, RotateCcw, Info } from 'lucide-react';
+import { Boxes, Plus, X, AlertTriangle, RotateCcw, Info, Download, Loader2 } from 'lucide-react';
 import {
   CONNECTOR_BRAND_LABELS,
   CONNECTOR_BRAND_ORDER,
@@ -31,7 +31,10 @@ import {
   summarizeOrder,
   type ConduitRun,
 } from '../../utils/handholeLayoutEngine';
+import { generateHandholeOrderDxf, downloadDxfText, HandholeDxfExportError } from '../../utils/handholeDxfExport';
 import HandholeDrawing from './HandholeDrawing';
+
+const KKE450_TEMPLATE_URL = '/handhole-templates/KKE450_B75.dxf';
 
 export default function HandholeKnockoutCalc() {
   const [width, setWidth] = useState<KkEWidth>(450);
@@ -40,6 +43,8 @@ export default function HandholeKnockoutCalc() {
   const [addBrand, setAddBrand] = useState<ConnectorBrand>('kkfit');
   const [addFep, setAddFep] = useState<FepSize>(50);
   const [addCount, setAddCount] = useState(1);
+  const [dxfBusy, setDxfBusy] = useState(false);
+  const [dxfError, setDxfError] = useState<string | null>(null);
 
   const area = useMemo(() => machinableAreaFor(width), [width]);
   const result = useMemo(() => computeHandholeLayout({ width, runs, gridMm }), [width, runs, gridMm]);
@@ -55,6 +60,29 @@ export default function HandholeKnockoutCalc() {
   };
   const removeRun = (i: number) => setRuns(prev => prev.filter((_, j) => j !== i));
   const reset = () => setRuns([]);
+
+  // 発注図面(DXF)ダウンロード可否。450サイズ(area非null)かつ配置済みの穴が1件以上あり、
+  // 未配置の穴が無い場合のみ許可する（穴が足りないまま発注してしまう事故を防ぐ）。
+  const canDownloadDxf = result.area != null && result.placedHoles.length > 0 && result.unplacedHoles.length === 0;
+
+  const downloadOrderDxf = async () => {
+    if (!canDownloadDxf) return;
+    setDxfBusy(true);
+    setDxfError(null);
+    try {
+      const res = await fetch(KKE450_TEMPLATE_URL);
+      if (!res.ok) {
+        throw new Error(`テンプレートDXFの取得に失敗しました（HTTP ${res.status}）。`);
+      }
+      const templateText = await res.text();
+      const dxfText = generateHandholeOrderDxf(templateText, result.placedHoles, width);
+      downloadDxfText(dxfText, `KKE${width}_B75_発注図面_${new Date().toISOString().slice(0, 10)}.dxf`);
+    } catch (e) {
+      setDxfError(e instanceof HandholeDxfExportError ? e.message : `発注図面の生成に失敗しました: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setDxfBusy(false);
+    }
+  };
 
   const chip = (active: boolean) =>
     `px-3 py-2.5 rounded-lg text-sm font-bold border transition-colors ${
@@ -232,6 +260,52 @@ export default function HandholeKnockoutCalc() {
               <span>{w.message}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 発注図面(DXF)ダウンロード */}
+      {totalHoles > 0 && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-4 space-y-3">
+          <label className="text-xs font-semibold text-slate-500 block">発注図面（DXF）</label>
+          {result.area == null ? (
+            <div className="flex items-start gap-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-3 text-xs text-slate-500">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>
+                このサイズ（{width}）は加工図面への自動書き込みに<span className="font-bold">未対応</span>です
+                （加工可能エリアの実寸がKK-E型450サイズ以外は未確認のため）。450サイズのみ対応しています。
+              </span>
+            </div>
+          ) : result.unplacedHoles.length > 0 ? (
+            <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-xs text-red-700 dark:text-red-300">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>
+                配置できなかった穴が{result.unplacedHoles.length}件あるため、発注図面はダウンロードできません。
+                本数を減らすか、サイズの大きいハンドホールを検討してから再度お試しください。
+              </span>
+            </div>
+          ) : null}
+          <button
+            onClick={downloadOrderDxf}
+            disabled={!canDownloadDxf || dxfBusy}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+              canDownloadDxf && !dxfBusy
+                ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
+            }`}
+          >
+            {dxfBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            発注図面をダウンロード(DXF)
+          </button>
+          {dxfError && (
+            <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-xs text-red-700 dark:text-red-300">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{dxfError}</span>
+            </div>
+          )}
+          <p className="text-[11px] text-slate-400">
+            北関東工業の空白発注図面（KKE450_B75.dxf・A面）に、配置済みの穴をCIRCLE・TEXTとして書き込みます。
+            既存の図面データは変更しません。B/C/D面は今回未対応です。
+          </p>
         </div>
       )}
 
