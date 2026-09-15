@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Outlet, NavLink, useNavigate } from "react-router-dom"
-import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature, Wrench, Bot, Thermometer, Zap, LogOut, Cable, Contact, Video } from "lucide-react"
+import { Settings, Menu, Bell, ClipboardList, LayoutDashboard, FileText, CheckSquare, CalendarClock, CalendarDays, PieChart, ShieldAlert, Truck, FileSignature, Wrench, Bot, Thermometer, Zap, LogOut, Cable, Contact, Video, Target } from "lucide-react"
 import { ThemeSwitcher } from "../ui/ThemeSwitcher"
 import logoImg from "../../assets/logo.png"
 import { supabase } from "../../lib/supabase"
@@ -158,6 +158,17 @@ export default function AppLayout() {
                     <>
                       <Cable className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
                       ケーブル用配管早見表
+                      {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
+                    </>
+                  )}
+                </NavLink>
+
+                {/* プルボックス穴あけ（独立ページ） */}
+                <NavLink to="/pullbox-knockout" className={getNavClass}>
+                  {({ isActive }) => (
+                    <>
+                      <Target className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'}`} />
+                      プルボックス穴あけ
                       {isActive && <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-r-md"></span>}
                     </>
                   )}
