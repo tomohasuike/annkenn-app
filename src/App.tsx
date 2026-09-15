@@ -39,6 +39,7 @@ import PowerCalc from "./pages/tools/PowerCalc"
 import LightingCalc from "./pages/tools/LightingCalc"
 import ConduitFillCalc from "./pages/tools/ConduitFillCalc"
 import PullBoxKnockoutCalc from "./pages/tools/PullBoxKnockoutCalc"
+import HandholeKnockoutCalc from "./pages/tools/HandholeKnockoutCalc"
 import TrainingVideos from "./pages/tools/TrainingVideos"
 import { KensackEngine } from "./pages/KensackEngine"
 import TepcoForm from "./pages/tools/TepcoForm"
@@ -115,6 +116,9 @@ function App() {
 
               {/* プルボックス穴あけ（独立ページ・案件選択不要） */}
               <Route path="pullbox-knockout" element={<PullBoxKnockoutCalc />} />
+
+              {/* ハンドホール穴あけ（独立ページ・案件選択不要） */}
+              <Route path="handhole-knockout" element={<HandholeKnockoutCalc />} />
 
               {/* 作業手順動画（独立ページ・案件選択不要） */}
               <Route path="training-videos" element={<TrainingVideos />} />
