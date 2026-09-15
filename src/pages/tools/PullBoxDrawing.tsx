@@ -248,7 +248,7 @@ export default function PullBoxDrawing({
                     <Line points={[MARGIN.left, py(tier.clipTopMm), MARGIN.left + drawW, py(tier.clipTopMm)]}
                       stroke={color} strokeWidth={1} dash={[3, 3]} opacity={0.55} />
                     <Text x={MARGIN.left + drawW - 96} y={py(tier.clipTopMm) - 12}
-                      text={`クリップ頂部 ${tier.clipTopMm}`} fontSize={9} fill={color} opacity={0.9} />
+                      text={`クリップ頂部 ${tier.clipTopMm}${tier.clipTopUncertain ? '?' : ''}`} fontSize={9} fill={color} opacity={0.9} />
                   </>
                 )}
 

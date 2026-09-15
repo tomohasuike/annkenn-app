@@ -69,7 +69,8 @@ export interface Hole {
   actualHoleMm: number;
   /** コネクタのおねじ外径(mm)。実際に通る最小径。 */
   threadOdMm: number;
-  clipModel: string;
+  /** null＝支持クリップのカタログ未確認（VE・PF/CD・プリカ管）。現場で選定する必要がある。 */
+  clipModel: string | null;
   /** その穴をホールソーで開けるかパンチャーで抜くか */
   drilling: DrillingMethod;
 }
@@ -82,6 +83,8 @@ export interface TierResult {
   ducterBottomMm: number;
   /** この段で一番高いクリップの頂部(mm)。次の段はここを基準に積む。 */
   clipTopMm: number;
+  /** trueなら、この段に支持クリップの高さが不明な管が混ざっている（clipTopMmはその分を見ていない下限値）。 */
+  clipTopUncertain: boolean;
   holes: Hole[];
   /** 左端から1本目の管の外面まで(mm)。管が無ければ null */
   leftClearanceMm: number | null;
@@ -202,13 +205,17 @@ export function computeLayout(input: LayoutInput): LayoutResult {
     const ducterTop = ducterBottom + ducterHeight;
 
     // ── 段内の管を検証しつつ寸法を集める ──────────────────
-    const valid: { conduit: ConduitRef; od: number; knock: number; thread: number; clip: { model: string; heightMm: number } }[] = [];
+    // clip（支持クリップ）だけは無くても穴は開けられるので、od/knock/threadと違い必須にしない。
+    // VE・PF/CD・プリカ(F2)は支持クリップのカタログを未確認（2026-09-15時点）で、clipSpec()がnullを返す。
+    const valid: {
+      conduit: ConduitRef; od: number; knock: number; thread: number;
+      clip: { model: string; heightMm: number } | null;
+    }[] = [];
     tier.pipes.forEach(c => {
       const od = outerDiameter(c);
       const knock = knockoutDiameter(c);
       const thread = connectorThreadDiameter(c);
-      const clip = clipSpec(c);
-      if (od == null || knock == null || thread == null || clip == null) {
+      if (od == null || knock == null || thread == null) {
         warnings.push({
           level: 'error',
           tierIndex: ti,
@@ -216,7 +223,7 @@ export function computeLayout(input: LayoutInput): LayoutResult {
         });
         return;
       }
-      valid.push({ conduit: c, od, knock, thread, clip });
+      valid.push({ conduit: c, od, knock, thread, clip: clipSpec(c) });
     });
 
     const ods = valid.map(v => v.od);
@@ -235,12 +242,27 @@ export function computeLayout(input: LayoutInput): LayoutResult {
         // ここを推奨ノック径のままにすると、図面どおりに開けた穴が指定と違う径になる。
         actualHoleMm: drilling.sawMm ?? v.knock,
         threadOdMm: v.thread,
-        clipModel: v.clip.model,
+        clipModel: v.clip?.model ?? null,
         drilling,
       };
     });
 
-    const clipTop = valid.length > 0 ? ducterTop + Math.max(...valid.map(v => v.clip.heightMm)) : ducterTop;
+    // クリップ高さが分からない管が混じっていたら、頂部は「その分を見ていない下限値」になる。
+    const hasUnknownClip = valid.some(v => v.clip == null);
+    const clipTop = valid.length > 0
+      ? ducterTop + Math.max(0, ...valid.filter(v => v.clip).map(v => v.clip!.heightMm))
+      : ducterTop;
+    if (hasUnknownClip) {
+      warnings.push({
+        level: 'warn',
+        tierIndex: ti,
+        message:
+          `${ti + 1}段目に支持クリップの型番・高さが分かっていない管があります` +
+          `（VE・PF/CD・プリカ管は支持クリップのカタログを未確認）。` +
+          `クリップ頂部 ${clipTop}mm はその管のぶんを見ていない下限値です。` +
+          `上に段を重ねる場合や蓋との干渉は必ず現場で確認してください。`,
+      });
+    }
 
     // ── あきを出す（警告の有無にかかわらず、常に数字で見せる） ──
     const gapsMm = holes.slice(0, -1).map(
@@ -254,7 +276,8 @@ export function computeLayout(input: LayoutInput): LayoutResult {
 
     results.push({
       ducter: tier.ducter, ducterTopMm: ducterTop, ducterBottomMm: ducterBottom,
-      clipTopMm: clipTop, holes, leftClearanceMm, rightClearanceMm, gapsMm,
+      clipTopMm: clipTop, clipTopUncertain: hasUnknownClip,
+      holes, leftClearanceMm, rightClearanceMm, gapsMm,
     });
     prevClipTop = clipTop;
 
@@ -334,7 +357,8 @@ export function summarizeParts(result: LayoutResult): {
   result.tiers.forEach(t =>
     t.holes.forEach(h => {
       k.set(h.actualHoleMm, (k.get(h.actualHoleMm) ?? 0) + 1);
-      c.set(h.clipModel, (c.get(h.clipModel) ?? 0) + 1);
+      const clipKey = h.clipModel ?? '（現場選定・カタログ未確認）';
+      c.set(clipKey, (c.get(clipKey) ?? 0) + 1);
       const isPunch = h.drilling.tool === 'パンチャー';
       const label = isPunch ? `パンチャー φ${h.actualHoleMm}` : `ホールソー φ${h.drilling.sawMm}`;
       const cur = tool.get(label);

@@ -7,11 +7,18 @@
 // 数値を触ったら必ずこれを通してから出すこと。
 // 根拠: hitec-ai-team/reports/プルボックス穴あけアプリ_計画_2026-09-15/
 import { computeLayout, summarizeParts } from './pullBoxLayoutEngine';
-import { outerDiameter, clipSpec, knockoutDiameter, connectorThreadDiameter, DUCTER_HEIGHT_MM, type ConduitRef } from '../constants/pullBoxKnockout';
+import {
+  outerDiameter, clipSpec, knockoutDiameter, connectorThreadDiameter, drillingMethod,
+  DUCTER_HEIGHT_MM, THREAD_SPEC, resolveThreadOption,
+  type ConduitRef, type ThreadSize,
+} from '../constants/pullBoxKnockout';
 
 const C = (size: number): ConduitRef => ({ kind: 'C', size });
 const G = (size: number): ConduitRef => ({ kind: 'G', size });
 const E = (size: number): ConduitRef => ({ kind: 'E', size });
+const VE = (size: number, variant?: string): ConduitRef => ({ kind: 'VE', size, variant });
+const PFCD = (size: number, variant?: string): ConduitRef => ({ kind: 'PFCD', size, variant });
+const F2 = (size: number, variant?: string): ConduitRef => ({ kind: 'F2', size, variant });
 let ng = 0;
 const eq = (name: string, got: number, want: number, tol = 0.001) => {
   const ok = Math.abs(got - want) <= tol;
@@ -149,6 +156,114 @@ console.log('\n■ 端寄せのとき、指定した「端のあき」がその�
 
 console.log('\n■ 拾い出し集計');
 console.log(' ', JSON.stringify(summarizeParts(t2)));
+
+console.log('\n■ ねじ呼び→穴径（THREAD_SPEC・VE/PF・CD/プリカ共通）とHITEC実績値表の突き合わせ');
+{
+  // HITEC実績値表そのもの（φ21・27・33の3本、それ以上はパンチャー）
+  const wantSaw: [ThreadSize, number][] = [['G1/2', 21], ['G3/4', 27], ['G1', 33]];
+  for (const [t, w] of wantSaw) eq(`THREAD_SPEC['${t}'].sawMm`, THREAD_SPEC[t].sawMm!, w);
+  for (const t of ['G1 1/4', 'G1 1/2', 'G2', 'G2 1/2', 'G3', 'G4'] as ThreadSize[]) {
+    const ok = THREAD_SPEC[t].sawMm === null;
+    if (!ok) ng++;
+    console.log(`  ${ok ? 'OK ' : 'NG '} ${t}: ホールソー非対応(パンチャー) sawMm=${THREAD_SPEC[t].sawMm}`);
+  }
+  // 新しい「ねじ呼び基準」のテーブルと、既存の鋼製管(G/C)側の実装が同じ結果になっているか
+  // （二重管理になった場合の食い違いに気づけるようにする再発防止テスト）
+  const crossChecks: [string, ThreadSize, ConduitRef][] = [
+    ['厚鋼G16', 'G1/2', G(16)], ['薄鋼C19', 'G1/2', C(19)],
+    ['厚鋼G22', 'G3/4', G(22)], ['薄鋼C25', 'G3/4', C(25)],
+    ['厚鋼G28', 'G1', G(28)], ['薄鋼C31', 'G1', C(31)],
+  ];
+  for (const [name, thread, ref] of crossChecks) {
+    const legacySaw = drillingMethod(ref, connectorThreadDiameter(ref)!).sawMm;
+    eq(`${name} のホールソー径 == THREAD_SPEC['${thread}']`, legacySaw!, THREAD_SPEC[thread].sawMm!);
+  }
+}
+
+console.log('\n■ VE・PF/CD・プリカ(F2) 追加分の芯高さ・穴径');
+{
+  // 芯高さ Y = ダクター高さ + 外径/2（既存の丸め規則と同じ）。外径は原本PDF照合済みの
+  // conduitSpecReference（VE・HIVE / CD管 / 2種金属可とう電線管(F2)）から。
+  const cases: [string, ConduitRef, number, number][] = [
+    // [表示名, 管, 期待する外径(mm), 期待するY(D1: 30+外径/2)]
+    ['VE14-S', VE(14, 'S'), 18, 39],
+    ['VE14-標準', VE(14, '標準'), 18, 39],
+    ['VE22', VE(22), 26, 43],
+    ['VE82', VE(82), 89, 74.5],
+    ['PF/CD14', PFCD(14), 19, 39.5],
+    ['PF/CD16-S', PFCD(16, 'S'), 21, 40.5],
+    ['PF/CD16-標準', PFCD(16, '標準'), 21, 40.5],
+    ['PF/CD22', PFCD(22), 27.5, 43.5],
+    ['BG17', F2(17, 'BG'), 21.5, 40.5],
+    ['BC76', F2(76, 'BC'), 82.9, 71.5],
+  ];
+  for (const [name, ref, wantOd, wantY] of cases) {
+    eq(`${name} 外径`, outerDiameter(ref)!, wantOd);
+    const r = computeLayout({ boxWidthMm: 600, boxHeightMm: 400, tiers: [{ ducter: 'D1', pipes: [ref] }], clearancesMm: [] });
+    eq(`${name} 芯高さY`, r.tiers[0].holes[0].y, wantY);
+  }
+
+  // 穴径：同じ呼び径でも接続方法でねじ呼びが変わり、穴径が変わることの確認
+  const holeCases: [string, ConduitRef, number][] = [
+    ['VE14-S → G1/2 → φ21', VE(14, 'S'), 21],
+    ['VE14-標準 → G3/4 → φ27', VE(14, '標準'), 27],
+    ['PF/CD16-S → G1/2 → φ21', PFCD(16, 'S'), 21],
+    ['PF/CD16-標準 → G3/4 → φ27', PFCD(16, '標準'), 27],
+    ['BG17 → G1/2 → φ21', F2(17, 'BG'), 21],
+    ['BG17-22 → G3/4 → φ27', F2(17, 'BG-22'), 27],
+    ['BC17 → G1/2 → φ21', F2(17, 'BC'), 21],
+    ['BG38 → G1 1/4 → パンチャー(φ43目安)', F2(38, 'BG'), 43],
+  ];
+  for (const [name, ref, wantHole] of holeCases) {
+    const thread = connectorThreadDiameter(ref);
+    const dm = drillingMethod(ref, thread!);
+    const actual = dm.sawMm ?? knockoutDiameter(ref);
+    eq(name, actual!, wantHole);
+  }
+
+  // 呼び径に複数の接続方法があるのにvariant未指定 → 解決できず「対応表に無い呼び径」扱いになること
+  {
+    const ambiguous = resolveThreadOption(PFCD(16));
+    const ok = ambiguous === null;
+    if (!ok) ng++;
+    console.log(`  ${ok ? 'OK ' : 'NG '} PF/CD16をvariant未指定で呼ぶと未解決になる: ${JSON.stringify(ambiguous)}`);
+
+    const r = computeLayout({ boxWidthMm: 400, boxHeightMm: 400, tiers: [{ ducter: 'D1', pipes: [PFCD(16)] }], clearancesMm: [] });
+    const hasError = r.warnings.some(w => w.level === 'error' && w.message.includes('対応表に無い呼び径'));
+    if (!hasError) ng++;
+    console.log(`  ${hasError ? 'OK ' : 'NG '} variant未指定のPF/CD16はエラー警告になる`);
+  }
+
+  // 支持クリップ: ネグロス電工カタログ2026/27A確認済み分（VE22等）はclipModelが埋まり、
+  // 頂部不明の警告は出ないこと（2026-09-15 クリップ表実装）
+  {
+    const r = computeLayout({ boxWidthMm: 400, boxHeightMm: 400, tiers: [{ ducter: 'D1', pipes: [VE(22)] }], clearancesMm: [] });
+    const okClip = r.tiers[0].holes[0].clipModel === 'DC25DC22';
+    if (!okClip) ng++;
+    console.log(`  ${okClip ? 'OK ' : 'NG '} VE22のclipModelはDC25DC22: ${r.tiers[0].holes[0].clipModel}`);
+    const okCertain = r.tiers[0].clipTopUncertain !== true;
+    if (!okCertain) ng++;
+    console.log(`  ${okCertain ? 'OK ' : 'NG '} VE22の段はclipTopUncertain=falseまたは未設定`);
+    const hasWarn = r.warnings.some(w => w.level === 'warn' && w.message.includes('支持クリップ'));
+    if (hasWarn) ng++;
+    console.log(`  ${!hasWarn ? 'OK ' : 'NG '} VE22は支持クリップ不明の警告が出ない`);
+  }
+
+  // 呼び径がクリップのラインナップ自体に無い場合（VE14）は、従来通りclipModelはnull、
+  // 頂部は「不明」の警告が出ること
+  {
+    const r = computeLayout({ boxWidthMm: 400, boxHeightMm: 400, tiers: [{ ducter: 'D1', pipes: [VE(14, 'S')] }], clearancesMm: [] });
+    const okClip = r.tiers[0].holes[0].clipModel === null;
+    if (!okClip) ng++;
+    console.log(`  ${okClip ? 'OK ' : 'NG '} VE14(ラインナップ外)のclipModelはnull: ${r.tiers[0].holes[0].clipModel}`);
+    const okUncertain = r.tiers[0].clipTopUncertain === true;
+    if (!okUncertain) ng++;
+    console.log(`  ${okUncertain ? 'OK ' : 'NG '} VE14の段はclipTopUncertain=true`);
+    const hasWarn = r.warnings.some(w => w.level === 'warn' && w.message.includes('支持クリップ'));
+    if (!hasWarn) ng++;
+    console.log(`  ${hasWarn ? 'OK ' : 'NG '} VE14は支持クリップ不明の警告が出る`);
+  }
+}
 
 console.log(`\n${ng === 0 ? '✅ 全件一致' : `❌ 不一致 ${ng} 件`}`);
 if (ng > 0) throw new Error(`プルボックス計算の検証に失敗: 不一致 ${ng} 件`);

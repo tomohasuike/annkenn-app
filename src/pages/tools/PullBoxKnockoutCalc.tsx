@@ -16,9 +16,11 @@ import {
   DUCTER_ORDER,
   SUPPORT_FROM_BOX_MAX_MM,
   conduitLabel,
+  threadOptionsFor,
   type ConduitKind,
   type ConduitRef,
   type DucterType,
+  type ThreadOption,
 } from '../../constants/pullBoxKnockout';
 import {
   computeLayout,
@@ -49,6 +51,8 @@ export default function PullBoxKnockoutCalc() {
   const [dimensionMode, setDimensionMode] = useState<DimensionMode>('cumulative');
   const [addKind, setAddKind] = useState<ConduitKind>('C');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  /** 同じ呼び径に複数の接続方法(ねじ呼び)があるとき、選ばせている最中の状態。 */
+  const [pendingVariant, setPendingVariant] = useState<{ ti: number; size: number } | null>(null);
 
   const result = useMemo(
     () => computeLayout({ boxWidthMm, boxHeightMm, tiers, clearancesMm, alignment, edgeGapMm }),
@@ -70,8 +74,25 @@ export default function PullBoxKnockoutCalc() {
   const setDucter = (ti: number, d: DucterType) =>
     setTiers(prev => prev.map((t, i) => (i === ti ? { ...t, ducter: d } : t)));
 
-  const addPipe = (ti: number, size: number) =>
-    setTiers(prev => prev.map((t, i) => (i === ti ? { ...t, pipes: [...t.pipes, { kind: addKind, size }] } : t)));
+  const addPipe = (ti: number, size: number, variant?: string) =>
+    setTiers(prev => prev.map((t, i) => (i === ti ? { ...t, pipes: [...t.pipes, { kind: addKind, size, variant }] } : t)));
+
+  /** 呼び径のボタンを押したとき。接続方法(ねじ呼び)が複数あれば選ばせてから足す。 */
+  const chooseSize = (ti: number, size: number) => {
+    const options = threadOptionsFor(addKind, size);
+    if (options.length > 1) {
+      setPendingVariant({ ti, size });
+      return;
+    }
+    addPipe(ti, size, options[0]?.variant);
+    setPendingVariant(null);
+  };
+
+  const chooseVariant = (opt: ThreadOption) => {
+    if (!pendingVariant) return;
+    addPipe(pendingVariant.ti, pendingVariant.size, opt.variant);
+    setPendingVariant(null);
+  };
 
   const removePipe = (ti: number, pi: number) => {
     setSelectedKey(null);
@@ -85,6 +106,7 @@ export default function PullBoxKnockoutCalc() {
 
   const removeTier = (ti: number) => {
     setSelectedKey(null);
+    setPendingVariant(null);
     setTiers(prev => prev.filter((_, i) => i !== ti));
     setClearancesMm(prev => prev.filter((_, i) => i !== Math.max(ti - 1, 0)));
   };
@@ -96,6 +118,7 @@ export default function PullBoxKnockoutCalc() {
     setTiers([{ ducter: 'D1', pipes: [] }]);
     setClearancesMm([]);
     setSelectedKey(null);
+    setPendingVariant(null);
   };
 
   // ── 画面 ──────────────────────────────────────────────
@@ -232,10 +255,14 @@ export default function PullBoxKnockoutCalc() {
             {/* 管を足す */}
             <div className="space-y-2 pt-1">
               <label className="text-xs font-semibold text-slate-500 block">配管を足す（左から順に並びます）</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                 {(Object.keys(CONDUIT_KIND_LABELS) as ConduitKind[]).map(k => (
-                  <button key={k} onClick={() => setAddKind(k)} className={chip(addKind === k) + ' !text-xs'}>
-                    {k} <span className="font-normal">{CONDUIT_KIND_LABELS[k]}</span>
+                  <button
+                    key={k}
+                    onClick={() => { setAddKind(k); setPendingVariant(null); }}
+                    className={chip(addKind === k) + ' !text-xs'}
+                  >
+                    {CONDUIT_KIND_LABELS[k]}
                   </button>
                 ))}
               </div>
@@ -243,13 +270,35 @@ export default function PullBoxKnockoutCalc() {
                 {CONDUIT_SIZES[addKind].map(s => (
                   <button
                     key={s}
-                    onClick={() => addPipe(ti, s)}
+                    onClick={() => chooseSize(ti, s)}
                     className="px-2 py-2.5 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-blue-400 hover:text-blue-600"
                   >
                     {s}
                   </button>
                 ))}
               </div>
+              {pendingVariant?.ti === ti && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-2.5">
+                  <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">
+                    呼び{pendingVariant.size}の接続方法を選んでください（現場で使う方）:
+                  </span>
+                  {threadOptionsFor(addKind, pendingVariant.size).map(opt => (
+                    <button
+                      key={opt.variant ?? opt.variantLabel}
+                      onClick={() => chooseVariant(opt)}
+                      className="px-3 py-1.5 rounded-lg text-sm font-bold border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+                    >
+                      {opt.variantLabel} <span className="font-normal opacity-70">（{opt.thread}）</span>
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setPendingVariant(null)}
+                    className="text-xs font-bold text-slate-400 hover:text-red-500 px-2"
+                  >
+                    やめる
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -316,7 +365,7 @@ export default function PullBoxKnockoutCalc() {
                   ['開け方', selected.drilling.tool === 'ホールソー'
                     ? `ホールソー φ${selected.drilling.sawMm}`
                     : 'パンチャー'],
-                  ['クリップ', selected.clipModel],
+                  ['クリップ', selected.clipModel ?? '（現場選定）'],
                 ].map(([k, v]) => (
                   <div key={k}>
                     <div className="text-[11px] text-blue-600 dark:text-blue-300">{k}</div>
@@ -413,7 +462,7 @@ export default function PullBoxKnockoutCalc() {
                         <td className="text-right tabular-nums text-slate-700 dark:text-slate-200">{h.x}</td>
                         <td className="text-right tabular-nums font-bold text-slate-800 dark:text-slate-100">{h.y}</td>
                         <td className="text-right tabular-nums font-bold text-slate-800 dark:text-slate-100">φ{h.actualHoleMm}</td>
-                        <td className="text-right text-[11px] text-slate-500">{h.clipModel}</td>
+                        <td className="text-right text-[11px] text-slate-500">{h.clipModel ?? '（現場選定）'}</td>
                       </tr>
                     )),
                   )}
@@ -480,6 +529,14 @@ export default function PullBoxKnockoutCalc() {
         </p>
         <p>
           支持点はボックスとの接続箇所から{SUPPORT_FROM_BOX_MAX_MM}mm以下に取ってください（内線規程 3110-7条3項〔注2〕・3110-4図）。
+        </p>
+        <p>
+          <span className="font-semibold">VE管・PF/CD管・プリカチューブ(F2)</span>も、
+          管の太さではなくボックスコネクタの<span className="font-semibold">ねじ呼び</span>で穴径が決まります。
+          同じ呼び径でも接続方法（Sタイプ／標準、BG／BC等）でねじ呼びが変わることがあるため、選択式にしています。
+          外径の出典が無い呼び径（VE呼び10・100、PF・CD呼び36以上）は今回は対象外です。
+          また、これらの管種は支持クリップのカタログを未確認のため、クリップ頂部の値は目安（下限）です。
+          段を重ねる場合や蓋との干渉は必ず現場で確認してください。
         </p>
       </div>
     </div>
