@@ -70,7 +70,14 @@ export default function HandholeDrawing({
       stageW: drawW + MARGIN.left + MARGIN.right,
       stageH: drawH + MARGIN.top + MARGIN.bottom,
       px: (mm: number) => MARGIN.left + (area.totalWidthMm - area.workableWidthMm) / 2 + mm * scale,
-      py: (mm: number) => MARGIN.top + drawH - mm * scale,
+      // ローカルy(加工可能エリア左下=0)を画面Yへ変換する。
+      // 【2026-09-16 修正】以前は `MARGIN.top + drawH - mm*scale` としており、これだと
+      // 下端除外帯(bottomExcludeMm)を無視して「エリア下端=面の絶対下端」として描画してしまい、
+      // 加工可能エリアの矩形・穴が実際より下端除外ぶん下にズレて表示されていた
+      // （上端に不要な空白ができ、下端は「加工不可」帯と重なって見えた。社長の実機報告で発覚）。
+      // 上端除外(topExcludeMm)ぶんフレーム上端から下げた位置を「エリア上端」の基準にすることで、
+      // エリアが上下の加工不可帯の間に正しく収まるようにする。
+      py: (mm: number) => MARGIN.top + (area.topExcludeMm + area.workableHeightMm - mm) * scale,
     };
   }, [area, wrapWidth]);
 
