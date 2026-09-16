@@ -134,6 +134,32 @@ export function minClearanceFor(brand: ConnectorBrand): number {
   return brand === 'holeonly' ? 30 : 10;
 }
 
+/**
+ * 【重要な限界】この10mm/30mmという離隔ルールは、あくまで北関東工業の資料が定める
+ * 「コネクター同士が机上で干渉しないための最小値」であり、実際に施工者が現場で
+ * 締め付け作業をするための工具スペースは考慮されていない（2026-09-16、社長ご指摘・
+ * サブエージェント調査で確認）。
+ *
+ * 根拠：KKフィット専用技術資料（KKfit_dedicated_brochure.pdf）注意事項に
+ * 「FEP管は手締めしてください。工具は使用しないでください。※サイズ100,125,150は
+ * 工具もご使用可能です。（工具を使用する場合は手締め後25°まで）」とあり、大径サイズは
+ * 手締めだけでは不十分で工具（ベルトレンチ等。北関東工業自身は工具名を明記していないが、
+ * 同じ用途の他社製品＝立基「PLジョイント/Stype」の施工要領書ではΦ125・Φ150で
+ * 「締め具（別売品）もしくはベルトレンチ」と明記されている）を使う運用が前提になっている。
+ * しかし北関東工業のどの資料にも「工具使用時に周囲へ追加で何mm空けるか」という定めは無い
+ * （drawing_howto.pdf・connector_list.pdfとも、サイズによらず離隔は一律10mmのまま）。
+ *
+ * つまり「メーカー資料通りに実装すると、大径コネクターの工具アクセス性までは保証できない」
+ * という、実装ではなく元資料側の限界。数値化された基準が無い以上、この関数で勝手に
+ * 補正値を追加することはしない（捏造にあたるため）。判断はツール側の`extraClearanceMm`
+ * オプション（handholeLayoutEngine.ts）でユーザー（現場を知る人間）に委ねる。
+ */
+export function likelyNeedsTightenToolFor(brand: ConnectorBrand, fep: FepSize): boolean {
+  // 確認が取れているのはKKフィットのFEP100以上のみ（上記コメント参照）。
+  // 他銘柄は北関東工業の資料に記載が無く「不明」であり、falseは「工具不要」を意味しない。
+  return brand === 'kkfit' && fep >= 100;
+}
+
 /** コネクター中心位置の丸め単位(mm)。現場運用は5mmまたは10mm刻み。既定は5mm。 */
 export const PLACEMENT_GRID_OPTIONS_MM = [5, 10] as const;
 export type PlacementGridMm = (typeof PLACEMENT_GRID_OPTIONS_MM)[number];

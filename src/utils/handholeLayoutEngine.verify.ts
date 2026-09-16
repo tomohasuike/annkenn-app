@@ -13,6 +13,7 @@ import {
   HOLE_DIAMETER_MM, holeDiameterFor, minClearanceFor, machinableAreasFor,
   HANDHOLE_FACE_ORDER, KKE_450_FACE_DXF_ORIGIN,
   KKE_OUTER_SPEC, CONNECTOR_OUTER_DIAMETER_MM, connectorOuterDiameterFor, footprintDiameterFor,
+  likelyNeedsTightenToolFor,
   type ConnectorBrand, type FepSize, type HandholeFace,
 } from '../constants/handholeKitakanto';
 
@@ -350,6 +351,51 @@ console.log('\n■ 発注仕様の集計（summarizeOrder）：面・段が違�
   ok_('kkfit FEP30が5本に合算される', kkfit30?.count === 5, `${kkfit30?.count}`);
   const nandemo50 = lines.find(l => l.brand === 'nandemo' && l.fepSize === 50);
   ok_('nandemo FEP50が1本', nandemo50?.count === 1);
+}
+
+console.log('\n■ likelyNeedsTightenToolFor: 確認できているのはkkfit FEP100以上のみ');
+{
+  ok_('kkfit FEP100は工具の可能性あり', likelyNeedsTightenToolFor('kkfit', 100) === true);
+  ok_('kkfit FEP150は工具の可能性あり', likelyNeedsTightenToolFor('kkfit', 150) === true);
+  ok_('kkfit FEP80は対象外', likelyNeedsTightenToolFor('kkfit', 80) === false);
+  ok_('nandemo FEP150は未確認のためfalse(=不要という意味ではない)', likelyNeedsTightenToolFor('nandemo', 150) === false);
+}
+
+console.log('\n■ 工具使用の可能性がある配管を含むと警告が出る（追加離隔0の時のみ）');
+{
+  const runs: ConduitRun[] = [{ face: 'B', row: 1, brand: 'kkfit', fepSize: 100, count: 1 }];
+  const r0 = computeHandholeLayout({ width: 450, runs, extraClearanceMm: 0 });
+  ok_('追加離隔0だと工具の警告が出る', r0.warnings.some(w => w.level === 'warn' && w.message.includes('工具')));
+  const r1 = computeHandholeLayout({ width: 450, runs, extraClearanceMm: 20 });
+  ok_('追加離隔を設定済みなら工具の警告は出ない', !r1.warnings.some(w => w.level === 'warn' && w.message.includes('工具')));
+}
+
+console.log('\n■ extraClearanceMm: メーカー規定の離隔に上乗せされ、ピッチ・段の積み上げ両方に反映される');
+{
+  const runs: ConduitRun[] = [
+    { face: 'B', row: 1, brand: 'kkfit', fepSize: 50, count: 2 },
+  ];
+  const base = computeHandholeLayout({ width: 450, runs, extraClearanceMm: 0 });
+  const extra = computeHandholeLayout({ width: 450, runs, extraClearanceMm: 20 });
+  const baseHoles = [...base.placedHoles].sort((a, b) => a.x - b.x);
+  const extraHoles = [...extra.placedHoles].sort((a, b) => a.x - b.x);
+  ok_('base: 2個配置できる', baseHoles.length === 2);
+  ok_('extra: 2個配置できる', extraHoles.length === 2);
+  const basePitch = baseHoles.length === 2 ? baseHoles[1].x - baseHoles[0].x : NaN;
+  const extraPitch = extraHoles.length === 2 ? extraHoles[1].x - extraHoles[0].x : NaN;
+  ok_('追加離隔20mmぶんピッチが広がる', extraPitch - basePitch >= 20, `base=${basePitch} extra=${extraPitch}`);
+
+  const runsRows: ConduitRun[] = [
+    { face: 'C', row: 1, brand: 'kkfit', fepSize: 50, count: 1 },
+    { face: 'C', row: 2, brand: 'kkfit', fepSize: 50, count: 1 },
+  ];
+  const baseRows = computeHandholeLayout({ width: 450, runs: runsRows, extraClearanceMm: 0 });
+  const extraRows = computeHandholeLayout({ width: 450, runs: runsRows, extraClearanceMm: 20 });
+  const baseFace = baseRows.faces.find(f => f.face === 'C');
+  const extraFace = extraRows.faces.find(f => f.face === 'C');
+  const baseBand2 = baseFace?.rows.find(r => r.row === 2)?.bandBottomMm ?? NaN;
+  const extraBand2 = extraFace?.rows.find(r => r.row === 2)?.bandBottomMm ?? NaN;
+  ok_('追加離隔20mmぶん2段目の下端も上がる', extraBand2 - baseBand2 >= 20, `base=${baseBand2} extra=${extraBand2}`);
 }
 
 console.log(`\n${ng === 0 ? '✅ 全件一致' : `❌ 不一致 ${ng} 件`}`);

@@ -58,6 +58,10 @@ const emptyFaceRows = (): FaceRowsState => ({ A: [{ runs: [] }], B: [], C: [], D
 export default function HandholeKnockoutCalc() {
   const [width, setWidth] = useState<KkEWidth>(450);
   const [gridMm, setGridMm] = useState<PlacementGridMm>(DEFAULT_PLACEMENT_GRID_MM);
+  // 工具（ベルトレンチ等）用の追加離隔(mm)。メーカー資料に数値の定めが無いため既定0=補正なし。
+  // 大径コネクターは手締めだけでなく工具が必要になる場合があり、その分の余裕を現場判断で
+  // 上乗せできるようにする（2026-09-16 社長ご指摘）。
+  const [extraClearanceMm, setExtraClearanceMm] = useState(0);
   const [faceRows, setFaceRows] = useState<FaceRowsState>(emptyFaceRows);
   const [addBrand, setAddBrand] = useState<ConnectorBrand>('kkfit');
   const [addFep, setAddFep] = useState<FepSize>(50);
@@ -83,7 +87,10 @@ export default function HandholeKnockoutCalc() {
     return out;
   }, [faceRows]);
 
-  const result = useMemo(() => computeHandholeLayout({ width, runs, gridMm }), [width, runs, gridMm]);
+  const result = useMemo(
+    () => computeHandholeLayout({ width, runs, gridMm, extraClearanceMm }),
+    [width, runs, gridMm, extraClearanceMm],
+  );
   const orderLines = useMemo(() => summarizeOrder(result), [result]);
   const totalHoles = result.requiredHoles.length;
 
@@ -375,6 +382,24 @@ export default function HandholeKnockoutCalc() {
         </div>
       </div>
 
+      {/* 工具用の追加離隔 */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-4 space-y-2">
+        <label className="text-xs font-semibold text-slate-500 block">工具用の追加離隔（mm、既定0）</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="number" inputMode="numeric" min={0} value={extraClearanceMm}
+            onChange={e => setExtraClearanceMm(Math.max(Number(e.target.value) || 0, 0))}
+            className="w-24 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold"
+          />
+          <span className="text-xs text-slate-400">mm（メーカー規定の10mm/30mmに上乗せ）</span>
+        </div>
+        <p className="text-[11px] text-slate-400">
+          大径のコネクターは手締めでは締まらず、ベルトレンチ等の工具が必要になる場合があります。
+          工具を使うための追加スペースはメーカー資料に定めが無いため、既定値は0（メーカー規定通り）です。
+          現場の判断で必要な分をここで上乗せしてください。
+        </p>
+      </div>
+
       {/* 図（面ごとにタブ切り替え） */}
       {totalHoles > 0 && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-4 space-y-3">
@@ -576,6 +601,13 @@ export default function HandholeKnockoutCalc() {
         </p>
         <p>
           KK-R型・国交省型は今回未対応です（型だけ用意し、データは投入していません）。
+        </p>
+        <p>
+          <span className="font-semibold">離隔10mm/30mmは、あくまでコネクター同士が机上で干渉しないための最小値です。</span>
+          大径のコネクター（KKフィットの場合FEP100以上等）は、メーカー資料でも手締めでは不十分で
+          工具（ベルトレンチ等）を使う運用が前提になっていますが、工具を使うための追加スペースは
+          どのメーカー資料にも定めがありません。この計算には反映されていないため、該当する配管が
+          あるときは警告を出します。必要な余裕は上の「工具用の追加離隔」で現場判断により上乗せしてください。
         </p>
       </div>
     </div>

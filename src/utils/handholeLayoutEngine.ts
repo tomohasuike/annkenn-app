@@ -35,6 +35,7 @@ import {
   holeDiameterFor,
   footprintDiameterFor,
   minClearanceFor,
+  likelyNeedsTightenToolFor,
   machinableAreasFor,
   HANDHOLE_FACE_ORDER,
   FACE_LABELS,
@@ -63,6 +64,14 @@ export interface HandholeLayoutInput {
   runs: ConduitRun[];
   /** 中心位置の丸め単位(mm)。既定5mm。 */
   gridMm?: PlacementGridMm;
+  /**
+   * メーカー規定の離隔(10mm/30mm)に上乗せする、現場判断の追加マージン(mm)。既定0。
+   * 大径コネクターは締め付けにベルトレンチ等の工具が要る場合があり、その作業スペースは
+   * メーカー資料に定めが無い（likelyNeedsTightenToolForのコメント参照）。数値の根拠が
+   * 無い以上ツール側で勝手に補正しないため、必要な余裕は現場を知るユーザーがここで指定する。
+   * 横方向のピッチ・段と段の間の両方に同じ値を加える。
+   */
+  extraClearanceMm?: number;
 }
 
 /** 発注に必要な穴1つ分の仕様（配置前）。面・段はユーザーが選んだ通り、既に確定している。 */
@@ -199,7 +208,7 @@ interface RowXPlacement {
  * 離隔ルールがコネクター本体の外径基準であることが北関東工業の実物資料で確定したため
  * （2026-09-16）。穴自体の大きさ(diameterMm)は発注仕様の表示にのみ使う。
  */
-function layoutRowX(holes: RequiredHole[], gridMm: number): RowXPlacement[] {
+function layoutRowX(holes: RequiredHole[], gridMm: number, extraClearanceMm: number): RowXPlacement[] {
   const sorted = [...holes].sort((a, b) => b.footprintDiameterMm - a.footprintDiameterMm);
   const out: RowXPlacement[] = [];
   sorted.forEach((h, i) => {
@@ -208,7 +217,7 @@ function layoutRowX(holes: RequiredHole[], gridMm: number): RowXPlacement[] {
       centerX = ceilTo(h.footprintDiameterMm / 2, gridMm);
     } else {
       const prev = sorted[i - 1];
-      const gap = Math.max(h.clearanceMm, prev.clearanceMm);
+      const gap = Math.max(h.clearanceMm, prev.clearanceMm) + extraClearanceMm;
       const pitch = ceilTo((prev.footprintDiameterMm + h.footprintDiameterMm) / 2 + gap, gridMm);
       centerX = out[i - 1].x + pitch;
     }
@@ -247,6 +256,7 @@ function computeFaceLayout(
   area: MachinableArea,
   faceHoles: RequiredHole[],
   gridMm: number,
+  extraClearanceMm: number,
   warnings: LayoutWarning[],
 ): { rows: FaceRowResult[]; placedHoles: PlacedHole[] } {
   const rowNumbers = [...new Set(faceHoles.map(h => h.row))].sort((a, b) => a - b);
@@ -278,7 +288,7 @@ function computeFaceLayout(
       });
     }
 
-    const rowLayout = layoutRowX(rowHoles, gridMm);
+    const rowLayout = layoutRowX(rowHoles, gridMm, extraClearanceMm);
     const usedWidthMm = rowLayout.length > 0 ? Math.max(...rowLayout.map(r => r.rightEdge)) : 0;
     const overflow = rowLayout.find(r => r.rightEdge > area.workableWidthMm + 1e-9);
     if (overflow) {
@@ -315,19 +325,34 @@ function computeFaceLayout(
     placedHoles.push(...rowPlaced);
     rows.push({ row: rowNum, requiredHoles: rowHoles, placedHoles: rowPlaced, usedWidthMm, bandBottomMm, bandTopMm, fits });
 
-    rowBaseY = ceilTo(bandTopMm + rowMaxClearance, gridMm);
+    rowBaseY = ceilTo(bandTopMm + rowMaxClearance + extraClearanceMm, gridMm);
   }
 
   return { rows, placedHoles };
 }
 
 export function computeHandholeLayout(input: HandholeLayoutInput): HandholeLayoutResult {
-  const { width, runs, gridMm = DEFAULT_PLACEMENT_GRID_MM } = input;
+  const { width, runs, gridMm = DEFAULT_PLACEMENT_GRID_MM, extraClearanceMm = 0 } = input;
   const warnings: LayoutWarning[] = [];
   const requiredHoles = buildRequiredHoles(runs, warnings);
   const areasByFace = machinableAreasFor(width);
 
   pushUnconfirmedFaceWarnings(width, areasByFace, warnings);
+
+  // 大径コネクター（現状確認できているのはKKフィットFEP100以上）は、メーカー資料上も
+  // 手締めだけでなく工具（ベルトレンチ等）を使う運用が前提になっている。しかし北関東工業の
+  // どの資料にも工具使用時の追加離隔の定めが無いため、ツール側で数値を補正せず、
+  // 現場での確認を促す注意喚起にとどめる（likelyNeedsTightenToolForのコメント参照）。
+  if (requiredHoles.some(h => likelyNeedsTightenToolFor(h.brand, h.fepSize)) && extraClearanceMm === 0) {
+    warnings.push({
+      level: 'warn',
+      message:
+        '大径のコネクター（KKフィットFEP100以上等）が含まれています。メーカー資料でも手締めでは' +
+        '不十分で工具（ベルトレンチ等）を使う場合があるとされていますが、工具使用時に周囲へどれだけ' +
+        '追加でスペースが必要かはメーカー資料に定めが無く、この計算には反映されていません。' +
+        '現場で工具が使えるスペースがあるか確認するか、下の「工具用の追加離隔」を設定してください。',
+    });
+  }
 
   const faces: FaceLayoutResult[] = HANDHOLE_FACE_ORDER.map(face => {
     const area = areasByFace[face];
@@ -335,7 +360,7 @@ export function computeHandholeLayout(input: HandholeLayoutInput): HandholeLayou
     if (area == null) {
       return { face, area: null, rows: [], placedHoles: [] };
     }
-    const { rows, placedHoles } = computeFaceLayout(face, area, faceHoles, gridMm, warnings);
+    const { rows, placedHoles } = computeFaceLayout(face, area, faceHoles, gridMm, extraClearanceMm, warnings);
     return { face, area, rows, placedHoles };
   });
 
