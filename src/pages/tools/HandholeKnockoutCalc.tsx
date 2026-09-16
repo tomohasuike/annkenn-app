@@ -286,29 +286,33 @@ export default function HandholeKnockoutCalc() {
                 </button>
               </div>
 
-              {/* 入っている配管条件 */}
-              {row.runs.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {row.runs.map((r, ri) => (
-                    <button
-                      key={ri}
-                      onClick={() => removeRunFromRow(activeFace, rowIdx, ri)}
-                      className="group flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white dark:bg-slate-800 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-red-50 dark:hover:bg-red-900/30 border border-slate-200 dark:border-slate-700"
-                    >
-                      {CONNECTOR_BRAND_LABELS[r.brand]} FEP{r.fepSize} × {r.count}
-                      <X className="w-3.5 h-3.5 text-slate-400 group-hover:text-red-500" />
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* 入っている配管条件。ラッパーは常に描画し、中身だけ切り替える
+                  （空div→中身ありdivのように兄弟要素そのものが出たり消えたりすると、
+                  「使用幅」表示の出現と同時タイミングでReactのDOM差分計算が混乱し、
+                  本番ビルドで insertBefore の例外が起きたため、常設のラッパーに変更した。
+                  2026-09-16 実際にクラッシュを再現して確認済み）。 */}
+              <div className="flex flex-wrap gap-2 empty:hidden">
+                {row.runs.map((r, ri) => (
+                  <button
+                    key={`${r.brand}-${r.fepSize}-${ri}`}
+                    onClick={() => removeRunFromRow(activeFace, rowIdx, ri)}
+                    className="group flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white dark:bg-slate-800 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-red-50 dark:hover:bg-red-900/30 border border-slate-200 dark:border-slate-700"
+                  >
+                    {CONNECTOR_BRAND_LABELS[r.brand]} FEP{r.fepSize} × {r.count}
+                    <X className="w-3.5 h-3.5 text-slate-400 group-hover:text-red-500" />
+                  </button>
+                ))}
+              </div>
 
-              {/* 埋まり具合（面の実寸が確認できている場合のみ） */}
-              {activeFaceArea && rowResult && (
-                <p className={`text-[11px] ${rowResult.fits ? 'text-slate-400' : 'text-red-600 dark:text-red-400 font-bold'}`}>
-                  この段の使用幅: 約{Math.ceil(rowResult.usedWidthMm)}mm / 横幅{activeFaceArea.workableWidthMm}mm
-                  {!rowResult.fits && '（面に収まりません。下の警告を確認してください）'}
-                </p>
-              )}
+              {/* 埋まり具合（面の実寸が確認できている場合のみ）。同上の理由で常設ラッパー。 */}
+              <div className="empty:hidden">
+                {activeFaceArea && rowResult && (
+                  <p className={`text-[11px] ${rowResult.fits ? 'text-slate-400' : 'text-red-600 dark:text-red-400 font-bold'}`}>
+                    この段の使用幅: 約{Math.ceil(rowResult.usedWidthMm)}mm / 横幅{activeFaceArea.workableWidthMm}mm
+                    {!rowResult.fits && '（面に収まりません。下の警告を確認してください）'}
+                  </p>
+                )}
+              </div>
 
               {/* 配管条件を足す */}
               <div className="space-y-2 pt-1">
