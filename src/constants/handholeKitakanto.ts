@@ -121,14 +121,28 @@ export const KKE_OUTER_SPEC: Record<KkEWidth, KkEOuterSpec> = {
   2000: { outerMm: 2240, lidOpening: 'φ870/φ600', wallThicknessMm: 120 },
 };
 
+// ── 面（A/B/C/D） ─────────────────────────────────────────────
+//
+// 北関東工業のハンドホールは4面（A/B/C/D）に加工可能エリアがあり、発注時は配管条件に応じて
+// A面から順にB→C→D面へ穴を振り分けて考える必要がある（2026-09-15 社長ご指摘）。
+// 「※ABCD面及びステップの位置は変更出来ません。」（KKE450_B75.dxf タイトル注記より）。
+export type HandholeFace = 'A' | 'B' | 'C' | 'D';
+
+/** 面を振り分ける際の優先順（A面から詰めて、入りきらない分をB→C→D面へ）。 */
+export const HANDHOLE_FACE_ORDER: HandholeFace[] = ['A', 'B', 'C', 'D'];
+
+export const FACE_LABELS: Record<HandholeFace, 'A面' | 'B面' | 'C面' | 'D面'> = {
+  A: 'A面', B: 'B面', C: 'C面', D: 'D面',
+};
+
 // ── 加工可能エリア（発注時にコネクター図を配置できる範囲） ──────────────
 //
-// **確認できているのはKK-E型450（品名規格「450E-750」＝内空高さ750mm）のA面のみ。**
+// **確認できているのはKK-E型450（品名規格「450E-750」＝内空高さ750mm）のA/B/C/D全4面。**
 // それ以外のサイズ（600/800/900/1000/1200/1500/1800/2000）は加工可能エリアの実寸が未確認。
 // 450サイズの比率を他サイズへ流用・外挿することは行わない（サイズごとに比率が異なる可能性が
 // 高いため、それは捏造にあたる、と社長より厳命）。
 //
-// 450E-750のA面:
+// 450E-750のA面（最初に確認済みだった面）:
 //   全幅530mm中、加工可能エリア幅350mm（左右各90mmは加工不可）。
 //   高さは、DXF実物（KKE450_B75.dxf、2026-09-15にDXFプロトタイプ検証で解析）内に
 //   「加工可能エリア」として明示的に描画されている矩形そのものの寸法を直接採用：600mm。
@@ -142,11 +156,45 @@ export const KKE_OUTER_SPEC: Record<KkEWidth, KkEOuterSpec> = {
 //   誤って混同したものだった。DXFに直接描画された矩形（動かぬ証拠）で確認したところ600mmが正しく、
 //   360mmは誤りだったため訂正した。
 //
+// 450E-750のB/C/D面（2026-09-15、4面対応化にあたって追加調査）:
+//   KKE450_B75.dxf 1ファイルの中に、A面と全く同じ「加工可能エリア」矩形（レイヤーD-STR-STR5の
+//   LINE4本）が、シート上でB面・C面・D面それぞれの位置にも独立して描画されていることを確認した。
+//   各面の位置は、面ラベルMTEXT（'A'/'B'/'C'/'D'、レイヤーD-STR-TXT）が各矩形の直上に実在すること
+//   で直接裏取りした（推測ではない）。4面とも矩形の実寸は幅350mm×高さ600mmで完全に一致する
+//   （各面ごとに個別に実測した結果であり、A面の値を外挿したものではない）。
+//   さらに、A面の920mm寸法チェーンが紐付く外枠ジオメトリ（レイヤーD-STR、ステップ形状含む）も、
+//   B/C/D面の位置に同一形状のまま独立して描画されていることを確認した（B/D面はA面から
+//   X+1350mm、C/D面はA面からY-1237.5mmの位置に、寸法チェーンの数値注記こそ無いが同一形状の
+//   図形が存在する）。よって全高920mm・上端除外220mm・下端除外100mmという内訳も4面共通と
+//   判断できる（＝図面内で複製されている同一図形を機械的に確認したものであり、異なる製品規格間
+//   の比率流用とは性質が異なる）。
+//
+//   ⊗マーク（内部インサート。工場が「干渉しないように削孔」する避けるべき位置。KKE450_B75.dxf
+//   タイトル注記「※AC面にあるこのマークは外側にあるインサートです。このインサートで吊らないで
+//   ください。」より）は、A面とC面の加工可能エリア内（レイヤーD-STR-STR5の対角線2本）にのみ
+//   存在し、B面・D面には存在しないことを実測で確認済み（B/D面の同レイヤーには矩形4本のLINEしか
+//   無く、対角線が無いことを確認した）。位置はA面・C面とも加工可能エリア左下から
+//   ローカル座標(175, 274)、対角線の半分＝22.5mmを半径とする円で近似。
+//
 // 出典: 北関東工業 KK-E型ハンドホール 450E-750 加工図面（HP掲載）実物DXF解析
 //       （scratchpad: KKE450_B75.dxf、2026-09-15）。
+export interface FaceKeepOutZone {
+  /** UI表示用ラベル。 */
+  label: string;
+  /** 中心のローカル座標(mm)。加工可能エリア左下を原点とする。 */
+  xMm: number;
+  yMm: number;
+  /** 避けるべき半径(mm)。DXF実測（⊗マークの対角線の半分）。 */
+  radiusMm: number;
+  /** 出典・注記。 */
+  sourceNote: string;
+}
+
 export interface MachinableArea {
-  /** どの面のデータか（今回はA面のみ） */
-  faceLabel: string;
+  /** どの面のデータか。 */
+  face: HandholeFace;
+  /** UI表示用ラベル（'A面'等）。 */
+  faceLabel: 'A面' | 'B面' | 'C面' | 'D面';
   /** 面の全幅(mm) */
   totalWidthMm: number;
   /** 加工可能エリアの幅(mm) */
@@ -159,11 +207,35 @@ export interface MachinableArea {
   bottomExcludeMm: number;
   /** 加工可能エリアの高さ(mm)。totalHeightMm - topExcludeMm - bottomExcludeMm。 */
   workableHeightMm: number;
+  /** 避けるべき領域（⊗マーク＝内部インサート等）。無い面は空配列。 */
+  keepOutZones: FaceKeepOutZone[];
   /** 出典・注記。UIにそのまま出す。 */
   sourceNote: string;
 }
 
+const KKE_450_INSERT_MARK_SOURCE_NOTE =
+  '北関東工業 KK-E型ハンドホール 450E-750 加工図面DXF実物解析（2026-09-15）。' +
+  '⊗マーク（内部インサート）の対角線2本（レイヤーD-STR-STR5）を実測。' +
+  'タイトル注記「※AC面にあるこのマークは外側にあるインサートです。このインサートで吊らないでください。' +
+  '（干渉しないように削孔させていただきます。）」の裏付けあり。';
+
+function insertMarkZone(): FaceKeepOutZone {
+  return {
+    label: '⊗マーク（内部インサート）',
+    xMm: 175,
+    yMm: 274,
+    radiusMm: 22.5,
+    sourceNote: KKE_450_INSERT_MARK_SOURCE_NOTE,
+  };
+}
+
+const KKE_450_SOURCE_NOTE_COMMON =
+  '北関東工業 KK-E型ハンドホール 450E-750の加工図面DXF実物解析による実測値' +
+  '（2026-09-15、加工可能エリアの描画矩形そのものを各面ごとに直接測定。' +
+  '450以外のサイズ・450の別の深さ（-500/-1000等）は加工可能エリア未確認のため、この数値は流用しないこと。';
+
 const KKE_450_MACHINABLE_AREA_A: MachinableArea = {
+  face: 'A',
   faceLabel: 'A面',
   totalWidthMm: 530,
   workableWidthMm: 350,
@@ -171,16 +243,81 @@ const KKE_450_MACHINABLE_AREA_A: MachinableArea = {
   topExcludeMm: 100 + 120,
   bottomExcludeMm: 100,
   workableHeightMm: 920 - (100 + 120) - 100,
+  keepOutZones: [insertMarkZone()],
   sourceNote:
-    '北関東工業 KK-E型ハンドホール 450E-750の加工図面DXF実物解析による実測値' +
-    '（2026-09-15、加工可能エリアの描画矩形そのものを直接測定。訂正履歴あり、コード上部コメント参照）。' +
-    '450以外のサイズ・450の別の深さ（-500/-1000等）は加工可能エリア未確認のため、この数値は流用しないこと。',
+    KKE_450_SOURCE_NOTE_COMMON +
+    ' A面は加工可能エリア矩形に加え、920mm寸法チェーン（DIMENSIONエンティティ）も直接確認済み。訂正履歴ありコード上部コメント参照。',
+};
+
+const KKE_450_MACHINABLE_AREA_B: MachinableArea = {
+  face: 'B',
+  faceLabel: 'B面',
+  totalWidthMm: 530,
+  workableWidthMm: 350,
+  totalHeightMm: 920,
+  topExcludeMm: 100 + 120,
+  bottomExcludeMm: 100,
+  workableHeightMm: 600,
+  keepOutZones: [],
+  sourceNote:
+    KKE_450_SOURCE_NOTE_COMMON +
+    ' B面は加工可能エリア矩形(350×600mm)を直接測定。920mm寸法チェーンの数値注記(DIMENSION)はこの図面ではA面にしか描かれていないが、' +
+    '注記が紐付く外枠ジオメトリ自体がB面の位置にも同一形状で独立して描画されていることを確認済み。⊗マークは無し（実測で確認済み）。',
+};
+
+const KKE_450_MACHINABLE_AREA_C: MachinableArea = {
+  face: 'C',
+  faceLabel: 'C面',
+  totalWidthMm: 530,
+  workableWidthMm: 350,
+  totalHeightMm: 920,
+  topExcludeMm: 100 + 120,
+  bottomExcludeMm: 100,
+  workableHeightMm: 600,
+  keepOutZones: [insertMarkZone()],
+  sourceNote:
+    KKE_450_SOURCE_NOTE_COMMON +
+    ' C面は加工可能エリア矩形(350×600mm)を直接測定。920mm寸法チェーンの数値注記(DIMENSION)はこの図面ではA面にしか描かれていないが、' +
+    '注記が紐付く外枠ジオメトリ自体がC面の位置にも同一形状で独立して描画されていることを確認済み。⊗マークあり（A面と同じくローカル(175,274)に実測）。',
+};
+
+const KKE_450_MACHINABLE_AREA_D: MachinableArea = {
+  face: 'D',
+  faceLabel: 'D面',
+  totalWidthMm: 530,
+  workableWidthMm: 350,
+  totalHeightMm: 920,
+  topExcludeMm: 100 + 120,
+  bottomExcludeMm: 100,
+  workableHeightMm: 600,
+  keepOutZones: [],
+  sourceNote:
+    KKE_450_SOURCE_NOTE_COMMON +
+    ' D面は加工可能エリア矩形(350×600mm)を直接測定。920mm寸法チェーンの数値注記(DIMENSION)はこの図面ではA面にしか描かれていないが、' +
+    '注記が紐付く外枠ジオメトリ自体がD面の位置にも同一形状で独立して描画されていることを確認済み。⊗マークは無し（実測で確認済み）。',
 };
 
 /**
- * サイズごとの加工可能エリア（A面）。450以外はnull＝未確認。
+ * サイズ×面ごとの加工可能エリア。450以外はnull＝未確認。
  * 呼び出し側（計算エンジン・UI）は必ずnullを「未確認」として扱い、それらしい値で埋めないこと。
  */
-export function machinableAreaFor(width: KkEWidth): MachinableArea | null {
-  return width === 450 ? KKE_450_MACHINABLE_AREA_A : null;
+export function machinableAreasFor(width: KkEWidth): Record<HandholeFace, MachinableArea | null> {
+  if (width === 450) {
+    return { A: KKE_450_MACHINABLE_AREA_A, B: KKE_450_MACHINABLE_AREA_B, C: KKE_450_MACHINABLE_AREA_C, D: KKE_450_MACHINABLE_AREA_D };
+  }
+  return { A: null, B: null, C: null, D: null };
 }
+
+/**
+ * 各面の「加工可能エリア左下」を原点としたローカルmm座標から、KKE450_B75.dxf実物の
+ * 絶対座標へ変換するためのオフセット。DXF内のDIMENSIONエンティティ実測値・および
+ * D-STR-STR5レイヤーに実際に描画されている矩形の絶対座標から、面ごとに個別に確定した
+ * （A面はプロトタイプ検証で確定済み、B/C/D面は2026-09-15の4面対応調査で確定）。
+ * スケール1:1、回転・反転なし（4面とも同じ向き）。数値は実測値そのものなので変更しないこと。
+ */
+export const KKE_450_FACE_DXF_ORIGIN: Record<HandholeFace, { dxfOriginX: number; dxfOriginY: number }> = {
+  A: { dxfOriginX: 1995.959259451858, dxfOriginY: 1964.301545107644 },
+  B: { dxfOriginX: 3345.959259451859, dxfOriginY: 1964.301545107644 },
+  C: { dxfOriginX: 1995.959259451858, dxfOriginY: 726.8011701076509 },
+  D: { dxfOriginX: 3345.959259451859, dxfOriginY: 726.8011701076509 },
+};

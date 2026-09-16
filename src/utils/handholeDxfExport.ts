@@ -1,10 +1,10 @@
 // src/utils/handholeDxfExport.ts
 // ハンドホール穴あけ（北関東工業・発注仕様モード）: 計算済みの穴配置を、実物の北関東工業
-// 空白発注図面DXF（KK-E型450サイズ・450E-750・A面）へ書き込む純粋関数。
+// 空白発注図面DXF（KK-E型450サイズ・450E-750・A/B/C/D 4面）へ書き込む純粋関数。
 //
-// 対象は現時点でKK-E型450サイズ（`computeHandholeLayout()`の`area`が非nullを返すサイズ）のみ。
+// 対象は現時点でKK-E型450サイズ（`computeHandholeLayout()`の各面`area`が非nullを返すサイズ）のみ。
 // それ以外のサイズは加工可能エリアの実寸が未確認のため、この関数の対象外
-// （呼び出し側＝UIが、`result.area`がnullのサイズではこの関数を呼ばないこと）。
+// （呼び出し側＝UIが、対象面の`area`がnullのサイズではこの関数を呼ばないこと）。
 //
 // 【安全のための追記方式】
 // 既存のDXFエンティティ・レイヤーテーブル・スタイルテーブル等には一切触れない。
@@ -17,24 +17,24 @@
 //     参照しているモデル空間ブロックレコードのハンドル"1F"（実測・プロトタイプ検証で確認済み）
 // 新規エンティティのハンドル（グループコード5）は、実物ファイルの$HANDSEED（0x6443A）より
 // 十分大きい0x100000以降から採番し、既存ハンドルと衝突しないようにする。
+// 複数面にまたがる場合も、全部同じENTITIESセクションに追記するだけでよい（面ごとに
+// セクションを分ける必要はない。北関東工業の実物図面もA/B/C/D 4面をひとつのENTITIESセクション
+// 内に並べて描画しているため）。
 //
-// 【座標変換】（A面。プロトタイプ検証でDXF内のDIMENSIONエンティティの実測値から確定済み。
-// 数値は捏造・推測ではなく実測値そのものなので変更しないこと）
-//   DXF_X = local_x + 1995.959259451858
-//   DXF_Y = local_y + 1964.301545107644
-// スケール1:1、回転・反転なし。local_x/local_yは`computeHandholeLayout()`が`placedHoles`として
-// 返す「加工可能エリア左下を原点」とするmm座標。
+// 【座標変換】（面ごとに異なるオフセットを使う。DXF内のDIMENSIONエンティティ・
+// 実際に描画された矩形の実測値から面ごとに確定済み。数値は捏造・推測ではなく実測値そのものなので
+// 変更しないこと。詳細は src/constants/handholeKitakanto.ts の KKE_450_FACE_DXF_ORIGIN を参照）
+//   DXF_X = local_x + KKE_450_FACE_DXF_ORIGIN[face].dxfOriginX
+//   DXF_Y = local_y + KKE_450_FACE_DXF_ORIGIN[face].dxfOriginY
+// スケール1:1、回転・反転なし（4面とも同じ向き）。local_x/local_yは`computeHandholeLayout()`が
+// `placedHoles`として返す「その面の加工可能エリア左下を原点」とするmm座標。
 //
 // 検証: npx tsx でこの関数を実際に呼び出し、public/handhole-templates/KKE450_B75.dxfへ
 // 実際に書き込んだ結果をscratchpadへ出力、Python(ezdxf)で読み込み・レンダリングして
 // 目視確認済み（既存エンティティが変換前後で完全一致することもezdxfの属性比較で確認済み）。
 
-import { machinableAreaFor, type KkEWidth } from '../constants/handholeKitakanto';
+import { machinableAreasFor, KKE_450_FACE_DXF_ORIGIN, type KkEWidth } from '../constants/handholeKitakanto';
 import type { PlacedHole } from './handholeLayoutEngine';
-
-/** A面 加工可能エリア左下原点のDXF座標（実測値。変更禁止）。 */
-const ORIGIN_X = 1995.959259451858;
-const ORIGIN_Y = 1964.301545107644;
 
 /**
  * 新規エンティティのオーナーハンドル。KKE450_B75.dxf実物のENTITIESセクション内、
@@ -130,14 +130,15 @@ export function generateHandholeOrderDxf(
     throw new HandholeDxfExportError('配置された穴がありません。配管条件を追加してください。');
   }
 
-  const area = machinableAreaFor(width);
-  if (!area) {
-    // width===450なら本来ここには来ないはず（machinableAreaForの前提が変わっていない限り）。
-    throw new HandholeDxfExportError('加工可能エリアの実寸データが見つかりません。');
-  }
+  const areasByFace = machinableAreasFor(width);
 
   // 安全のための範囲チェック（呼び出し側がunplacedHolesを取り違えて渡した場合の事故防止）。
   for (const h of placedHoles) {
+    const area = areasByFace[h.face];
+    if (!area) {
+      // widthが450なら本来ここには来ないはず（machinableAreasForの前提が変わっていない限り）。
+      throw new HandholeDxfExportError(`${h.face}面の加工可能エリアの実寸データが見つかりません。`);
+    }
     const r = h.diameterMm / 2;
     const outOfRange =
       h.x - r < -1e-6 ||
@@ -146,7 +147,7 @@ export function generateHandholeOrderDxf(
       h.y + r > area.workableHeightMm + 1e-6;
     if (outOfRange) {
       throw new HandholeDxfExportError(
-        `穴「${h.label}」(x=${h.x}, y=${h.y}, φ${h.diameterMm})が加工可能エリア` +
+        `穴「${h.label}」(${area.faceLabel} x=${h.x}, y=${h.y}, φ${h.diameterMm})が加工可能エリア` +
           `（幅${area.workableWidthMm}×高さ${area.workableHeightMm}mm）をはみ出しています。発注図面への書き込みを中止しました。`,
       );
     }
@@ -174,8 +175,9 @@ export function generateHandholeOrderDxf(
 
   const chunks: string[] = [];
   for (const hole of placedHoles) {
-    const dxfX = ORIGIN_X + hole.x;
-    const dxfY = ORIGIN_Y + hole.y;
+    const origin = KKE_450_FACE_DXF_ORIGIN[hole.face];
+    const dxfX = origin.dxfOriginX + hole.x;
+    const dxfY = origin.dxfOriginY + hole.y;
     const radius = hole.diameterMm / 2;
 
     chunks.push(buildCircleEntity(nextHandle(), dxfX, dxfY, radius, eol));

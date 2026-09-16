@@ -1,22 +1,36 @@
 // src/pages/tools/HandholeDrawing.tsx
-// ハンドホール加工図（発注仕様の原寸イメージ）。
+// ハンドホール加工図（発注仕様の原寸イメージ）。1面ぶんを描画する。4面ある場合は
+// 呼び出し側（HandholeKnockoutCalc.tsx）がタブ等でこのコンポーネントを面ごとに切り替えて使う。
 //
 //   px = margin + mm * scale
 //   Y は下から上（原点＝加工可能エリアの左下）。画面座標とは上下が逆なので py() で反転する。
 //
 // プルボックスの加工図(PullBoxDrawing.tsx)と同じ考え方：実寸「比」で見た目が分かればよい。
 // 面の全体（totalWidth×totalHeight）を外枠として描き、その中に加工可能エリアを破線で示し、
-// 配置できた穴は塗り、配置できなかった穴は右側に「未配置」として別枠で並べる。
+// ⊗マーク等の避けるべき領域があれば斜線の円で示し、配置できた穴は塗って表示する。
+//
+// 段（2026-09-16追加）: rowsが渡されたら、各段の境界（bandBottomMm）に横の区切り線を引き、
+// 「N段目」ラベルを出す。横幅・高さ超過でその段が配置できなかった場合(fits=false)は
+// 区切り線とラベルを赤くして、どの段が問題かひと目で分かるようにする。
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stage, Layer, Rect, Circle, Line, Text, Group } from 'react-konva';
-import type { HandholeLayoutResult } from '../../utils/handholeLayoutEngine';
+import type { MachinableArea } from '../../constants/handholeKitakanto';
+import type { FaceRowResult, PlacedHole } from '../../utils/handholeLayoutEngine';
 
 const MARGIN = { top: 40, right: 24, bottom: 30, left: 60 };
 const MAX_DRAW_H = 420;
-const UNPLACED_COL_W = 150;
 
-export default function HandholeDrawing({ result }: { result: HandholeLayoutResult }) {
+export default function HandholeDrawing({
+  area,
+  placedHoles,
+  rows = [],
+}: {
+  area: MachinableArea | null;
+  placedHoles: PlacedHole[];
+  /** 段の区切り線を描くための段ごとの結果（省略時は区切り線を描かない）。 */
+  rows?: FaceRowResult[];
+}) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [wrapWidth, setWrapWidth] = useState(760);
   const [isDark, setIsDark] = useState(false);
@@ -42,38 +56,33 @@ export default function HandholeDrawing({ result }: { result: HandholeLayoutResu
   }, []);
 
   const c = isDark
-    ? { paper: '#0f172a', ink: '#e2e8f0', sub: '#94a3b8', line: '#475569', area: '#1e293b', hole: '#1e293b', unplaced: '#7f1d1d' }
-    : { paper: '#ffffff', ink: '#1e293b', sub: '#64748b', line: '#cbd5e1', area: '#eff6ff', hole: '#f8fafc', unplaced: '#fee2e2' };
-
-  const { area } = result;
+    ? { paper: '#0f172a', ink: '#e2e8f0', sub: '#94a3b8', line: '#475569', area: '#1e293b', hole: '#1e293b', keepout: '#7f1d1d' }
+    : { paper: '#ffffff', ink: '#1e293b', sub: '#64748b', line: '#cbd5e1', area: '#eff6ff', hole: '#f8fafc', keepout: '#fee2e2' };
 
   const geom = useMemo(() => {
     if (!area) return null;
-    const hasUnplaced = result.unplacedHoles.length > 0;
-    const extraRight = hasUnplaced ? UNPLACED_COL_W : 0;
-    const availW = Math.max(wrapWidth - MARGIN.left - MARGIN.right - extraRight, 120);
+    const availW = Math.max(wrapWidth - MARGIN.left - MARGIN.right, 120);
     const scale = Math.min(availW / area.totalWidthMm, MAX_DRAW_H / area.totalHeightMm);
     const drawW = area.totalWidthMm * scale;
     const drawH = area.totalHeightMm * scale;
     return {
       scale, drawW, drawH,
-      stageW: drawW + MARGIN.left + MARGIN.right + extraRight,
+      stageW: drawW + MARGIN.left + MARGIN.right,
       stageH: drawH + MARGIN.top + MARGIN.bottom,
       px: (mm: number) => MARGIN.left + (area.totalWidthMm - area.workableWidthMm) / 2 + mm * scale,
       py: (mm: number) => MARGIN.top + drawH - mm * scale,
-      extraRight,
     };
-  }, [area, wrapWidth, result.unplacedHoles.length]);
+  }, [area, wrapWidth]);
 
   if (!area || !geom) {
     return (
       <div className="rounded-xl border-2 border-dashed border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-6 text-center text-sm text-amber-800 dark:text-amber-300">
-        このサイズは加工可能エリアの実寸が未確認のため、図は作成できません。穴の一覧（参考値）のみ下に表示しています。
+        この面は加工可能エリアの実寸が未確認のため、図は作成できません。
       </div>
     );
   }
 
-  const { scale, drawW, drawH, stageW, stageH, px, py, extraRight } = geom;
+  const { scale, drawW, drawH, stageW, stageH, px, py } = geom;
   // 加工可能エリアの左下(area座標 0,0)の画面位置
   const areaLeftPx = px(0);
   const areaBottomPx = py(0);
@@ -105,8 +114,41 @@ export default function HandholeDrawing({ result }: { result: HandholeLayoutResu
             text={`加工可能エリア ${area.workableWidthMm}×${area.workableHeightMm}mm`}
             fontSize={10} fontStyle="bold" fill="#2563eb" />
 
+          {/* 避けるべき領域（⊗マーク＝内部インサート等） */}
+          {area.keepOutZones.map((z, i) => {
+            const zx = areaLeftPx + z.xMm * scale;
+            const zy = areaBottomPx - z.yMm * scale;
+            const zr = Math.max(z.radiusMm * scale, 3);
+            return (
+              <Group key={i}>
+                <Circle x={zx} y={zy} radius={zr} fill={c.keepout} opacity={0.5} stroke="#dc2626" strokeWidth={1.2} dash={[3, 2]} />
+                <Line points={[zx - zr * 0.7, zy - zr * 0.7, zx + zr * 0.7, zy + zr * 0.7]} stroke="#dc2626" strokeWidth={1.2} />
+                <Line points={[zx - zr * 0.7, zy + zr * 0.7, zx + zr * 0.7, zy - zr * 0.7]} stroke="#dc2626" strokeWidth={1.2} />
+                <Text x={zx - 50} y={zy + zr + 4} width={100} align="center" text={z.label} fontSize={8} fill="#dc2626" />
+              </Group>
+            );
+          })}
+
+          {/* 段の区切り線（1段目の下端＝加工可能エリアの下端は既に枠線で示されているので省く） */}
+          {rows.filter(r => r.bandBottomMm > 1e-6).map(r => {
+            const lineY = areaBottomPx - r.bandBottomMm * scale;
+            const col = r.fits ? '#2563eb' : '#dc2626';
+            return (
+              <Group key={`row-${r.row}`}>
+                <Line points={[areaLeftPx, lineY, areaLeftPx + areaWidthPx, lineY]}
+                  stroke={col} strokeWidth={1} dash={[5, 3]} opacity={0.65} />
+                <Text x={areaLeftPx + 4} y={lineY - 13} text={`${r.row}段目${r.fits ? '' : '（エラー）'}`}
+                  fontSize={9} fontStyle="bold" fill={col} />
+              </Group>
+            );
+          })}
+          {rows.length > 0 && (
+            <Text x={areaLeftPx + 4} y={areaBottomPx - 13}
+              text={`1段目`} fontSize={9} fontStyle="bold" fill={rows.find(r => r.row === 1)?.fits === false ? '#dc2626' : '#2563eb'} />
+          )}
+
           {/* 配置済みの穴 */}
-          {result.placedHoles.map(h => {
+          {placedHoles.map(h => {
             const cx = areaLeftPx + h.x * scale;
             const cy = areaBottomPx - h.y * scale;
             const r = Math.max((h.diameterMm / 2) * scale, 3);
@@ -118,22 +160,6 @@ export default function HandholeDrawing({ result }: { result: HandholeLayoutResu
               </Group>
             );
           })}
-
-          {/* 未配置の穴（エリア外・右側に別枠で並べて注意喚起） */}
-          {result.unplacedHoles.length > 0 && (
-            <Group>
-              <Rect x={MARGIN.left + drawW + 10} y={MARGIN.top} width={extraRight - 16} height={drawH} fill={c.unplaced} opacity={0.35} stroke="#dc2626" dash={[4, 3]} />
-              <Text x={MARGIN.left + drawW + 14} y={MARGIN.top + 4} width={extraRight - 24} text="未配置（収まりません）" fontSize={9} fontStyle="bold" fill="#dc2626" />
-              {result.unplacedHoles.slice(0, 14).map((h, i) => (
-                <Text key={h.id} x={MARGIN.left + drawW + 14} y={MARGIN.top + 22 + i * 16} width={extraRight - 24}
-                  text={`φ${h.diameterMm} ${h.label}`} fontSize={9} fill="#b91c1c" />
-              ))}
-              {result.unplacedHoles.length > 14 && (
-                <Text x={MARGIN.left + drawW + 14} y={MARGIN.top + 22 + 14 * 16} width={extraRight - 24}
-                  text={`他 ${result.unplacedHoles.length - 14}件`} fontSize={9} fontStyle="bold" fill="#b91c1c" />
-              )}
-            </Group>
-          )}
         </Layer>
       </Stage>
     </div>

@@ -4,36 +4,54 @@
 // プルボックスの計算（現場でホールソーを開ける位置を出す）とは目的が違う。こちらは
 // 「発注時にコネクター図を加工可能エリアのどこへ置くか」という発注仕様を組み立てる。
 //
-// 配置アルゴリズム（シェルフ＝棚詰め方式）:
-//   1. 穴を径の大きい順に並べる。
-//   2. 加工可能エリアの左下を原点(0,0)として、行（横並び）に入るだけ詰める。
-//      行内の中心間ピッチ = (径A+径B)/2 + 離隔 を「切り上げ」でグリッドに丸める。
-//      切り捨てると離隔が指定値を下回る恐れがあるため、必ず切り上げる
-//      （プルボックス計算エンジンの丸め方針と同じ考え方）。
-//   3. 1行に入りきらない穴は次の行へ。行の高さはその行の最大径で決め、次の行との間には
-//      その行の最大離隔ぶんの隙間を空ける。
-//   4. 加工可能エリアをはみ出す穴は配置せず、エラーとして返す（呼び出し側は必ず表示すること）。
+// 面・段の選び方（2026-09-16 社長ご指摘で「段」対応化）:
+//   以前は「A面がいっぱいになったら自動でB面へ、C面へ…」という完全自動振り分けだったが、
+//   「FEP100なら何段詰まるかを見せて、上段/中段/下段のどこに置くかを選べるようにしたい」という
+//   要望を受け、面（A/B/C/D）に加えて面の中の「段」もユーザーが明示的に選ぶ方式に変更した。
+//   配管条件(ConduitRun)は必ずどの面(face)・何段目(row。1始まり、1段目=一番下)かを持つ。
+//   段の中の配置（左から右に何個並ぶか）だけは今まで通り自動（径・離隔からピッチを計算し、
+//   グリッドに丸める＝プルボックス計算エンジンの丸め方針と同じ考え方）。
 //
-// 加工可能エリアが未確認のサイズ（450以外）は、配置計算自体を行わずnullを返す。
-// 呼び出し側は「配置なし・穴一覧のみ参考値」として扱うこと。
+// 配置アルゴリズム:
+//   1. 面ごとに、その面に割り当てられた配管をさらに段番号でグループ化する。
+//   2. 段は面の中で1段目から順に下から積み上げる（段の高さ＝その段の中の一番大きい径。
+//      次の段との間の隙間＝その段とその上の段の中の最大離隔）。プルボックス計算エンジンの
+//      「行（棚詰め）」ロジックと同じ考え方を、自動で次の行へ回すのではなく
+//      ユーザーが選んだ段番号ごとに適用する。
+//   3. 段の中の左右位置は、径の大きい順に並べ、中心間ピッチ＝(径A+径B)/2+離隔を
+//      「切り上げ」でグリッドに丸めて計算する（切り捨てると離隔が指定値を下回るため）。
+//   4. 面・段はユーザーが選んだ以上、自動で他の面・段へ逃がさない。
+//      次のいずれかに該当する場合は、その場でエラーとして返す（呼び出し側は必ず表示すること）：
+//        - その段の配管が面の横幅に収まらない
+//        - 段を積み上げた高さが面の縦方向の加工可能エリアを超える
+//        - 配置した穴が⊗マーク等の避けるべき領域(keepOutZones)と重なる
+//      面の実寸が未確認（machinableAreasForがnullを返す面）を選んだ場合は、これまで通り
+//      警告(warn)を出して配置対象外にする（エラーではなく警告のまま。データが無いだけで
+//      ユーザーの選択ミスではないため）。
 //
 // 検証: handholeLayoutEngine.verify.ts（npx tsx で実行）
 
 import {
   holeDiameterFor,
   minClearanceFor,
-  machinableAreaFor,
+  machinableAreasFor,
+  HANDHOLE_FACE_ORDER,
+  FACE_LABELS,
   type ConnectorBrand,
   type FepSize,
   type KkEWidth,
   type MachinableArea,
+  type HandholeFace,
   type PlacementGridMm,
   DEFAULT_PLACEMENT_GRID_MM,
   CONNECTOR_BRAND_LABELS,
 } from '../constants/handholeKitakanto';
 
-/** 配管条件1行分：この銘柄・このFEP呼び径の配管が何本あるか。 */
+/** 配管条件1行分：この面・この段に、この銘柄・このFEP呼び径の配管が何本あるか。 */
 export interface ConduitRun {
+  face: HandholeFace;
+  /** 段番号。1始まり。1段目＝その面の中で一番下。 */
+  row: number;
   brand: ConnectorBrand;
   fepSize: FepSize;
   count: number;
@@ -46,7 +64,7 @@ export interface HandholeLayoutInput {
   gridMm?: PlacementGridMm;
 }
 
-/** 発注に必要な穴1つ分の仕様（配置前）。 */
+/** 発注に必要な穴1つ分の仕様（配置前）。面・段はユーザーが選んだ通り、既に確定している。 */
 export interface RequiredHole {
   id: string;
   label: string;
@@ -55,12 +73,41 @@ export interface RequiredHole {
   diameterMm: number;
   /** この穴が要求する最低離隔(mm)。隣の穴との実際の離隔判定は両者のmaxを取る。 */
   clearanceMm: number;
+  face: HandholeFace;
+  row: number;
 }
 
-/** 配置済みの穴。x/yは加工可能エリアの左下を原点とした中心位置(mm)。 */
+/** 配置済みの穴。x/yはその面（face）の加工可能エリアの左下を原点とした中心位置(mm)。 */
 export interface PlacedHole extends RequiredHole {
   x: number;
   y: number;
+}
+
+/** 1段ぶんの配置結果。 */
+export interface FaceRowResult {
+  row: number;
+  /** この段に割り当てられた配管（配置できたかどうかに関わらず全件）。 */
+  requiredHoles: RequiredHole[];
+  /** この段で実際に配置できた穴。 */
+  placedHoles: PlacedHole[];
+  /** この段の配管を左から並べたときに使う横幅(mm)。面の横幅を超えていても参考値として出す。 */
+  usedWidthMm: number;
+  /** この段の高さ帯の下端(mm)。面の加工可能エリア左下からの高さ。 */
+  bandBottomMm: number;
+  /** この段の高さ帯の上端(mm)＝この段の一番大きい径の穴の上端。 */
+  bandTopMm: number;
+  /** false＝横幅超過または高さ超過でこの段は配置できなかった（エラーがwarningsに入っている）。 */
+  fits: boolean;
+}
+
+/** 面ごとの配置結果。areaがnull＝その面は未確認のため配置対象外。 */
+export interface FaceLayoutResult {
+  face: HandholeFace;
+  area: MachinableArea | null;
+  /** 段ごとの結果。段番号の昇順（1段目→2段目→…）。 */
+  rows: FaceRowResult[];
+  /** rows[].placedHolesの合算。 */
+  placedHoles: PlacedHole[];
 }
 
 export type WarningLevel = 'error' | 'warn';
@@ -72,14 +119,14 @@ export interface LayoutWarning {
 
 export interface HandholeLayoutResult {
   width: KkEWidth;
-  /** 加工可能エリア。未確認サイズはnull。 */
-  area: MachinableArea | null;
   gridMm: PlacementGridMm;
   /** 発注に必要な穴の一覧（配置できたかどうかに関わらず全件）。 */
   requiredHoles: RequiredHole[];
-  /** 加工可能エリア内に自動配置できた穴。 */
+  /** 面ごとの配置結果。常にA/B/C/Dの4件（HANDHOLE_FACE_ORDER順）。 */
+  faces: FaceLayoutResult[];
+  /** 配置できた穴をまとめたもの（faces[].placedHolesの合算）。 */
   placedHoles: PlacedHole[];
-  /** エリア外・エリア未確認・データ欠落などで配置できなかった穴。 */
+  /** 配置できなかった穴（面の実寸未確認・横幅超過・高さ超過・⊗マーク重複・データ欠落など）。 */
   unplacedHoles: RequiredHole[];
   warnings: LayoutWarning[];
 }
@@ -115,111 +162,168 @@ function buildRequiredHoles(runs: ConduitRun[], warnings: LayoutWarning[]): Requ
         fepSize: run.fepSize,
         diameterMm: diameter,
         clearanceMm,
+        face: run.face,
+        row: run.row,
       });
     }
   });
   return holes;
 }
 
+interface RowXPlacement {
+  hole: RequiredHole;
+  x: number;
+  rightEdge: number;
+}
+
 /**
- * シェルフ（棚詰め）方式で穴を加工可能エリアに詰める。
- * 径の大きい順に詰めることで、行内の余りスペースを減らす一般的なヒューリスティック。
+ * 段内の横方向の位置を「幅の制限なし」で計算する（径の大きい順に、中心間ピッチを
+ * グリッドに切り上げて並べる）。実際に面の横幅に収まるかどうかは呼び出し側で判定する
+ * （収まらない場合にどこまで必要幅になるか＝usedWidthMmを見せるため、先に全部計算する）。
  */
-function packHoles(
-  holes: RequiredHole[],
-  areaWidthMm: number,
-  areaHeightMm: number,
-  gridMm: number,
-): { placed: PlacedHole[]; unplaced: RequiredHole[] } {
+function layoutRowX(holes: RequiredHole[], gridMm: number): RowXPlacement[] {
   const sorted = [...holes].sort((a, b) => b.diameterMm - a.diameterMm);
-  const placed: PlacedHole[] = [];
-  const unplaced: RequiredHole[] = [];
-
-  let rowBaseY = 0; // このタイミングでの「次の行の下端」の目安(mm)
-  let i = 0;
-
-  while (i < sorted.length) {
-    const rowHoles: RequiredHole[] = [];
-    const xs: number[] = [];
-    let j = i;
-
-    while (j < sorted.length) {
-      const h = sorted[j];
-      let centerX: number;
-      if (rowHoles.length === 0) {
-        centerX = ceilTo(h.diameterMm / 2, gridMm);
-      } else {
-        const prev = rowHoles[rowHoles.length - 1];
-        const gap = Math.max(h.clearanceMm, prev.clearanceMm);
-        const pitch = ceilTo((prev.diameterMm + h.diameterMm) / 2 + gap, gridMm);
-        centerX = xs[xs.length - 1] + pitch;
-      }
-      const rightEdge = centerX + h.diameterMm / 2;
-      if (rightEdge > areaWidthMm + 1e-9) break; // この行にはもう入らない
-      rowHoles.push(h);
-      xs.push(centerX);
-      j++;
+  const out: RowXPlacement[] = [];
+  sorted.forEach((h, i) => {
+    let centerX: number;
+    if (i === 0) {
+      centerX = ceilTo(h.diameterMm / 2, gridMm);
+    } else {
+      const prev = sorted[i - 1];
+      const gap = Math.max(h.clearanceMm, prev.clearanceMm);
+      const pitch = ceilTo((prev.diameterMm + h.diameterMm) / 2 + gap, gridMm);
+      centerX = out[i - 1].x + pitch;
     }
+    out.push({ hole: h, x: centerX, rightEdge: centerX + h.diameterMm / 2 });
+  });
+  return out;
+}
 
-    if (rowHoles.length === 0) {
-      // 1個も入らない＝この穴は単体でも幅方向に収まらない
-      unplaced.push(sorted[i]);
-      i++;
-      continue;
+/** 面ごとの警告（未確認面の扱い）を積む。全4面未確認なら1つにまとめ、一部だけなら面ごとに出す。 */
+function pushUnconfirmedFaceWarnings(
+  width: KkEWidth,
+  areasByFace: Record<HandholeFace, MachinableArea | null>,
+  warnings: LayoutWarning[],
+): void {
+  const unconfirmedFaces = HANDHOLE_FACE_ORDER.filter(f => areasByFace[f] == null);
+  if (unconfirmedFaces.length === HANDHOLE_FACE_ORDER.length) {
+    warnings.push({
+      level: 'warn',
+      message:
+        `KK-E型${width}サイズは全4面（A〜D）とも加工可能エリアの実寸が未確認です。配置は行わず、穴一覧のみを参考値として出しています。` +
+        `発注前に必ず北関東工業へ現物の加工図面を確認してください。`,
+    });
+  } else {
+    for (const f of unconfirmedFaces) {
+      warnings.push({
+        level: 'warn',
+        message: `KK-E型${width}サイズの${FACE_LABELS[f]}は加工可能エリアの実寸が未確認のため、配置対象から除外します。`,
+      });
     }
+  }
+}
+
+/** 1面ぶんの配置。段番号ごとに下から積み上げ、段内はlayoutRowXで横方向を計算する。 */
+function computeFaceLayout(
+  face: HandholeFace,
+  area: MachinableArea,
+  faceHoles: RequiredHole[],
+  gridMm: number,
+  warnings: LayoutWarning[],
+): { rows: FaceRowResult[]; placedHoles: PlacedHole[] } {
+  const rowNumbers = [...new Set(faceHoles.map(h => h.row))].sort((a, b) => a - b);
+  const rows: FaceRowResult[] = [];
+  const placedHoles: PlacedHole[] = [];
+  let rowBaseY = 0;
+
+  for (const rowNum of rowNumbers) {
+    const rowHoles = faceHoles.filter(h => h.row === rowNum);
+    if (rowHoles.length === 0) continue;
 
     const rowMaxDiameter = Math.max(...rowHoles.map(h => h.diameterMm));
+    const rowMaxClearance = Math.max(...rowHoles.map(h => h.clearanceMm));
     const centerYOffset = ceilTo(rowMaxDiameter / 2, gridMm);
+    const bandBottomMm = rowBaseY;
     const absCenterY = rowBaseY + centerYOffset;
-    const rowTopEdge = absCenterY + rowMaxDiameter / 2;
+    const bandTopMm = absCenterY + rowMaxDiameter / 2;
 
-    if (rowTopEdge > areaHeightMm + 1e-9) {
-      // この行は高さ方向に収まらない。以降の行も詰むほど高くなるので全部配置不可。
-      for (let k = i; k < sorted.length; k++) unplaced.push(sorted[k]);
-      break;
+    let fits = true;
+    if (bandTopMm > area.workableHeightMm + 1e-9) {
+      fits = false;
+      warnings.push({
+        level: 'error',
+        message:
+          `${FACE_LABELS[face]} ${rowNum}段目: 積み上げた高さ${bandTopMm}mmが加工可能エリアの高さ${area.workableHeightMm}mmを超えます。` +
+          `段数を減らすか、より下の段の配管径を小さくしてください。`,
+      });
     }
 
-    rowHoles.forEach((h, k) => placed.push({ ...h, x: xs[k], y: absCenterY }));
+    const rowLayout = layoutRowX(rowHoles, gridMm);
+    const usedWidthMm = rowLayout.length > 0 ? Math.max(...rowLayout.map(r => r.rightEdge)) : 0;
+    const overflow = rowLayout.find(r => r.rightEdge > area.workableWidthMm + 1e-9);
+    if (overflow) {
+      fits = false;
+      warnings.push({
+        level: 'error',
+        message:
+          `${FACE_LABELS[face]} ${rowNum}段目: ${overflow.hole.label}を含む配管が、加工可能エリアの横幅${area.workableWidthMm}mmに` +
+          `収まりません（この段に必要な幅は約${Math.ceil(usedWidthMm)}mm）。本数を減らすか、径の小さい配管に変更してください。`,
+      });
+    }
 
-    const rowMaxClearance = Math.max(...rowHoles.map(h => h.clearanceMm));
-    rowBaseY = ceilTo(rowTopEdge + rowMaxClearance, gridMm);
-    i = j;
+    const rowPlaced: PlacedHole[] = [];
+    if (fits) {
+      for (const r of rowLayout) {
+        const rad = r.hole.diameterMm / 2;
+        const conflict = area.keepOutZones.find(
+          z => Math.hypot(r.x - z.xMm, absCenterY - z.yMm) < rad + z.radiusMm,
+        );
+        if (conflict) {
+          warnings.push({
+            level: 'error',
+            message:
+              `${FACE_LABELS[face]} ${rowNum}段目: ${r.hole.label}(x=${r.x}, y=${absCenterY})が${conflict.label}と重なります。` +
+              `段内の配管の並び順・本数を変えて、この位置を避けてください。`,
+          });
+          continue;
+        }
+        rowPlaced.push({ ...r.hole, x: r.x, y: absCenterY });
+      }
+    }
+
+    placedHoles.push(...rowPlaced);
+    rows.push({ row: rowNum, requiredHoles: rowHoles, placedHoles: rowPlaced, usedWidthMm, bandBottomMm, bandTopMm, fits });
+
+    rowBaseY = ceilTo(bandTopMm + rowMaxClearance, gridMm);
   }
 
-  return { placed, unplaced };
+  return { rows, placedHoles };
 }
 
 export function computeHandholeLayout(input: HandholeLayoutInput): HandholeLayoutResult {
   const { width, runs, gridMm = DEFAULT_PLACEMENT_GRID_MM } = input;
   const warnings: LayoutWarning[] = [];
   const requiredHoles = buildRequiredHoles(runs, warnings);
-  const area = machinableAreaFor(width);
+  const areasByFace = machinableAreasFor(width);
 
-  if (area == null) {
-    warnings.push({
-      level: 'warn',
-      message:
-        `KK-E型${width}サイズは加工可能エリアの実寸が未確認です。自動配置は行わず、穴一覧のみを参考値として出しています。` +
-        `発注前に必ず北関東工業へ現物の加工図面を確認してください。`,
-    });
-    return {
-      width, area: null, gridMm,
-      requiredHoles, placedHoles: [], unplacedHoles: requiredHoles, warnings,
-    };
-  }
+  pushUnconfirmedFaceWarnings(width, areasByFace, warnings);
 
-  const { placed, unplaced } = packHoles(requiredHoles, area.workableWidthMm, area.workableHeightMm, gridMm);
+  const faces: FaceLayoutResult[] = HANDHOLE_FACE_ORDER.map(face => {
+    const area = areasByFace[face];
+    const faceHoles = requiredHoles.filter(h => h.face === face);
+    if (area == null) {
+      return { face, area: null, rows: [], placedHoles: [] };
+    }
+    const { rows, placedHoles } = computeFaceLayout(face, area, faceHoles, gridMm, warnings);
+    return { face, area, rows, placedHoles };
+  });
 
-  if (unplaced.length > 0) {
-    warnings.push({
-      level: 'error',
-      message: `${unplaced.length}個の穴が${area.faceLabel}の加工可能エリア（幅${area.workableWidthMm}×高さ${area.workableHeightMm}mm）に収まりません。本数を減らすか、サイズの大きいハンドホールを検討してください。`,
-    });
-  }
+  const placedHoles = faces.flatMap(f => f.placedHoles);
+  const placedIds = new Set(placedHoles.map(h => h.id));
+  const unplacedHoles = requiredHoles.filter(h => !placedIds.has(h.id));
 
   return {
-    width, area, gridMm,
-    requiredHoles, placedHoles: placed, unplacedHoles: unplaced, warnings,
+    width, gridMm, requiredHoles, faces, placedHoles, unplacedHoles, warnings,
   };
 }
 
