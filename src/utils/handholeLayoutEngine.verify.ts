@@ -56,7 +56,7 @@ console.log('\n■ コネクター外径テーブル（銘柄×FEP呼び径）�
 {
   const want: [ConnectorBrand, FepSize, number | null][] = [
     ['nandemo', 30, 65], ['nandemo', 100, 150], ['nandemo', 150, 220], ['nandemo', 200, null],
-    ['kkfit', 30, 74], ['kkfit', 100, 182], ['kkfit', 150, 240], ['kkfit', 200, null], // FEP100=182は未確定(要メーカー確認)
+    ['kkfit', 30, 74], ['kkfit', 100, 182], ['kkfit', 150, 240], ['kkfit', 200, null], // FEP100=182は専用技術資料で確定済み
     ['kmm_eflex', 50, 100], ['kmm_eflex', 125, 218],
     ['kmm_tac', 50, 100], ['kmm_tac', 125, 218],
     ['pljoint_s', 80, 138], ['pljoint_s', 150, 241],
