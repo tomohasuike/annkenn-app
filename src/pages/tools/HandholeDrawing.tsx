@@ -69,7 +69,10 @@ export default function HandholeDrawing({
       scale, drawW, drawH,
       stageW: drawW + MARGIN.left + MARGIN.right,
       stageH: drawH + MARGIN.top + MARGIN.bottom,
-      px: (mm: number) => MARGIN.left + (area.totalWidthMm - area.workableWidthMm) / 2 + mm * scale,
+      // 【2026-09-16 修正】左右の余白((totalWidthMm-workableWidthMm)/2＝90mm)にscaleを
+      // 掛け忘れており、mm単位の数値をそのままpx扱いしていたため横方向にもズレていた
+      // （社長の実機報告で発覚。縦方向のpy()修正と同種のミス）。
+      px: (mm: number) => MARGIN.left + ((area.totalWidthMm - area.workableWidthMm) / 2) * scale + mm * scale,
       // ローカルy(加工可能エリア左下=0)を画面Yへ変換する。
       // 【2026-09-16 修正】以前は `MARGIN.top + drawH - mm*scale` としており、これだと
       // 下端除外帯(bottomExcludeMm)を無視して「エリア下端=面の絶対下端」として描画してしまい、
