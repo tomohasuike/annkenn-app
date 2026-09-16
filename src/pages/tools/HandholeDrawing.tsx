@@ -15,7 +15,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stage, Layer, Rect, Circle, Line, Text, Group } from 'react-konva';
-import { connectorOuterDiameterFor, type MachinableArea } from '../../constants/handholeKitakanto';
+import { connectorOuterDiameterFor, footprintDiameterFor, type MachinableArea } from '../../constants/handholeKitakanto';
 import type { FaceRowResult, PlacedHole } from '../../utils/handholeLayoutEngine';
 
 const MARGIN = { top: 40, right: 24, bottom: 30, left: 60 };
@@ -177,6 +177,36 @@ export default function HandholeDrawing({
                 )}
               </Group>
             );
+          })}
+          {/* 段内で隣り合うコネクターどうしの実際のすき間(mm)を数字で表示。
+              北関東工業自身の配置例図(drawing_howto.pdf)も、円と円の間に赤字で
+              すき間の数値を書き込むスタイルになっている。「見た目が近く見える」という
+              指摘（社長）に対して、実測値を直接読めるようにすることで確認できるようにする。
+              すき間はコネクター外径（無ければ穴径）の縁から縁まで。 */}
+          {rows.flatMap(r => {
+            const sorted = [...r.placedHoles].sort((a, b) => a.x - b.x);
+            return sorted.slice(0, -1).map((h, i) => {
+              const next = sorted[i + 1];
+              const hFoot = footprintDiameterFor(h.brand, h.fepSize) ?? h.diameterMm;
+              const nextFoot = footprintDiameterFor(next.brand, next.fepSize) ?? next.diameterMm;
+              const gapMm = Math.round(((next.x - h.x) - (hFoot / 2 + nextFoot / 2)) * 10) / 10;
+              const y = areaBottomPx - h.y * scale;
+              const fromPx = areaLeftPx + (h.x + hFoot / 2) * scale;
+              const toPx = areaLeftPx + (next.x - nextFoot / 2) * scale;
+              // 本来アルゴリズム上10mm(穴のみは30mm)を下回ることは無いはずだが、
+              // 目視で確認できるよう万一下回っていた場合は赤で強調する。
+              const tight = gapMm < (h.clearanceMm - 1e-6) || gapMm < (next.clearanceMm - 1e-6);
+              const col = tight ? '#dc2626' : '#0891b2';
+              return (
+                <Group key={`gap-${r.row}-${h.id}`}>
+                  <Line points={[fromPx, y - 5, fromPx, y + 5]} stroke={col} strokeWidth={1} />
+                  <Line points={[toPx, y - 5, toPx, y + 5]} stroke={col} strokeWidth={1} />
+                  <Line points={[fromPx, y, toPx, y]} stroke={col} strokeWidth={1.4} />
+                  <Text x={(fromPx + toPx) / 2 - 24} y={y - 15} width={48} align="center"
+                    text={`${gapMm}`} fontSize={9} fontStyle="bold" fill={col} />
+                </Group>
+              );
+            });
           })}
         </Layer>
       </Stage>
