@@ -15,7 +15,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stage, Layer, Rect, Circle, Line, Text, Group } from 'react-konva';
-import type { MachinableArea } from '../../constants/handholeKitakanto';
+import { connectorOuterDiameterFor, type MachinableArea } from '../../constants/handholeKitakanto';
 import type { FaceRowResult, PlacedHole } from '../../utils/handholeLayoutEngine';
 
 const MARGIN = { top: 40, right: 24, bottom: 30, left: 60 };
@@ -157,16 +157,24 @@ export default function HandholeDrawing({
               text={`1段目`} fontSize={9} fontStyle="bold" fill={rows.find(r => r.row === 1)?.fits === false ? '#dc2626' : '#2563eb'} />
           )}
 
-          {/* 配置済みの穴 */}
+          {/* 配置済みの穴（実線＝穴/ビット径）＋コネクター外径（破線、定義がある銘柄のみ） */}
           {placedHoles.map(h => {
             const cx = areaLeftPx + h.x * scale;
             const cy = areaBottomPx - h.y * scale;
             const r = Math.max((h.diameterMm / 2) * scale, 3);
+            const outerDiameterMm = connectorOuterDiameterFor(h.brand, h.fepSize);
+            const rOuter = outerDiameterMm != null ? Math.max((outerDiameterMm / 2) * scale, r) : null;
             return (
               <Group key={h.id}>
+                {rOuter != null && (
+                  <Circle x={cx} y={cy} radius={rOuter} stroke="#0891b2" strokeWidth={1.1} dash={[4, 3]} opacity={0.7} />
+                )}
                 <Circle x={cx} y={cy} radius={r} fill={c.hole} stroke="#16a34a" strokeWidth={1.6} />
-                <Text x={cx - 40} y={cy - r - 24} width={80} align="center" text={`φ${h.diameterMm}`} fontSize={10} fontStyle="bold" fill="#15803d" />
-                <Text x={cx - 40} y={cy - r - 12} width={80} align="center" text={h.label} fontSize={8} fill={c.sub} />
+                <Text x={cx - 40} y={cy - (rOuter ?? r) - 24} width={80} align="center" text={`φ${h.diameterMm}`} fontSize={10} fontStyle="bold" fill="#15803d" />
+                <Text x={cx - 40} y={cy - (rOuter ?? r) - 12} width={80} align="center" text={h.label} fontSize={8} fill={c.sub} />
+                {outerDiameterMm != null && (
+                  <Text x={cx - 40} y={cy + (rOuter ?? r) + 2} width={80} align="center" text={`外径φ${outerDiameterMm}`} fontSize={8} fill="#0891b2" />
+                )}
               </Group>
             );
           })}

@@ -12,7 +12,8 @@ import { computeHandholeLayout, summarizeOrder, type ConduitRun } from './handho
 import {
   HOLE_DIAMETER_MM, holeDiameterFor, minClearanceFor, machinableAreasFor,
   HANDHOLE_FACE_ORDER, KKE_450_FACE_DXF_ORIGIN,
-  KKE_OUTER_SPEC, type ConnectorBrand, type FepSize, type HandholeFace,
+  KKE_OUTER_SPEC, CONNECTOR_OUTER_DIAMETER_MM, connectorOuterDiameterFor, footprintDiameterFor,
+  type ConnectorBrand, type FepSize, type HandholeFace,
 } from '../constants/handholeKitakanto';
 
 let ng = 0;
@@ -49,6 +50,61 @@ console.log('\n■ 離隔ルール（穴のみ=30mm以上、それ以外=10mm以
 {
   eq("nandemoの離隔", minClearanceFor('nandemo'), 10);
   eq("holeonlyの離隔", minClearanceFor('holeonly'), 30);
+}
+
+console.log('\n■ コネクター外径テーブル（銘柄×FEP呼び径）が実物資料(connector_list.pdf)の表と一致するか');
+{
+  const want: [ConnectorBrand, FepSize, number | null][] = [
+    ['nandemo', 30, 65], ['nandemo', 100, 150], ['nandemo', 150, 220], ['nandemo', 200, null],
+    ['kkfit', 30, 74], ['kkfit', 100, 182], ['kkfit', 150, 240], ['kkfit', 200, null], // FEP100=182は未確定(要メーカー確認)
+    ['kmm_eflex', 50, 100], ['kmm_eflex', 125, 218],
+    ['kmm_tac', 50, 100], ['kmm_tac', 125, 218],
+    ['pljoint_s', 80, 138], ['pljoint_s', 150, 241],
+    ['kmf', 65, 129], ['kmf', 150, 246],
+    // holeonlyはコネクター本体が存在しないため全FEP呼び径でnull。
+    ['holeonly', 30, null], ['holeonly', 100, null], ['holeonly', 200, null],
+  ];
+  for (const [brand, fep, want1] of want) {
+    eq(`外径 ${brand} FEP${fep}`, connectorOuterDiameterFor(brand, fep), want1);
+  }
+  const brands = Object.keys(CONNECTOR_OUTER_DIAMETER_MM) as ConnectorBrand[];
+  ok_('外径テーブルの銘柄数は7', brands.length === 7, `${brands.length}`);
+}
+
+console.log('\n■ 実効直径(footprintDiameterFor)：外径があればそれ、無ければ穴径にフォールバック');
+{
+  // 外径が定義されている銘柄は外径を使う。
+  eq('nandemo FEP100の実効直径＝外径150', footprintDiameterFor('nandemo', 100), 150);
+  eq('kkfit FEP30の実効直径＝外径74', footprintDiameterFor('kkfit', 30), 74);
+  // holeonly（外径の概念が無い）は穴径にフォールバックする。
+  eq('holeonly FEP100の実効直径＝穴径135にフォールバック', footprintDiameterFor('holeonly', 100), holeDiameterFor('holeonly', 100));
+  eq('holeonly FEP100の実効直径の実値', footprintDiameterFor('holeonly', 100), 135);
+  // カタログに無い組み合わせは穴径同様nullになる。
+  eq('kkfit FEP200の実効直径はnull（穴径も無い）', footprintDiameterFor('kkfit', 200), null);
+}
+
+console.log('\n■ 実物資料の検算：なんでも継手FEP100×FEP65は中心間距離140mmになる（コネクター外径基準の直接証拠）');
+{
+  // drawing_howto.pdfの配置例図：FEP100(コネクター外径φ150)とFEP65(コネクター外径φ110)を
+  // 隣接配置した箇所に、赤字で離隔「10」・中心間距離「140」の寸法線がある。
+  // 150/2 + 110/2 + 10 = 75 + 55 + 10 = 140 と完全一致する。
+  // 穴径(ビット径:FEP100=120,FEP65=90)基準なら 120/2+90/2+10=105mmになってしまい、
+  // これは実物と食い違う＝旧実装（穴径基準）の設計上の欠陥そのもの。
+  eq('なんでも継手FEP100の外径', connectorOuterDiameterFor('nandemo', 100), 150);
+  eq('なんでも継手FEP65の外径', connectorOuterDiameterFor('nandemo', 65), 110);
+  const runs: ConduitRun[] = [
+    { face: 'A', row: 1, brand: 'nandemo', fepSize: 100, count: 1 },
+    { face: 'A', row: 1, brand: 'nandemo', fepSize: 65, count: 1 },
+  ];
+  const r = computeHandholeLayout({ width: 450, runs });
+  const faceA = r.faces.find(f => f.face === 'A')!;
+  const row1 = faceA.rows.find(x => x.row === 1)!;
+  ok_('2個とも配置できる', row1.placedHoles.length === 2, `${row1.placedHoles.length}`);
+  const big = row1.placedHoles.find(h => h.fepSize === 100)!;
+  const small = row1.placedHoles.find(h => h.fepSize === 65)!;
+  const centerDist = big && small ? Math.abs(big.x - small.x) : NaN;
+  eq('中心間距離が実物資料の140mmと一致（コネクター外径基準）', centerDist, 140);
+  ok_('穴径ベースだった旧実装の誤った105mmにはならない', centerDist !== 105, `${centerDist}`);
 }
 
 console.log('\n■ KK-E型 外形寸法表（型式・サイズ）');
@@ -104,16 +160,20 @@ console.log('\n■ 450サイズ以外は自動配置せず「未確認」警告�
   }
 }
 
-/** 配置結果の不変条件を検査：エリア内に収まっているか、離隔を守っているか。 */
+/**
+ * 配置結果の不変条件を検査：エリア内に収まっているか、離隔を守っているか。
+ * 2026-09-16: 離隔・境界判定はコネクター外径基準の実効直径(footprintDiameterMm)で
+ * 行われるようになったため、この検証も穴径(diameterMm)ではなくfootprintDiameterMmで見る。
+ */
 function checkInvariants(
   label: string,
-  placed: { x: number; y: number; diameterMm: number; clearanceMm: number }[],
+  placed: { x: number; y: number; footprintDiameterMm: number; clearanceMm: number }[],
   areaW: number,
   areaH: number,
 ) {
   let allInBounds = true;
   for (const h of placed) {
-    const r = h.diameterMm / 2;
+    const r = h.footprintDiameterMm / 2;
     if (h.x - r < -1e-6 || h.x + r > areaW + 1e-6 || h.y - r < -1e-6 || h.y + r > areaH + 1e-6) {
       allInBounds = false;
       console.log(`    はみ出し: x=${h.x} y=${h.y} r=${r} area=${areaW}x${areaH}`);
@@ -126,7 +186,7 @@ function checkInvariants(
     for (let k = i + 1; k < placed.length; k++) {
       const a = placed[i], b = placed[k];
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      const edgeGap = dist - a.diameterMm / 2 - b.diameterMm / 2;
+      const edgeGap = dist - a.footprintDiameterMm / 2 - b.footprintDiameterMm / 2;
       const required = Math.max(a.clearanceMm, b.clearanceMm);
       if (edgeGap < required - 1e-6) {
         allClear = false;
@@ -137,21 +197,41 @@ function checkInvariants(
   ok_(`${label}: 全穴ペアが離隔を満たす`, allClear);
 }
 
-console.log('\n■ 450サイズ：1つの面・1つの段の中で、左から順に自動配置され、離隔・エリア内を満たす');
+console.log('\n■ 450サイズ：1つの面・1つの段の中で、左から順に自動配置され、離隔・エリア内を満たす（コネクター外径基準）');
 {
+  // 2026-09-16: 離隔・ピッチがコネクター外径(footprintDiameterMm)基準になったことで、
+  // 旧テスト(kkfit FEP30×3 + nandemo FEP50×2 = 穴径ベースなら317.5mmで収まっていた)は
+  // 外径ベースだと必要幅が457mmになり350mmの横幅に収まらなくなった
+  // （これはツールが正しく「実際より狭く配置できてしまう」バグを直したことの裏返し）。
+  // この段は「複数銘柄が混在しても収まる範囲で正しく配置される」ことを検証する目的のため、
+  // 外径ベースでも収まる本数(kkfit FEP30×2 + nandemo FEP50×1)に調整した。
+  // 手計算: 外径 nandemo50=95, kkfit30=74。降順ソートで nandemo50,kkfit30,kkfit30。
+  //   center1=ceil(95/2,5)=50 / pitch12=ceil((95+74)/2+10,5)=95→center2=145 /
+  //   pitch23=ceil((74+74)/2+10,5)=85→center3=230 / rightEdge3=230+37=267<=350。
   const runs: ConduitRun[] = [
-    { face: 'B', row: 1, brand: 'kkfit', fepSize: 30, count: 3 },
-    { face: 'B', row: 1, brand: 'nandemo', fepSize: 50, count: 2 },
+    { face: 'B', row: 1, brand: 'kkfit', fepSize: 30, count: 2 },
+    { face: 'B', row: 1, brand: 'nandemo', fepSize: 50, count: 1 },
   ];
   const r = computeHandholeLayout({ width: 450, runs });
   const faceB = r.faces.find(f => f.face === 'B')!;
   ok_('B面areaが取れる', faceB.area != null);
   ok_('B面の段は1つだけ', faceB.rows.length === 1, `${faceB.rows.length}`);
-  ok_('1段目に5個配置できる', faceB.rows[0]?.placedHoles.length === 5, `${faceB.rows[0]?.placedHoles.length}`);
+  ok_('1段目に3個配置できる', faceB.rows[0]?.placedHoles.length === 3, `${faceB.rows[0]?.placedHoles.length}`);
   ok_('1段目は面の中で一番下(bandBottomMm=0)', faceB.rows[0]?.bandBottomMm === 0);
   if (faceB.area) checkInvariants('B面1段目', faceB.rows[0].placedHoles, faceB.area.workableWidthMm, faceB.area.workableHeightMm);
   const errorWarn = r.warnings.some(w => w.level === 'error');
   ok_('エラー警告は出ない', !errorWarn);
+
+  // 同じ本数を穴径ベース(旧実装)のまま計算していたら収まっていたはず、という比較用の確認。
+  // ＝新実装ではnandemo FEP50×2+kkfit FEP30×3(旧テストの本数)は収まらなくなることを明示する。
+  const overflowRuns: ConduitRun[] = [
+    { face: 'C', row: 1, brand: 'kkfit', fepSize: 30, count: 3 },
+    { face: 'C', row: 1, brand: 'nandemo', fepSize: 50, count: 2 },
+  ];
+  const r2 = computeHandholeLayout({ width: 450, runs: overflowRuns });
+  const faceC = r2.faces.find(f => f.face === 'C')!;
+  const rowC = faceC.rows.find(x => x.row === 1)!;
+  ok_('旧テストの本数(5個)は外径基準では横幅超過でfits=false', rowC.fits === false, `usedWidthMm=${rowC.usedWidthMm}`);
 }
 
 console.log('\n■ 450サイズ：段は面の中で1段目(下)→2段目(上)の順に積み上がる');
@@ -172,7 +252,9 @@ console.log('\n■ 450サイズ：段は面の中で1段目(下)→2段目(上)�
 
 console.log('\n■ 450サイズ：段の配管が面の横幅(350mm)を超えるとエラーになり、その段は配置されないこと');
 {
-  // φ180(kmf FEP150)を1段に2個。ピッチ190のため2個目の右端が350mmを超える。
+  // kmf FEP150（穴径180・コネクター外径246）を1段に2個。
+  // 外径基準のピッチ＝ceil((246+246)/2+10,5)=260。1個目center=125、2個目center=385、
+  // 2個目の右端=385+123=508mmが350mmを超える（穴径基準なら190ピッチで317.5mmに収まっていた）。
   const runs: ConduitRun[] = [{ face: 'D', row: 1, brand: 'kmf', fepSize: 150, count: 2 }];
   const r = computeHandholeLayout({ width: 450, runs });
   const faceD = r.faces.find(f => f.face === 'D')!;
@@ -186,7 +268,9 @@ console.log('\n■ 450サイズ：段の配管が面の横幅(350mm)を超える
 
 console.log('\n■ 450サイズ：段を積み上げすぎて面の高さ(600mm)を超えるとエラーになること');
 {
-  // φ180(kmf FEP150)を1個ずつ4段。3段目までは600mm以内、4段目で超える想定。
+  // kmf FEP150（コネクター外径246）を1個ずつ4段。外径基準では1段あたりbandTopが
+  // 248mmずつ積み上がり(centerOffset125+外径半径123)、1段目248mm・2段目508mmまでは
+  // 600mm以内だが、3段目で768mmとなり600mmを超える。
   const runs: ConduitRun[] = [1, 2, 3, 4].map(row => ({ face: 'B', row, brand: 'kmf', fepSize: 150, count: 1 } as ConduitRun));
   const r = computeHandholeLayout({ width: 450, runs });
   const faceB = r.faces.find(f => f.face === 'B')!;
@@ -198,24 +282,33 @@ console.log('\n■ 450サイズ：段を積み上げすぎて面の高さ(600mm)
   ok_('B面の高さ超過エラーが出る', hasError, r.warnings.map(w => w.message).join(' | '));
 }
 
-console.log('\n■ 450サイズ：A面の⊗マーク（内部インサート、ローカル175,274・半径22.5）と重なる穴だけ配置されないこと');
+console.log('\n■ 450サイズ：A面の⊗マーク（内部インサート、ローカル175,274・半径22.5）と重なる穴だけ配置されないこと（コネクター外径基準）');
 {
-  // kkfit FEP30(径45・離隔10)を5段(1〜4段目は1個ずつ・5段目は4個)積むと、
-  // 5段目の中心Yが約265になり、⊗マークの位置(175,274)近辺と一部の穴が重なる。
+  // 2026-09-16: 干渉判定がコネクター外径(footprintDiameterMm)基準になったことで、
+  // 旧テスト(kkfit FEP30を5段積んで265に到達させる)は外径ベースだと積み上がり方が変わり
+  // ⊗マークに届かなくなったため、外径基準で改めて手計算した組み合わせに更新した。
+  //
+  // 1段目: kmf FEP150(コネクター外径246)を1個。
+  //   centerYOffset=ceil(246/2,5)=125, bandTop=125+123=248, 次段base=ceil(248+10,5)=260。
+  // 2段目: kkfit FEP30(コネクター外径74)を4個。
+  //   centerYOffset=ceil(74/2,5)=40, absCenterY=260+40=300。
+  //   x位置(降順ピッチ85で並ぶ): 40, 125, 210, 295。
+  //   ⊗マーク(175,274,半径22.5)との距離: x=40→137.5, x=125→56.4, x=210→43.6, x=295→122.8。
+  //   半径37+22.5=59.5との比較で、x=125とx=210の2個だけが重なる（手計算で検算済み）。
   const runs: ConduitRun[] = [
-    { face: 'A', row: 1, brand: 'kkfit', fepSize: 30, count: 1 },
-    { face: 'A', row: 2, brand: 'kkfit', fepSize: 30, count: 1 },
-    { face: 'A', row: 3, brand: 'kkfit', fepSize: 30, count: 1 },
-    { face: 'A', row: 4, brand: 'kkfit', fepSize: 30, count: 1 },
-    { face: 'A', row: 5, brand: 'kkfit', fepSize: 30, count: 4 },
+    { face: 'A', row: 1, brand: 'kmf', fepSize: 150, count: 1 },
+    { face: 'A', row: 2, brand: 'kkfit', fepSize: 30, count: 4 },
   ];
   const r = computeHandholeLayout({ width: 450, runs });
   const faceA = r.faces.find(f => f.face === 'A')!;
-  const row5 = faceA.rows.find(x => x.row === 5)!;
-  ok_('5段目は横幅・高さは問題ない(fits=true)', row5.fits === true, `bandTopMm=${row5.bandTopMm}`);
-  ok_('5段目は4個要求', row5.requiredHoles.length === 4);
-  ok_('5段目は一部が⊗マークと重なり配置されない', row5.placedHoles.length > 0 && row5.placedHoles.length < 4,
-    `placed=${row5.placedHoles.length}`);
+  const row2 = faceA.rows.find(x => x.row === 2)!;
+  ok_('2段目は横幅・高さは問題ない(fits=true)', row2.fits === true, `bandTopMm=${row2.bandTopMm}`);
+  ok_('2段目は4個要求', row2.requiredHoles.length === 4);
+  ok_('2段目は4個中2個だけ⊗マークと重なり配置されない', row2.placedHoles.length === 2,
+    `placed=${row2.placedHoles.length} x=${row2.placedHoles.map(h => h.x).join(',')}`);
+  ok_('配置できたのはx=40とx=295の2個（x=125,210は⊗マークと重なり除外）',
+    row2.placedHoles.every(h => h.x === 40 || h.x === 295),
+    `x=${row2.placedHoles.map(h => h.x).join(',')}`);
   const hasError = r.warnings.some(w => w.level === 'error' && w.message.includes('A面') && w.message.includes('⊗マーク'));
   ok_('A面の⊗マーク重複エラーが出る', hasError, r.warnings.map(w => w.message).join(' | '));
   ok_('未配置がある', r.unplacedHoles.length > 0, `${r.unplacedHoles.length}`);

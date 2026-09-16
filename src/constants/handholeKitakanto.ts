@@ -64,6 +64,67 @@ export function holeDiameterFor(brand: ConnectorBrand, fep: FepSize): number | n
 }
 
 /**
+ * コネクター本体の外径（mm）＝ FEP呼び径 × コネクター銘柄 の2軸テーブル。
+ * null＝そのFEP呼び径にその銘柄の設定が無い（HOLE_DIAMETER_MMのnullと一致するはず）。
+ *
+ * 【重要・設計変更の根拠】離隔ルール「コネクター同士の離隔は最低10mm以上」は、
+ * 穴径（ビット径）ではなく、この「コネクター本体の外径」を基準にしている。
+ * 北関東工業の実物資料で確定的に裏付け済み（2026-09-16 社長ご指摘・再調査）:
+ *
+ *   - drawing_howto.pdf の配置例図：「なんでも継手」FEP100(外径φ150)とFEP65(外径φ110)を
+ *     隣接配置した箇所に、赤字で離隔「10」・中心間距離「140」の寸法線がある。
+ *     150/2 + 110/2 + 10 = 75 + 55 + 10 = 140 と完全一致する
+ *     （穴径＝ビット径ではFEP100=φ120, FEP65=φ90であり、この数字には絶対にならない）。
+ *   - connector_list.pdf にも「最小離隔（縦横時）：なんでも継手の外寸でとる事！」
+ *     「最小離隔（斜め時）：角型継手の外寸でとる事！」と明記されている。
+ *
+ * 出典: 北関東工業 connector_list.pdf（26版：2023年12月14日、ベクターPDFを
+ * pdftotext -layout で直接抽出・検算済み。2026-09-16確認）。捏造禁止・原本の数値そのまま。
+ *
+ * 【未確定・メーカー要確認】kkfit（KKフィット）FEP100の外径は、この表では182としているが、
+ * 北関東工業の別資料（本社カタログp.114の低解像度画像）では「162」とも読める食い違いがあり、
+ * 完全には確定していない。今回はconnector_list.pdf（ベクターPDF・現行版で信頼度が高い方）の
+ * 値である182を採用する。発注前に必ず北関東工業へ現物確認すること。
+ *
+ * holeonly（穴のみ）はコネクター本体が存在しないため外径の概念が無く、全てnull。
+ * その場合は離隔・配置判定は従来通り穴径（ビット径）ベースにフォールバックする
+ * （footprintDiameterFor参照）。
+ */
+export const CONNECTOR_OUTER_DIAMETER_MM: Record<ConnectorBrand, Record<FepSize, number | null>> = {
+  nandemo:    { 30: 65, 40: 75, 50: 95, 65: 110, 80: 125, 100: 150, 125: 195, 150: 220, 200: null },
+  // kkfit FEP100=182は未確定（本社カタログp.114の低解像度画像では162とも読める）。connector_list.pdf優先。
+  kkfit:      { 30: 74, 40: 89, 50: 98, 65: 123, 80: 138, 100: 182, 125: 212, 150: 240, 200: null },
+  kmm_eflex:  { 30: 75, 40: 80, 50: 100, 65: 120, 80: 135, 100: 164, 125: 218, 150: 218, 200: null },
+  kmm_tac:    { 30: 75, 40: 80, 50: 100, 65: 120, 80: 135, 100: 164, 125: 218, 150: 218, 200: null },
+  pljoint_s:  { 30: 74, 40: 89, 50: 98, 65: 123, 80: 138, 100: 182, 125: 213, 150: 241, 200: null },
+  kmf:        { 30: 75, 40: 85, 50: 110, 65: 129, 80: 153, 100: 185, 125: 218, 150: 246, 200: null },
+  // 穴のみ：コネクター本体が存在しないため外径の概念そのものが無い（全てnull＝データ欠落ではない）。
+  holeonly:   { 30: null, 40: null, 50: null, 65: null, 80: null, 100: null, 125: null, 150: null, 200: null },
+};
+
+/** コネクター本体の外径(mm)。テーブルに無ければ（またはholeonly等で概念が無ければ）null。 */
+export function connectorOuterDiameterFor(brand: ConnectorBrand, fep: FepSize): number | null {
+  return CONNECTOR_OUTER_DIAMETER_MM[brand]?.[fep] ?? null;
+}
+
+/**
+ * 配置・離隔・⊗マーク干渉判定に使う「実効直径」(mm)。
+ * 考え方：コネクター外径が定義されていればそれを使う（実物の離隔ルールは外径基準のため）。
+ * 定義が無い場合（＝"穴のみ"のようにコネクター本体そのものが存在しない加工）は、
+ * 従来通り穴径（ビット径）にフォールバックする。
+ * 穴径自体がテーブルに無い（=データ欠落）場合はnullを返す。この場合の扱いは
+ * 呼び出し側の既存のエラー経路（「穴径データがありません」）に委ねる。
+ *
+ * 注意：ここで返す値はあくまで「配置・離隔判定用」。発注仕様・DXFに書き込む
+ * 「実際に開ける穴の大きさ」は引き続きholeDiameterForの値（diameterMm）を使うこと。
+ */
+export function footprintDiameterFor(brand: ConnectorBrand, fep: FepSize): number | null {
+  const outer = connectorOuterDiameterFor(brand, fep);
+  if (outer != null) return outer;
+  return holeDiameterFor(brand, fep);
+}
+
+/**
  * コネクター同士の最低離隔(mm)。「穴のみ」加工は30mm以上、それ以外は10mm以上。
  * 出典: 北関東工業 加工図面の注記（2026-09-15確認）。
  */

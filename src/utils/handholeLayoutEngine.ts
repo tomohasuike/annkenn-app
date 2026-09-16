@@ -33,6 +33,7 @@
 
 import {
   holeDiameterFor,
+  footprintDiameterFor,
   minClearanceFor,
   machinableAreasFor,
   HANDHOLE_FACE_ORDER,
@@ -70,7 +71,15 @@ export interface RequiredHole {
   label: string;
   brand: ConnectorBrand;
   fepSize: FepSize;
+  /** 実際に開ける穴の大きさ(mm)＝ビット径。発注仕様・DXFの表示に使う（配置判定には使わない）。 */
   diameterMm: number;
+  /**
+   * 配置・離隔・⊗マーク干渉判定に使う実効直径(mm)。
+   * コネクター本体の外径が定義されていればそれ、無ければ（穴のみ等）diameterMmと同じ値。
+   * 北関東工業の実物資料により、離隔ルールは穴径ではなくコネクター外径基準と判明したため
+   * （2026-09-16、footprintDiameterFor参照）。
+   */
+  footprintDiameterMm: number;
   /** この穴が要求する最低離隔(mm)。隣の穴との実際の離隔判定は両者のmaxを取る。 */
   clearanceMm: number;
   face: HandholeFace;
@@ -154,6 +163,9 @@ function buildRequiredHoles(runs: ConduitRun[], warnings: LayoutWarning[]): Requ
       return;
     }
     const clearanceMm = minClearanceFor(run.brand);
+    // 穴径(diameter)が取れている以上、footprintDiameterForは必ず非null（コネクター外径が
+    // 無ければ穴径そのものにフォールバックするため）。念のためdiameterへのフォールバックを残す。
+    const footprintDiameter = footprintDiameterFor(run.brand, run.fepSize) ?? diameter;
     for (let n = 0; n < run.count; n++) {
       holes.push({
         id: `r${ri}-${n}`,
@@ -161,6 +173,7 @@ function buildRequiredHoles(runs: ConduitRun[], warnings: LayoutWarning[]): Requ
         brand: run.brand,
         fepSize: run.fepSize,
         diameterMm: diameter,
+        footprintDiameterMm: footprintDiameter,
         clearanceMm,
         face: run.face,
         row: run.row,
@@ -177,24 +190,29 @@ interface RowXPlacement {
 }
 
 /**
- * 段内の横方向の位置を「幅の制限なし」で計算する（径の大きい順に、中心間ピッチを
+ * 段内の横方向の位置を「幅の制限なし」で計算する（実効直径の大きい順に、中心間ピッチを
  * グリッドに切り上げて並べる）。実際に面の横幅に収まるかどうかは呼び出し側で判定する
  * （収まらない場合にどこまで必要幅になるか＝usedWidthMmを見せるため、先に全部計算する）。
+ *
+ * ピッチ・並び順・右端(rightEdge)は、いずれも穴径(diameterMm)ではなく実効直径
+ * (footprintDiameterMm＝コネクター外径があればそれ、無ければ穴径)を基準にする。
+ * 離隔ルールがコネクター本体の外径基準であることが北関東工業の実物資料で確定したため
+ * （2026-09-16）。穴自体の大きさ(diameterMm)は発注仕様の表示にのみ使う。
  */
 function layoutRowX(holes: RequiredHole[], gridMm: number): RowXPlacement[] {
-  const sorted = [...holes].sort((a, b) => b.diameterMm - a.diameterMm);
+  const sorted = [...holes].sort((a, b) => b.footprintDiameterMm - a.footprintDiameterMm);
   const out: RowXPlacement[] = [];
   sorted.forEach((h, i) => {
     let centerX: number;
     if (i === 0) {
-      centerX = ceilTo(h.diameterMm / 2, gridMm);
+      centerX = ceilTo(h.footprintDiameterMm / 2, gridMm);
     } else {
       const prev = sorted[i - 1];
       const gap = Math.max(h.clearanceMm, prev.clearanceMm);
-      const pitch = ceilTo((prev.diameterMm + h.diameterMm) / 2 + gap, gridMm);
+      const pitch = ceilTo((prev.footprintDiameterMm + h.footprintDiameterMm) / 2 + gap, gridMm);
       centerX = out[i - 1].x + pitch;
     }
-    out.push({ hole: h, x: centerX, rightEdge: centerX + h.diameterMm / 2 });
+    out.push({ hole: h, x: centerX, rightEdge: centerX + h.footprintDiameterMm / 2 });
   });
   return out;
 }
@@ -240,12 +258,14 @@ function computeFaceLayout(
     const rowHoles = faceHoles.filter(h => h.row === rowNum);
     if (rowHoles.length === 0) continue;
 
-    const rowMaxDiameter = Math.max(...rowHoles.map(h => h.diameterMm));
+    // 段の高さ(bandTopMm)は、段の中の最大の「実効直径」(footprintDiameterMm)で決める
+    // （穴径ではなくコネクター外径基準。2026-09-16、実物資料で確定）。
+    const rowMaxFootprint = Math.max(...rowHoles.map(h => h.footprintDiameterMm));
     const rowMaxClearance = Math.max(...rowHoles.map(h => h.clearanceMm));
-    const centerYOffset = ceilTo(rowMaxDiameter / 2, gridMm);
+    const centerYOffset = ceilTo(rowMaxFootprint / 2, gridMm);
     const bandBottomMm = rowBaseY;
     const absCenterY = rowBaseY + centerYOffset;
-    const bandTopMm = absCenterY + rowMaxDiameter / 2;
+    const bandTopMm = absCenterY + rowMaxFootprint / 2;
 
     let fits = true;
     if (bandTopMm > area.workableHeightMm + 1e-9) {
@@ -274,7 +294,8 @@ function computeFaceLayout(
     const rowPlaced: PlacedHole[] = [];
     if (fits) {
       for (const r of rowLayout) {
-        const rad = r.hole.diameterMm / 2;
+        // ⊗マーク(内部インサート)との干渉判定も実効直径(コネクター外径基準)で行う。
+        const rad = r.hole.footprintDiameterMm / 2;
         const conflict = area.keepOutZones.find(
           z => Math.hypot(r.x - z.xMm, absCenterY - z.yMm) < rad + z.radiusMm,
         );
