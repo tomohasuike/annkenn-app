@@ -215,6 +215,18 @@ export default function HandholeDrawing({
               const next = sorted[i + 1];
               const hFoot = footprintDiameterFor(h.brand, h.fepSize) ?? h.diameterMm;
               const nextFoot = footprintDiameterFor(next.brand, next.fepSize) ?? next.diameterMm;
+
+              // 2つの穴の間に⊗マーク等の避けるべき領域があると、この「すき間」は本来の隣接ペアの
+              // 間隔ではなく、間の穴が⊗マークと重なって配置できなかった結果の見せかけの空きになる
+              // （2026-09-18、実機確認：4本要求→中央2本が⊗マークと重なり除外→残った両端2本の間に
+              // 実際の何倍もの隙間ができ、その隙間線・数値が⊗マークの真上に重なって描かれ読みにくい
+              // 状態になっていた）。この場合はすき間線・数値を描かず、⊗マークの表示を優先する。
+              const zoneBetween = area.keepOutZones.some(z =>
+                z.xMm > Math.min(h.x, next.x) && z.xMm < Math.max(h.x, next.x) &&
+                Math.abs(z.yMm - h.y) < z.radiusMm + Math.max(hFoot, nextFoot) / 2,
+              );
+              if (zoneBetween) return null;
+
               const gapMm = Math.round(((next.x - h.x) - (hFoot / 2 + nextFoot / 2)) * 10) / 10;
               const y = areaBottomPx - h.y * scale;
               const fromPx = areaLeftPx + (h.x + hFoot / 2) * scale;
