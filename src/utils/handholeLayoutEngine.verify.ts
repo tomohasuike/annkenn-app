@@ -142,8 +142,8 @@ console.log('\n■ 加工可能エリア：450はA/B/C/D全4面に値がある�
   const originKeys = new Set(origins.map(o => `${o.dxfOriginX},${o.dxfOriginY}`));
   ok_('450 4面のDXF原点はすべて異なる', originKeys.size === 4, `${[...originKeys].join(' / ')}`);
 
-  // 600は600E-600/600E-1200の2バリエーションを実装済みなので未確認リストから除外。
-  for (const w of [800, 900, 1000, 1200, 1500, 1800, 2000] as const) {
+  // 600・900は複数バリエーションを実装済みなので未確認リストから除外。
+  for (const w of [800, 1000, 1200, 1500, 1800, 2000] as const) {
     const areas = machinableAreasFor(w);
     ok_(`${w}サイズは4面とも加工可能エリア未確認(null)`, HANDHOLE_FACE_ORDER.every(f => areas[f] === null));
   }
@@ -155,7 +155,7 @@ console.log('\n■ 加工可能エリア：450はA/B/C/D全4面に値がある�
 console.log('\n■ 450サイズ以外（未確認サイズ）は自動配置せず「未確認」警告になること（面・段を指定していても）');
 {
   const runs: ConduitRun[] = [{ face: 'A', row: 1, brand: 'kkfit', fepSize: 50, count: 2 }];
-  for (const w of [900, 1800] as const) {
+  for (const w of [1000, 1800] as const) {
     const r = computeHandholeLayout({ width: w, runs });
     ok_(`${w}: 4面ともareaはnull`, r.faces.every(f => f.area === null));
     ok_(`${w}: 配置0件`, r.placedHoles.length === 0);
@@ -245,6 +245,72 @@ console.log('\n■ 600E-1200：ブロック選択（block）で上下ブロッ�
   const rImplicit = computeHandholeLayout({ width: 600, heightVariantCode: '600E-1200', runs: implicitRuns });
   const faceB = rImplicit.faces.find(f => f.face === 'B')!;
   ok_('blockを省略すると1(下ブロック)扱いになる', faceB.rows[0]?.block === 1, `${faceB.rows[0]?.block}`);
+}
+
+console.log('\n■ 900サイズ：900E-900（既定、上下2ブロック）の加工可能エリア実測値（実発注データで最頻出サイズのため2026-09-18追加）');
+{
+  const areas = machinableAreasFor(900); // heightVariantCode省略＝既定の900E-900
+  for (const face of HANDHOLE_FACE_ORDER) {
+    const a = areas[face];
+    ok_(`900E-900 ${face}面の加工可能エリアが取れる`, a != null);
+    if (!a) continue;
+    eq(`900E-900 ${face}面 全幅`, a.totalWidthMm, 1000);
+    eq(`900E-900 ${face}面 加工可能幅`, a.workableWidthMm, 750);
+    eq(`900E-900 ${face}面 全高`, a.totalHeightMm, 1140);
+    eq(`900E-900 ${face}面 上端除外`, a.topExcludeMm, 320);
+    eq(`900E-900 ${face}面 下端除外`, a.bottomExcludeMm, 125);
+    eq(`900E-900 ${face}面 ブロック数`, a.blocks.length, 2);
+    eq(`900E-900 ${face}面 下ブロック(index0)高さ`, a.blocks[0]?.heightMm, 320);
+    eq(`900E-900 ${face}面 上ブロック(index1)高さ`, a.blocks[1]?.heightMm, 225);
+    eq(`900E-900 ${face}面 ブロック間ギャップ`, a.gapsMm[0], 150);
+    eq(`900E-900 ${face}面 加工可能高さ(=320+150+225)`, a.workableHeightMm, 695);
+    ok_(`900E-900 ${face}面 自己整合(上端+可動域+下端=全高)`, a.topExcludeMm + a.workableHeightMm + a.bottomExcludeMm === a.totalHeightMm);
+  }
+  ok_('900E-900 A面の⊗マークは下ブロックにある(x=375,y=53)', areas.A?.keepOutZones.length === 1 && areas.A.keepOutZones[0].xMm === 375 && areas.A.keepOutZones[0].yMm === 53);
+  ok_('900E-900 C面の⊗マークは下ブロックにある', areas.C?.keepOutZones.length === 1 && areas.C.keepOutZones[0].yMm === 53);
+  ok_('900E-900 B面に⊗マークは無い', (areas.B?.keepOutZones.length ?? 0) === 0);
+  ok_('900E-900 D面に⊗マークは無い', (areas.D?.keepOutZones.length ?? 0) === 0);
+}
+
+console.log('\n■ 900サイズ：900E-1200（上下2ブロック）の加工可能エリア実測値。600E-1200と縦方向の内訳が一致すること');
+{
+  const areas900 = machinableAreasFor(900, '900E-1200');
+  const areas600 = machinableAreasFor(600, '600E-1200');
+  for (const face of HANDHOLE_FACE_ORDER) {
+    const a = areas900[face];
+    const a6 = areas600[face];
+    ok_(`900E-1200 ${face}面の加工可能エリアが取れる`, a != null);
+    if (!a || !a6) continue;
+    eq(`900E-1200 ${face}面 全幅`, a.totalWidthMm, 1000);
+    eq(`900E-1200 ${face}面 加工可能幅`, a.workableWidthMm, 750);
+    eq(`900E-1200 ${face}面 全高`, a.totalHeightMm, 1440);
+    eq(`900E-1200 ${face}面 上端除外`, a.topExcludeMm, 320);
+    eq(`900E-1200 ${face}面 下端除外`, a.bottomExcludeMm, 125);
+    eq(`900E-1200 ${face}面 ブロック数`, a.blocks.length, 2);
+    eq(`900E-1200 ${face}面 下ブロック(index0)高さ`, a.blocks[0]?.heightMm, 620);
+    eq(`900E-1200 ${face}面 上ブロック(index1)高さ`, a.blocks[1]?.heightMm, 225);
+    eq(`900E-1200 ${face}面 ブロック間ギャップ`, a.gapsMm[0], 150);
+    ok_(`900E-1200 ${face}面 自己整合(上端+可動域+下端=全高)`, a.topExcludeMm + a.workableHeightMm + a.bottomExcludeMm === a.totalHeightMm);
+    // 900E-1200は600E-1200と縦方向の内訳(上端除外・各ブロック高さ・隙間・下端除外)が完全に一致する
+    // （幅・⊗マークのx位置のみ異なる）。これはS/Bピースの高さ構成が幅サイズに依存しないことの裏付け。
+    ok_(`900E-1200/600E-1200 ${face}面 縦方向の内訳が一致`,
+      a.topExcludeMm === a6.topExcludeMm && a.bottomExcludeMm === a6.bottomExcludeMm &&
+      a.blocks[0].heightMm === a6.blocks[0].heightMm && a.blocks[1].heightMm === a6.blocks[1].heightMm &&
+      a.gapsMm[0] === a6.gapsMm[0]);
+  }
+  ok_('900E-1200 A面の⊗マークは下ブロックにある(x=375,y=190)', areas900.A?.keepOutZones.length === 1 && areas900.A.keepOutZones[0].xMm === 375 && areas900.A.keepOutZones[0].yMm === 190);
+  ok_('900E-1200 B面に⊗マークは無い', (areas900.B?.keepOutZones.length ?? 0) === 0);
+}
+
+console.log('\n■ 900サイズ：900×900×900mmで実際にKKフィットFEP100(工具警告対象)を配置しても問題ないこと');
+{
+  // 実発注で最頻出のサイズ・実発注でよく使われる大径コネクタ(KKフィットFEP100)の組み合わせを
+  // 一度通しで検算しておく（回帰の早期発見用）。
+  const runs: ConduitRun[] = [{ face: 'A', row: 1, brand: 'kkfit', fepSize: 100, count: 1 }];
+  const r = computeHandholeLayout({ width: 900, runs, extraClearanceMm: 20 });
+  ok_('900E-900で配置できる', r.placedHoles.length === 1, r.warnings.map(w => w.message).join(' | '));
+  const faceA = r.faces.find(f => f.face === 'A')!;
+  if (faceA.area) checkInvariants('900E-900 A面', faceA.placedHoles, faceA.area.workableWidthMm, faceA.area.workableHeightMm);
 }
 
 /**

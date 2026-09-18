@@ -250,6 +250,18 @@ export const FACE_LABELS: Record<HandholeFace, 'A面' | 'B面' | 'C面' | 'D面'
 // 1050mm、いずれも「縁塊付き」）は一覧の存在だけ確認し、正確な品名規格コード・加工可能エリアの
 // 実寸は未確認のため、ここには載せない（それらしいコードを補って埋めることは捏造にあたる）。
 // 「角枠付き」「化粧蓋付き」等リッド種別違いの高さバリエーションも未調査。
+//
+// 900サイズ（2026-09-18追加）: 実発注データ調査（PLANEST-EF拾いデータ＋栃木県内9自治体の
+// 実際の入札設計書、多数案件を実際に読んで抽出）で「900×900×900mm」「900×900×1200mm」が
+// 実務で圧倒的に多く使われていることが判明したため、450/600に続いて実物図面調査を実施した。
+// https://kitakanto.co.jp/pages/1333/#block1161 で900E-600/900E-900(S15+B75)/
+// 900E-900(S45+B45)/900E-1000/900E-1200/900E-1300/900E-1500の7バリエーション存在を確認、
+// このうち900E-900(S45+B45)と900E-1200(S45+B75)の2つを実際にDXF解析した。
+// 900mmには構成の異なる組み合わせが2通り存在する（S15+B75とS45+B45、どちらも内空高さ900mm）。
+// 今回実際にDXFを解析したのはS45+B45の方のみで、そのDXFタイトルは"９００Ｅ-９００"だった
+// （S15+B75の方は未解析・タイトル表記も未確認。もし同じ"900E-900"という品名規格になるなら
+// 2つの物理的に異なる構造が同じコードを共有してしまう可能性があるが、今回はS15+B75を
+// 開いていないため確認できていない）。以下の`code: '900E-900'`のデータはS45+B45の実測値である。
 export interface KkEHeightVariant {
   /** 品名規格（例:"600E-1200"）。加工図面のタイトル注記に実在する文字列そのもの。machinableAreasForに渡すキー。 */
   code: string;
@@ -266,7 +278,11 @@ export const KKE_HEIGHT_VARIANTS: Record<KkEWidth, KkEHeightVariant[]> = {
     { code: '600E-600', width: 600, innerHeightMm: 600, pieceCombo: 'S15+B45' },
     { code: '600E-1200', width: 600, innerHeightMm: 1200, pieceCombo: 'S45+B75' },
   ],
-  800: [], 900: [], 1000: [], 1200: [], 1500: [], 1800: [], 2000: [],
+  900: [
+    { code: '900E-900', width: 900, innerHeightMm: 900, pieceCombo: 'S45+B45' },
+    { code: '900E-1200', width: 900, innerHeightMm: 1200, pieceCombo: 'S45+B75' },
+  ],
+  800: [], 1000: [], 1200: [], 1500: [], 1800: [], 2000: [],
 };
 
 /** widthの高さバリエーション一覧（実寸確認済みのものだけ）。無ければ空配列。 */
@@ -545,6 +561,82 @@ const KKE600_1200_AREA: Record<HandholeFace, MachinableArea> = {
   D: build600_1200Area('D', 'D面', false),
 };
 
+const KKE900_SOURCE_NOTE_COMMON =
+  '北関東工業 KK-E型ハンドホール900サイズの加工図面DXF実物解析による実測値（2026-09-18、' +
+  '実発注データ調査で900×900が最頻出サイズと判明したため調査。ezdxfでブロック参照を再帰explodeし' +
+  '座標・寸法エンティティ・PDFテキスト層から直接抽出。全高＝上端除外+ブロック高さ+隙間+下端除外の' +
+  '自己整合を検算済み）。900の他の高さバリエーション（600/900mm(S15+B75)/1000/1300/1500）は' +
+  '未確認のため流用しないこと。';
+
+const KKE900_900_SOURCE_NOTE =
+  KKE900_SOURCE_NOTE_COMMON + ' 品名規格「ＫＫ-Ｅ型ハンドホール　９００Ｅ-９００」（S45+B45、上下2ブロック。' +
+  '900mmのもう一方の組み合わせS15+B75は未解析）。' +
+  '出典ファイル: 900_S45B45.dxf（元ファイル名202512160847074509.dxf）、' +
+  'https://kitakanto.co.jp/pages/1333/#block1161';
+
+const KKE900_1200_SOURCE_NOTE =
+  KKE900_SOURCE_NOTE_COMMON + ' 品名規格「ＫＫ-Ｅ型ハンドホール　９００Ｅ-１２００」（S45+B75、上下2ブロック）。' +
+  '出典ファイル: 1200_S45B75.dxf（元ファイル名202512160854236681.dxf）、' +
+  'https://kitakanto.co.jp/pages/1333/#block1161';
+
+/**
+ * 900E-900（S45+B45）。600E-1200と縦方向の内訳（上端除外320・接合部150・下端除外125）が
+ * 完全に一致する（幅・下ブロック高さのみ異なる）。「S/Bピースの高さ構成は幅サイズに依存せず
+ * 一定」という仮説を裏付ける結果だが、他サイズでの検証はまだ行っていない（2026-09-18確認）。
+ */
+function build900_900Area(face: HandholeFace, faceLabel: MachinableArea['faceLabel'], hasInsertMark: boolean): MachinableArea {
+  return buildMachinableArea({
+    face,
+    faceLabel,
+    totalWidthMm: 1000,
+    workableWidthMm: 750,
+    totalHeightMm: 1140,
+    topExcludeMm: 320,
+    bottomExcludeMm: 125,
+    // index0=下ブロック(320mm、⊗マークがあればここ)、index1=上ブロック(225mm、⊗マーク無し)。
+    blocks: [
+      { heightMm: 320, keepOutZones: hasInsertMark ? [insertMarkZone(375, 53, KKE900_900_SOURCE_NOTE)] : [] },
+      { heightMm: 225, keepOutZones: [] },
+    ],
+    gapsMm: [150],
+    sourceNote: KKE900_900_SOURCE_NOTE + ` ${faceLabel}は加工可能エリアが上下2ブロック(下320mm/接合部150mm/上225mm)に分かれる。`,
+  });
+}
+
+function build900_1200Area(face: HandholeFace, faceLabel: MachinableArea['faceLabel'], hasInsertMark: boolean): MachinableArea {
+  return buildMachinableArea({
+    face,
+    faceLabel,
+    totalWidthMm: 1000,
+    workableWidthMm: 750,
+    totalHeightMm: 1440,
+    topExcludeMm: 320,
+    bottomExcludeMm: 125,
+    // index0=下ブロック(620mm、⊗マークがあればここ)、index1=上ブロック(225mm、⊗マーク無し)。
+    // 600E-1200と縦方向の内訳が完全に一致（下ブロック620mmまで同値）。
+    blocks: [
+      { heightMm: 620, keepOutZones: hasInsertMark ? [insertMarkZone(375, 190, KKE900_1200_SOURCE_NOTE)] : [] },
+      { heightMm: 225, keepOutZones: [] },
+    ],
+    gapsMm: [150],
+    sourceNote: KKE900_1200_SOURCE_NOTE + ` ${faceLabel}は加工可能エリアが上下2ブロック(下620mm/接合部150mm/上225mm)に分かれる。`,
+  });
+}
+
+const KKE900_900_AREA: Record<HandholeFace, MachinableArea> = {
+  A: build900_900Area('A', 'A面', true),
+  B: build900_900Area('B', 'B面', false),
+  C: build900_900Area('C', 'C面', true),
+  D: build900_900Area('D', 'D面', false),
+};
+
+const KKE900_1200_AREA: Record<HandholeFace, MachinableArea> = {
+  A: build900_1200Area('A', 'A面', true),
+  B: build900_1200Area('B', 'B面', false),
+  C: build900_1200Area('C', 'C面', true),
+  D: build900_1200Area('D', 'D面', false),
+};
+
 /**
  * サイズ(width)×高さバリエーション(heightVariantCode)ごとの面別加工可能エリア。
  * heightVariantCodeを省略した場合はそのwidthの既定バリエーション（KKE_HEIGHT_VARIANTSの先頭）を使う。
@@ -555,7 +647,9 @@ const KKE600_1200_AREA: Record<HandholeFace, MachinableArea> = {
  * - 450 (既定"450E-750"): 単一ブロック。
  * - 600 "600E-600"（既定、S15+B45）: 単一ブロック、可動域450×320mm。
  * - 600 "600E-1200"（S45+B75）: 上下2ブロック、⊗マークは下ブロックのみ。
- * それ以外のwidth・heightVariantCodeは未確認。450/600の比率を他へ流用・外挿することはしない。
+ * - 900 "900E-900"（既定、S45+B45）: 上下2ブロック、可動域750×(320+150+225)mm。
+ * - 900 "900E-1200"（S45+B75）: 上下2ブロック、可動域750×(620+150+225)mm。
+ * それ以外のwidth・heightVariantCodeは未確認。450/600/900の比率を他へ流用・外挿することはしない。
  */
 export function machinableAreasFor(
   width: KkEWidth,
@@ -570,6 +664,12 @@ export function machinableAreasFor(
   }
   if (code === '600E-1200') {
     return { ...KKE600_1200_AREA };
+  }
+  if (code === '900E-900') {
+    return { ...KKE900_900_AREA };
+  }
+  if (code === '900E-1200') {
+    return { ...KKE900_1200_AREA };
   }
   return { A: null, B: null, C: null, D: null };
 }
