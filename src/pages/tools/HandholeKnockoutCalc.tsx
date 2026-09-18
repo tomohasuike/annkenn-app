@@ -32,6 +32,7 @@ import {
   defaultHeightVariantFor,
   HANDHOLE_FACE_ORDER,
   FACE_LABELS,
+  FACE_OPPOSITE,
   type ConnectorBrand,
   type FepSize,
   type KkEWidth,
@@ -48,6 +49,7 @@ import {
 } from '../../utils/handholeLayoutEngine';
 import { generateHandholeOrderDxf, downloadDxfText, HandholeDxfExportError } from '../../utils/handholeDxfExport';
 import HandholeDrawing from './HandholeDrawing';
+import HandholePlanView from './HandholePlanView';
 
 const KKE450_TEMPLATE_URL = '/handhole-templates/KKE450_B75.dxf';
 
@@ -470,20 +472,40 @@ export default function HandholeKnockoutCalc() {
 
       {/* 面タブ＋ブロックタブ＋段カード */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-4 space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <label className="text-xs font-semibold text-slate-500 block">面・段ごとの配管条件</label>
-          <div className="flex flex-wrap gap-2">
-            {HANDHOLE_FACE_ORDER.map(f => {
-              const fr = result.faces.find(x => x.face === f);
-              const count = fr?.placedHoles.length ?? 0;
-              const rowCount = faceRows[f].reduce((sum, block) => sum + block.length, 0);
-              return (
-                <button key={f} onClick={() => setActiveFace(f)} className={chip(activeFace === f) + ' !text-sm'}>
-                  {FACE_LABELS[f]}
-                  {rowCount > 0 && <span className={`ml-1 ${activeFace === f ? 'text-blue-100' : 'text-slate-400'}`}>({rowCount}段{count > 0 ? `・${count}穴` : ''})</span>}
-                </button>
-              );
-            })}
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+          {/* 平面図（真上から見た模式図）で面を選ぶ。2026-09-18 社長ご指摘：「A/B/C/D面は
+              基準の取り方で変わるので平面図が重要」「ハンドホールは直進が多いのでA⇔C・B⇔Dが
+              対になっていることも考慮」への対応。実際の削孔図（オーイケ製16基）でも面ごとの
+              使い方に偏りがある実例が確認できている（HandholePlanView.tsx冒頭コメント参照）。 */}
+          <HandholePlanView
+            activeFace={activeFace}
+            onSelectFace={setActiveFace}
+            faceHoleCounts={Object.fromEntries(
+              HANDHOLE_FACE_ORDER.map(f => [f, result.faces.find(x => x.face === f)?.placedHoles.length ?? 0]),
+            )}
+          />
+          <div className="flex-1 min-w-0 space-y-2 w-full">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <label className="text-xs font-semibold text-slate-500 block">面・段ごとの配管条件</label>
+              <div className="flex flex-wrap gap-2">
+                {HANDHOLE_FACE_ORDER.map(f => {
+                  const fr = result.faces.find(x => x.face === f);
+                  const count = fr?.placedHoles.length ?? 0;
+                  const rowCount = faceRows[f].reduce((sum, block) => sum + block.length, 0);
+                  return (
+                    <button key={f} onClick={() => setActiveFace(f)} className={chip(activeFace === f) + ' !text-sm'}>
+                      {FACE_LABELS[f]}
+                      {rowCount > 0 && <span className={`ml-1 ${activeFace === f ? 'text-blue-100' : 'text-slate-400'}`}>({rowCount}段{count > 0 ? `・${count}穴` : ''})</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              配管は直進して反対側の面から出ることが多いため、{FACE_LABELS[activeFace]}を選んだ場合、
+              対辺は{FACE_LABELS[FACE_OPPOSITE[activeFace]]}になります（左の模式図で水色表示）。
+              L字に曲げる場合は隣り合う面（{FACE_LABELS[activeFace]}以外）を選んでください。
+            </p>
           </div>
         </div>
 
