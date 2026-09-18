@@ -52,6 +52,7 @@ import {
   type KkEWidth,
   type MachinableArea,
   type MachinableBlock,
+  type FaceKeepOutZone,
   type HandholeFace,
   type PlacementGridMm,
   DEFAULT_PLACEMENT_GRID_MM,
@@ -221,6 +222,45 @@ interface RowXPlacement {
 }
 
 /**
+ * centerX(半径radiusMm)が、高さcenterYの位置で⊗マーク等の避けるべき領域(zones、ブロック
+ * ローカル座標)と重なる場合、その領域の右端の少し先までcenterXを押し出す(グリッドに切り上げ)。
+ * 複数の領域がある場合は、押し出した先でも別の領域と重ならなくなるまで繰り返す
+ * （領域は有限個・毎回xは単調に増加するため必ず有限回で収束する。念のため上限回数も設ける）。
+ *
+ * 2026-09-18、社長ご指摘で追加：「⊗マークと重なるからその穴は諦める」のではなく
+ * 「重なった穴をマークの先まで動かして配置し直す」方式に変更した。左には動かさない
+ * （常に大きい方＝右に寄せる、というこのファイルの丸め方針＝ceilToと同じ考え方）。
+ */
+function avoidKeepOutZones(
+  centerX: number,
+  radiusMm: number,
+  centerY: number,
+  zones: FaceKeepOutZone[],
+  gridMm: number,
+): number {
+  let x = centerX;
+  for (let guard = 0; guard < zones.length + 10; guard++) {
+    let moved = false;
+    for (const z of zones) {
+      const threshold = radiusMm + z.radiusMm;
+      const dy = centerY - z.yMm;
+      if (Math.abs(dy) >= threshold - 1e-9) continue; // この高さでは重ならない
+      const halfWidth = Math.sqrt(Math.max(threshold * threshold - dy * dy, 0));
+      const forbiddenMin = z.xMm - halfWidth;
+      const forbiddenMax = z.xMm + halfWidth;
+      if (x > forbiddenMin - 1e-9 && x < forbiddenMax + 1e-9) {
+        let pushed = ceilTo(forbiddenMax, gridMm);
+        if (pushed <= forbiddenMax + 1e-9) pushed += gridMm; // ちょうど境界上に丸まった場合の保険
+        x = pushed;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return x;
+}
+
+/**
  * 段内の横方向の位置を「幅の制限なし」で計算する（実効直径の大きい順に、中心間ピッチを
  * グリッドに切り上げて並べる）。実際に面の横幅に収まるかどうかは呼び出し側で判定する
  * （収まらない場合にどこまで必要幅になるか＝usedWidthMmを見せるため、先に全部計算する）。
@@ -229,8 +269,18 @@ interface RowXPlacement {
  * (footprintDiameterMm＝コネクター外径があればそれ、無ければ穴径)を基準にする。
  * 離隔ルールがコネクター本体の外径基準であることが北関東工業の実物資料で確定したため
  * （2026-09-16）。穴自体の大きさ(diameterMm)は発注仕様の表示にのみ使う。
+ *
+ * 2026-09-18、⊗マーク等の避けるべき領域(keepOutZones)を渡すと、ナイーブに計算した位置が
+ * 領域と重なる場合はavoidKeepOutZonesで領域の先まで押し出す。押し出した結果、面の横幅を
+ * 超える場合の扱いは呼び出し側(computeBlockLayout)が個別に判定する。
  */
-function layoutRowX(holes: RequiredHole[], gridMm: number, extraClearanceMm: number): RowXPlacement[] {
+function layoutRowX(
+  holes: RequiredHole[],
+  gridMm: number,
+  extraClearanceMm: number,
+  absCenterY: number,
+  keepOutZones: FaceKeepOutZone[],
+): RowXPlacement[] {
   const sorted = [...holes].sort((a, b) => b.footprintDiameterMm - a.footprintDiameterMm);
   const out: RowXPlacement[] = [];
   sorted.forEach((h, i) => {
@@ -243,6 +293,7 @@ function layoutRowX(holes: RequiredHole[], gridMm: number, extraClearanceMm: num
       const pitch = ceilTo((prev.footprintDiameterMm + h.footprintDiameterMm) / 2 + gap, gridMm);
       centerX = out[i - 1].x + pitch;
     }
+    centerX = avoidKeepOutZones(centerX, h.footprintDiameterMm / 2, absCenterY, keepOutZones, gridMm);
     out.push({ hole: h, x: centerX, rightEdge: centerX + h.footprintDiameterMm / 2 });
   });
   return out;
@@ -306,9 +357,10 @@ function computeBlockLayout(
     const absCenterY = rowBaseY + centerYOffset;
     const bandTopMm = absCenterY + rowMaxFootprint / 2;
 
-    let fits = true;
-    if (bandTopMm > block.heightMm + 1e-9) {
-      fits = false;
+    // 段の高さ（ブロックの縦方向の加工可能高さ）を超える場合だけは、段全体を丸ごと
+    // 配置対象外にする（段の途中の高さで一部だけ有効、ということはあり得ないため）。
+    const heightOk = bandTopMm <= block.heightMm + 1e-9;
+    if (!heightOk) {
       warnings.push({
         level: 'error',
         message:
@@ -317,24 +369,30 @@ function computeBlockLayout(
       });
     }
 
-    const rowLayout = layoutRowX(rowHoles, gridMm, extraClearanceMm);
+    // 2026-09-18、社長ご指摘で変更：横方向は「⊗マーク等の避けるべき領域に当たった穴を
+    // その場で諦める」のではなく、layoutRowX内のavoidKeepOutZonesで領域の先まで押し出して
+    // 配置し直す。押し出した結果それでも面の横幅を超える穴だけを、この穴単位で配置対象外にする
+    // （以前は「1本でも横幅を超えたら段全体を丸ごと配置しない」だったが、押し出しで空いたはずの
+    // 場所まで無駄にしてしまうため、⊗マーク重複判定と同じ「その穴だけ諦める」方式に統一した）。
+    const rowLayout = heightOk
+      ? layoutRowX(rowHoles, gridMm, extraClearanceMm, absCenterY, block.keepOutZones)
+      : [];
     const usedWidthMm = rowLayout.length > 0 ? Math.max(...rowLayout.map(r => r.rightEdge)) : 0;
-    const overflow = rowLayout.find(r => r.rightEdge > workableWidthMm + 1e-9);
-    if (overflow) {
-      fits = false;
-      warnings.push({
-        level: 'error',
-        message:
-          `${blockLabel} ${rowNum}段目: ${overflow.hole.label}を含む配管が、加工可能エリアの横幅${workableWidthMm}mmに` +
-          `収まりません（この段に必要な幅は約${Math.ceil(usedWidthMm)}mm）。本数を減らすか、径の小さい配管に変更してください。`,
-      });
-    }
 
     const rowPlaced: PlacedHole[] = [];
-    if (fits) {
+    if (heightOk) {
       for (const r of rowLayout) {
-        // ⊗マーク(内部インサート)との干渉判定も実効直径(コネクター外径基準)で行う。
-        // block.keepOutZonesはブロックローカル座標なので、absCenterY(ブロックローカル)と直接比較できる。
+        if (r.rightEdge > workableWidthMm + 1e-9) {
+          warnings.push({
+            level: 'error',
+            message:
+              `${blockLabel} ${rowNum}段目: ${r.hole.label}(x=${r.x})が加工可能エリアの横幅${workableWidthMm}mmを` +
+              `超えてはみ出すため配置できません（⊗マーク等を避けて押し出した結果を含みます）。本数を減らすか、配置順・径を変えてください。`,
+          });
+          continue;
+        }
+        // ⊗マーク(内部インサート)との干渉判定（保険。avoidKeepOutZonesで回避済みのはずだが、
+        // 複数領域が絡む複雑な配置での取りこぼしに備えて残す）。
         const rad = r.hole.footprintDiameterMm / 2;
         const conflict = block.keepOutZones.find(
           z => Math.hypot(r.x - z.xMm, absCenterY - z.yMm) < rad + z.radiusMm,
@@ -351,6 +409,10 @@ function computeBlockLayout(
         rowPlaced.push({ ...r.hole, x: r.x, y: absCenterY });
       }
     }
+
+    // このrowの`fits`は「要求した穴が1本残らず配置できたか」を表す（高さ超過・横幅超過・
+    // ⊗マーク重複のいずれかで1本でも欠けたらfalse）。UI側の色分け・警告表示に使う。
+    const fits = heightOk && rowPlaced.length === rowHoles.length;
 
     placedHoles.push(...rowPlaced);
     rows.push({ row: rowNum, requiredHoles: rowHoles, placedHoles: rowPlaced, usedWidthMm, bandBottomMm, bandTopMm, fits });

@@ -407,7 +407,7 @@ export default function HandholeKnockoutCalc() {
                 {activeFaceArea && rowResult && (
                   <p className={`text-[11px] ${rowResult.fits ? 'text-slate-400' : 'text-red-600 dark:text-red-400 font-bold'}`}>
                     この段の使用幅: 約{Math.ceil(rowResult.usedWidthMm)}mm / 横幅{activeFaceArea.workableWidthMm}mm
-                    {!rowResult.fits && '（面に収まりません。下の警告を確認してください）'}
+                    {!rowResult.fits && `（配置できなかった穴が${rowResult.requiredHoles.length - rowResult.placedHoles.length}本あります。下の警告を確認してください）`}
                   </p>
                 )}
               </div>
@@ -680,8 +680,10 @@ export default function HandholeKnockoutCalc() {
         <p>
           <span className="font-semibold">面(A/B/C/D)・ブロック・段は自動では動かしません。</span>
           面の中で「段」を足すと、その段は（選んでいるブロックの中で）一番上に積まれます（1段目が一番下）。段の中の配管の左右の並びだけは、
-          径の大きい順・離隔をグリッドに切り上げる方式で自動計算します。段の配管がブロックの横幅に収まらない・段を積み上げた高さが
-          ブロックの高さを超える・⊗マークと重なる、のいずれかに該当する場合は、他の面・ブロック・段へは動かさずその場でエラーとして表示します。
+          径の大きい順・離隔をグリッドに切り上げる方式で自動計算します。並べた位置が⊗マーク等の避けるべき領域と重なる場合は、その領域の
+          先まで自動で位置をずらして配置し直します（2026-09-18対応。以前はその穴を諦めるだけでしたが、動かせる範囲があれば動かします）。
+          ずらした結果も含めて、段の配管がブロックの横幅に収まらない・段を積み上げた高さがブロックの高さを超える場合は、その穴だけを
+          配置対象外にします（他の穴は影響を受けず配置されたままになります）。段全体・他の面・ブロックへは動かしません。
         </p>
         <p>
           <span className="font-semibold">「ブロック」とは何か:</span> 北関東工業のKK-E型は「分割式」（縁塊+スラブ+継胴+ベースを上下に

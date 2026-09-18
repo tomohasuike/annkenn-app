@@ -337,20 +337,24 @@ console.log('\n■ 450サイズ：段は面の中で1段目(下)→2段目(上)�
   ok_('1段目の穴のyが2段目の穴のyより小さい', (row1.placedHoles[0]?.y ?? 0) < (row2.placedHoles[0]?.y ?? 0));
 }
 
-console.log('\n■ 450サイズ：段の配管が面の横幅(350mm)を超えるとエラーになり、その段は配置されないこと');
+console.log('\n■ 450サイズ：段の配管が面の横幅(350mm)を超える場合、はみ出す穴だけが配置対象外になること（2026-09-18、段全体を諦める方式から変更）');
 {
-  // kmf FEP150（穴径180・コネクター外径246）を1段に2個。
-  // 外径基準のピッチ＝ceil((246+246)/2+10,5)=260。1個目center=125、2個目center=385、
-  // 2個目の右端=385+123=508mmが350mmを超える（穴径基準なら190ピッチで317.5mmに収まっていた）。
+  // kmf FEP150（穴径180・コネクター外径246）を1段に2個。D面には⊗マークが無いため、
+  // 押し出し(avoidKeepOutZones)は発生しない。外径基準のピッチ＝ceil((246+246)/2+10,5)=260。
+  // 1個目center=125（右端248、350mm以内）、2個目center=385（右端508、350mmを超える）。
+  // 2026-09-18以前は「1本でも横幅を超えたら段全体を配置しない」だったが、社長ご指摘
+  // 「はみ出した穴だけ諦めればいいのでは」を受け、⊗マーク重複と同じ「その穴だけ諦める」方式に
+  // 統一した。1個目は横幅に収まるので配置され、2個目だけが配置対象外になる。
   const runs: ConduitRun[] = [{ face: 'D', row: 1, brand: 'kmf', fepSize: 150, count: 2 }];
   const r = computeHandholeLayout({ width: 450, runs });
   const faceD = r.faces.find(f => f.face === 'D')!;
   const row1 = faceD.rows.find(x => x.row === 1)!;
-  ok_('横幅超過でfits=false', row1.fits === false);
-  ok_('この段は1個も配置されない', row1.placedHoles.length === 0, `${row1.placedHoles.length}`);
-  ok_('未配置に2個とも入る', r.unplacedHoles.length === 2, `${r.unplacedHoles.length}`);
-  const hasError = r.warnings.some(w => w.level === 'error' && w.message.includes('D面') && w.message.includes('横幅'));
-  ok_('D面1段目の横幅超過エラーが出る', hasError, r.warnings.map(w => w.message).join(' | '));
+  ok_('要求2本のうち1本しか配置できないためfits=false', row1.fits === false);
+  ok_('横幅に収まる1個目(x=125)は配置される', row1.placedHoles.length === 1 && row1.placedHoles[0]?.x === 125,
+    `placed=${row1.placedHoles.length} x=${row1.placedHoles.map(h => h.x).join(',')}`);
+  ok_('未配置は1個だけ(横幅を超える2個目のみ)', r.unplacedHoles.length === 1, `${r.unplacedHoles.length}`);
+  const hasError = r.warnings.some(w => w.level === 'error' && w.message.includes('D面') && w.message.includes('横幅') && w.message.includes('x=385'));
+  ok_('D面1段目、x=385の穴だけ横幅超過エラーが出る', hasError, r.warnings.map(w => w.message).join(' | '));
 }
 
 console.log('\n■ 450サイズ：段を積み上げすぎて面の高さ(600mm)を超えるとエラーになること');
@@ -369,19 +373,22 @@ console.log('\n■ 450サイズ：段を積み上げすぎて面の高さ(600mm)
   ok_('B面の高さ超過エラーが出る', hasError, r.warnings.map(w => w.message).join(' | '));
 }
 
-console.log('\n■ 450サイズ：A面の⊗マーク（内部インサート、ローカル175,274・半径22.5）と重なる穴だけ配置されないこと（コネクター外径基準）');
+console.log('\n■ 450サイズ：A面の⊗マーク（内部インサート、ローカル175,274・半径22.5）に当たる穴は「その場で諦める」のではなく先まで押し出して配置し直すこと（2026-09-18、社長ご指摘で変更）');
 {
-  // 2026-09-16: 干渉判定がコネクター外径(footprintDiameterMm)基準になったことで、
-  // 旧テスト(kkfit FEP30を5段積んで265に到達させる)は外径ベースだと積み上がり方が変わり
-  // ⊗マークに届かなくなったため、外径基準で改めて手計算した組み合わせに更新した。
+  // 2026-09-18: 社長ご指摘「⊗マークと重なるからその穴を諦めるのではなく、マークの先まで
+  // 動かして配置し直せばいいのでは」を受け、layoutRowX内でナイーブな位置が⊗マーク等と重なる
+  // 場合は領域の右端の先まで中心位置を押し出す(avoidKeepOutZones)ように変更した。
   //
   // 1段目: kmf FEP150(コネクター外径246)を1個。
   //   centerYOffset=ceil(246/2,5)=125, bandTop=125+123=248, 次段base=ceil(248+10,5)=260。
-  // 2段目: kkfit FEP30(コネクター外径74)を4個。
-  //   centerYOffset=ceil(74/2,5)=40, absCenterY=260+40=300。
-  //   x位置(降順ピッチ85で並ぶ): 40, 125, 210, 295。
-  //   ⊗マーク(175,274,半径22.5)との距離: x=40→137.5, x=125→56.4, x=210→43.6, x=295→122.8。
-  //   半径37+22.5=59.5との比較で、x=125とx=210の2個だけが重なる（手計算で検算済み）。
+  // 2段目: kkfit FEP30(コネクター外径74)を4個。centerYOffset=ceil(74/2,5)=40, absCenterY=300。
+  //   ⊗マーク(175,274,半径22.5)との干渉範囲は、dy=300-274=26, threshold=37+22.5=59.5,
+  //   halfWidth=sqrt(59.5^2-26^2)=53.5 → x∈(121.5,228.5)が⊗マークと重なる禁止帯。
+  //   押し出し後の実際の位置(npx tsxで実装を直接実行し検算済み): x=40(禁止帯外・そのまま),
+  //   x=125→禁止帯内のため228.5の先の230まで押し出し, x=230+ピッチ85=315→350mmの横幅を超える
+  //   ため配置対象外, x=315+85=400→同じく横幅超過で配置対象外。結果、2個(x=40,230)配置・
+  //   2個(横幅超過)配置対象外、という「本数の上限自体は変わらないが理由と位置が変わる」結果になる
+  //   （⊗マークを避けて押し出した先で今度は面の横幅に収まらなくなるため。手計算・実装出力とも一致）。
   const runs: ConduitRun[] = [
     { face: 'A', row: 1, brand: 'kmf', fepSize: 150, count: 1 },
     { face: 'A', row: 2, brand: 'kkfit', fepSize: 30, count: 4 },
@@ -389,17 +396,42 @@ console.log('\n■ 450サイズ：A面の⊗マーク（内部インサート、
   const r = computeHandholeLayout({ width: 450, runs });
   const faceA = r.faces.find(f => f.face === 'A')!;
   const row2 = faceA.rows.find(x => x.row === 2)!;
-  ok_('2段目は横幅・高さは問題ない(fits=true)', row2.fits === true, `bandTopMm=${row2.bandTopMm}`);
+  ok_('2段目は高さは問題ないが4本中2本しか入らずfits=false', row2.fits === false, `bandTopMm=${row2.bandTopMm}`);
   ok_('2段目は4個要求', row2.requiredHoles.length === 4);
-  ok_('2段目は4個中2個だけ⊗マークと重なり配置されない', row2.placedHoles.length === 2,
+  ok_('2段目は4個中2個配置できる（⊗マークを避けて押し出した結果）', row2.placedHoles.length === 2,
     `placed=${row2.placedHoles.length} x=${row2.placedHoles.map(h => h.x).join(',')}`);
-  ok_('配置できたのはx=40とx=295の2個（x=125,210は⊗マークと重なり除外）',
-    row2.placedHoles.every(h => h.x === 40 || h.x === 295),
+  ok_('配置できたのはx=40とx=230の2個（x=230は125から⊗マークの先まで押し出された位置）',
+    row2.placedHoles.every(h => h.x === 40 || h.x === 230),
     `x=${row2.placedHoles.map(h => h.x).join(',')}`);
-  const hasError = r.warnings.some(w => w.level === 'error' && w.message.includes('A面') && w.message.includes('⊗マーク'));
-  ok_('A面の⊗マーク重複エラーが出る', hasError, r.warnings.map(w => w.message).join(' | '));
+  ok_('押し出し後も⊗マークとは重ならない（干渉判定に引っかからない）',
+    !r.warnings.some(w => w.level === 'error' && w.message.includes('と重なります')),
+    r.warnings.map(w => w.message).join(' | '));
+  const hasError = r.warnings.some(w => w.level === 'error' && w.message.includes('A面') && w.message.includes('横幅'));
+  ok_('押し出した先で横幅を超える2本は横幅超過エラーになる', hasError, r.warnings.map(w => w.message).join(' | '));
   ok_('未配置がある', r.unplacedHoles.length > 0, `${r.unplacedHoles.length}`);
   if (faceA.area) checkInvariants('A面全体(配置できた分)', faceA.placedHoles, faceA.area.workableWidthMm, faceA.area.workableHeightMm);
+}
+
+console.log('\n■ 600E-600：⊗マークを避けて押し出した結果、面の横幅に収まらない分だけが配置対象外になること（社長報告の実例の再現）');
+{
+  // 社長が実機で報告した状況の再現：A面1段目にKKフィットFEP50(外径98)を4本要求。
+  // ⊗マーク(225,65,半径22.5)との干渉範囲はx∈(155.1,294.9)。押し出し前は40,160,270,380mmに
+  // 並ぶはずが、160→295(押し出し)、270は押し出し後の295から見て次のピッチ位置なので
+  // 実際にはlayoutRowXが順に計算するため、押し出しの連鎖を実装出力で直接確認する。
+  const runs: ConduitRun[] = [{ face: 'A', row: 1, brand: 'kkfit', fepSize: 50, count: 4 }];
+  const r = computeHandholeLayout({ width: 600, heightVariantCode: '600E-600', runs });
+  const faceA = r.faces.find(f => f.face === 'A')!;
+  const row1 = faceA.rows.find(x => x.row === 1)!;
+  ok_('4本要求、⊗マークと面の横幅の両方の制約で2本しか入らない(この位置での物理的な上限)',
+    row1.placedHoles.length === 2, `placed=${row1.placedHoles.length} x=${row1.placedHoles.map(h => h.x).join(',')}`);
+  ok_('1本目はx=50(禁止帯より左、押し出し不要)', row1.placedHoles.some(h => h.x === 50),
+    `x=${row1.placedHoles.map(h => h.x).join(',')}`);
+  ok_('2本目は⊗マークの先(x=295)まで押し出されている（旧実装のx=380と違う位置）',
+    row1.placedHoles.some(h => h.x === 295), `x=${row1.placedHoles.map(h => h.x).join(',')}`);
+  ok_('残り2本は押し出した先で横幅超過になり配置対象外', r.unplacedHoles.length === 2, `${r.unplacedHoles.length}`);
+  const hasKeepoutError = r.warnings.some(w => w.level === 'error' && w.message.includes('と重なります'));
+  ok_('もはや⊗マーク重複エラーは出ない（押し出しで回避済みのため）', !hasKeepoutError, r.warnings.map(w => w.message).join(' | '));
+  if (faceA.area) checkInvariants('600E-600 A面1段目(配置できた分)', row1.placedHoles, faceA.area.workableWidthMm, faceA.area.workableHeightMm);
 }
 
 console.log('\n■ 5mm/10mmグリッドに丸められているか（x・yとも）');
