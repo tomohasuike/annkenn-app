@@ -149,6 +149,64 @@ export default function HandholeKnockoutCalc() {
     setManualPositions(prev => ({ ...prev, [holeId]: { x: xMm, y: yMm } }));
   };
 
+  // ── 複数選択→まとめて並べる（2026-09-18 社長ご要望） ──────────────────
+  // 「それぞれ一個一個動かすのは難しい。グルーピングで均等割付け・指定割り付けができるといい」
+  // への対応。選択自体は穴IDの集合(selectedHoleIds)を持つだけで、実際の並べ替えは
+  // manualPositionsへのまとめ書き込みとして実装する（ドラッグ1本と仕組みは同じ）。
+  // 穴IDに面が含まれるため、面をまたいだ選択が残っても実害は無い（表示中の面のチップにしか
+  // 現れず、実行対象も表示中の面の穴に絞って計算する）。
+  const [selectedHoleIds, setSelectedHoleIds] = useState<Set<string>>(new Set());
+  const [pitchInputMm, setPitchInputMm] = useState(0);
+
+  const toggleHoleSelect = (holeId: string) => {
+    setSelectedHoleIds(prev => {
+      const next = new Set(prev);
+      if (next.has(holeId)) next.delete(holeId); else next.add(holeId);
+      return next;
+    });
+  };
+
+  // 選択した穴のうち、両端(現在の左端・右端の中心)はそのままに、間を等間隔に並べ直す。
+  // CADの「均等割付け」と同じ考え方：端は動かさず、間だけ均す。
+  const distributeSelectedEvenly = () => {
+    if (!displayedFaceResult) return;
+    const selected = displayedFaceResult.placedHoles.filter(h => selectedHoleIds.has(h.id));
+    if (selected.length < 2) return;
+    const sorted = [...selected].sort((a, b) => a.x - b.x);
+    const minX = sorted[0].x;
+    const maxX = sorted[sorted.length - 1].x;
+    const step = (maxX - minX) / (sorted.length - 1);
+    setManualPositions(prev => {
+      const next = { ...prev };
+      sorted.forEach((h, i) => {
+        const xMm = Math.round((minX + step * i) / gridMm) * gridMm;
+        next[h.id] = { x: xMm, y: h.y };
+      });
+      return next;
+    });
+  };
+
+  // 選択した穴を、現在の中心位置を保ったまま指定ピッチ(mm)で並べ直す（中心から左右に展開）。
+  // 実際の削孔図でもC面・D面に左右対称配置する例が複数確認できているため（2026-09-18調査）、
+  // 左端基準ではなく中心基準にしている。
+  const distributeSelectedWithPitch = () => {
+    if (!displayedFaceResult || pitchInputMm <= 0) return;
+    const selected = displayedFaceResult.placedHoles.filter(h => selectedHoleIds.has(h.id));
+    if (selected.length < 2) return;
+    const sorted = [...selected].sort((a, b) => a.x - b.x);
+    const n = sorted.length;
+    const centerX = (sorted[0].x + sorted[n - 1].x) / 2;
+    const startX = centerX - (pitchInputMm * (n - 1)) / 2;
+    setManualPositions(prev => {
+      const next = { ...prev };
+      sorted.forEach((h, i) => {
+        const xMm = Math.round((startX + pitchInputMm * i) / gridMm) * gridMm;
+        next[h.id] = { x: xMm, y: h.y };
+      });
+      return next;
+    });
+  };
+
   const heightVariants = useMemo(() => heightVariantsFor(width), [width]);
   const areas = useMemo(() => machinableAreasFor(width, heightVariantCode), [width, heightVariantCode]);
   const allFacesUnconfirmed = HANDHOLE_FACE_ORDER.every(f => areas[f] == null);
@@ -213,16 +271,38 @@ export default function HandholeKnockoutCalc() {
     };
   }, [activeFaceResult, manualPositions]);
 
-  // 現在表示中の位置(ドラッグ後含む)で、離隔不足・⊗マーク重なり・エリア外等の違反が
-  // 無いかをチェックする。ドラッグ自体は止めず、違反している穴だけ縁を赤くする
-  // （AskUserQuestionで確定した方針「色で知らせるだけ」）。
-  const violatingHoleIds = useMemo(() => {
-    if (!activeFaceArea || !displayedFaceResult) return new Set<string>();
-    const positioned: PositionedHole[] = displayedFaceResult.placedHoles.map(h => ({
-      id: h.id, label: h.label, x: h.x, y: h.y, footprintDiameterMm: h.footprintDiameterMm, clearanceMm: h.clearanceMm,
-    }));
-    return new Set(checkPlacementViolations(positioned, activeFaceArea).map(v => v.holeId));
-  }, [activeFaceArea, displayedFaceResult]);
+  // ドラッグ・均等割付け・指定ピッチで調整した位置を反映した、全面ぶんの配置済み穴一覧。
+  // 「配置座標一覧」表・発注図面(DXF)は見た目のプレビューではなく実際に工場へ渡す仕様なので、
+  // 調整結果を反映しないと「画面では直したのに発注データは古いまま」という事故になる
+  // （2026-09-18、社長の「一個一個動かすのは難しい」フィードバックへの対応中に気づいた
+  // 設計漏れ。ドラッグ機能を追加した直後は画面表示だけに反映していた）。
+  const displayedPlacedHoles = useMemo(
+    () => applyManualPositions(result.placedHoles, manualPositions),
+    [result.placedHoles, manualPositions],
+  );
+
+  // 全面ぶんの、離隔不足・⊗マーク重なり・エリア外等の違反一覧（面をまたいで集計）。
+  // ドラッグ自体は止めず、違反している穴だけ縁を赤くする（AskUserQuestionで確定した方針
+  // 「色で知らせるだけ」）が、発注図面(DXF)は違反が残っている間はダウンロードさせない
+  // （画面上の警告を見落としたまま工場に送ってしまう事故を防ぐため）。
+  const allFaceViolations = useMemo(() => {
+    const out: { face: HandholeFace; holeId: string; reasons: string[] }[] = [];
+    HANDHOLE_FACE_ORDER.forEach(face => {
+      const area = areas[face];
+      const faceResult = result.faces.find(f => f.face === face);
+      if (!area || !faceResult) return;
+      const positioned: PositionedHole[] = applyManualPositions(faceResult.placedHoles, manualPositions).map(h => ({
+        id: h.id, label: h.label, x: h.x, y: h.y, footprintDiameterMm: h.footprintDiameterMm, clearanceMm: h.clearanceMm,
+      }));
+      checkPlacementViolations(positioned, area).forEach(v => out.push({ face, ...v }));
+    });
+    return out;
+  }, [areas, result.faces, manualPositions]);
+
+  const violatingHoleIds = useMemo(
+    () => new Set(allFaceViolations.filter(v => v.face === activeFace).map(v => v.holeId)),
+    [allFaceViolations, activeFace],
+  );
 
   // 選択中の面・バリエーションでブロック数が減った（例：ブロック2を選んだ状態で450に切り替えた）
   // 場合、存在するブロックへ戻す。
@@ -270,12 +350,14 @@ export default function HandholeKnockoutCalc() {
     setSuggestRequests([]);
     setSuggestUnallocated(null);
     setManualPositions({});
+    setSelectedHoleIds(new Set());
   };
 
   // サイズ・高さバリエーションを切り替えると加工可能エリア自体が変わり、ドラッグで
   // 調整した位置の意味が無くなる（面の大きさ・⊗マーク位置が違うため）ので、都度クリアする。
   useEffect(() => {
     setManualPositions({});
+    setSelectedHoleIds(new Set());
   }, [width, heightVariantCode]);
 
   // ── おすすめ割り付けの操作 ──────────────────────────────────
@@ -299,12 +381,14 @@ export default function HandholeKnockoutCalc() {
     }
   };
 
-  // 発注図面(DXF)ダウンロード可否。配置済みの穴が1件以上あり、
-  // 未配置の穴が無い場合のみ許可する（穴が足りないまま発注してしまう事故を防ぐ）。
+  // 発注図面(DXF)ダウンロード可否。配置済みの穴が1件以上あり、未配置の穴が無く、
+  // ドラッグ等での調整後に離隔不足・⊗マーク重なり等の違反が残っていない場合のみ許可する
+  // （穴が足りない・重なったまま発注してしまう事故を防ぐ）。
   // 発注図面(DXF)への自動書き込みはKK-E型450サイズのテンプレートのみ用意されている
   // （handholeDxfExport.tsのgenerateHandholeOrderDxfが450以外を明示的に拒否する）。
   // 600等は加工可能エリア自体は実装済みでもDXFテンプレートが無いため、widthで別途ガードする。
-  const canDownloadDxf = width === 450 && result.placedHoles.length > 0 && result.unplacedHoles.length === 0;
+  const canDownloadDxf = width === 450 && result.placedHoles.length > 0
+    && result.unplacedHoles.length === 0 && allFaceViolations.length === 0;
 
   const downloadOrderDxf = async () => {
     if (!canDownloadDxf) return;
@@ -316,7 +400,7 @@ export default function HandholeKnockoutCalc() {
         throw new Error(`テンプレートDXFの取得に失敗しました（HTTP ${res.status}）。`);
       }
       const templateText = await res.text();
-      const dxfText = generateHandholeOrderDxf(templateText, result.placedHoles, width);
+      const dxfText = generateHandholeOrderDxf(templateText, displayedPlacedHoles, width);
       downloadDxfText(dxfText, `KKE${width}_B75_発注図面_${new Date().toISOString().slice(0, 10)}.dxf`);
     } catch (e) {
       setDxfError(e instanceof HandholeDxfExportError ? e.message : `発注図面の生成に失敗しました: ${e instanceof Error ? e.message : String(e)}`);
@@ -739,6 +823,76 @@ export default function HandholeKnockoutCalc() {
             violatingHoleIds={violatingHoleIds}
             gridMm={gridMm}
           />
+
+          {/* 複数選択→均等割付け・指定ピッチ（2026-09-18 社長ご要望「一個一個動かすのは
+              難しい。グルーピングで均等割付け・指定割り付けができるといい」への対応）。
+              チップで穴を選び、2個以上選ぶと下の2つのボタンが使えるようになる。 */}
+          {displayedFaceResult && displayedFaceResult.placedHoles.length >= 2 && (() => {
+            const selectedInFace = displayedFaceResult.placedHoles.filter(h => selectedHoleIds.has(h.id));
+            return (
+              <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2 bg-slate-50/60 dark:bg-slate-800/30">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <label className="text-xs font-semibold text-slate-500 block">複数の穴を選んでまとめて並べる</label>
+                  {selectedInFace.length > 0 && (
+                    <button
+                      onClick={() => setSelectedHoleIds(new Set())}
+                      className="text-xs font-bold text-slate-400 hover:text-red-500"
+                    >
+                      選択を解除
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {displayedFaceResult.placedHoles.map(h => (
+                    <button
+                      key={h.id}
+                      onClick={() => toggleHoleSelect(h.id)}
+                      className={chip(selectedHoleIds.has(h.id)) + ' !text-xs'}
+                    >
+                      {h.label}（x={Math.round(h.x)}）
+                    </button>
+                  ))}
+                </div>
+                {selectedInFace.length < 2 ? (
+                  <p className="text-[11px] text-slate-400">2つ以上選ぶと、均等割付け・指定ピッチでの並べ替えが使えます。</p>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <button
+                      onClick={distributeSelectedEvenly}
+                      className="px-3 py-2 rounded-lg bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold transition-colors"
+                    >
+                      均等割付け（両端はそのまま、間を均等に）
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">指定ピッチ(mm)</span>
+                      <input
+                        type="number" inputMode="numeric" min={0} value={pitchInputMm}
+                        onChange={e => setPitchInputMm(Math.max(Number(e.target.value) || 0, 0))}
+                        className="w-20 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold"
+                      />
+                      <button
+                        onClick={distributeSelectedWithPitch}
+                        disabled={pitchInputMm <= 0}
+                        className={`px-3 py-2 rounded-lg text-xs font-bold transition-colors ${
+                          pitchInputMm > 0
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
+                        }`}
+                      >
+                        このピッチで並べる
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <p className="text-[11px] text-slate-400">
+                  どちらも選択した穴の中心位置(x)だけを並べ替えます（yは変えません）。グリッド単位に丸めるため、
+                  ピッチがグリッドの倍数でない場合はわずかにずれることがあります。離隔不足・⊗マーク重なりが
+                  出た場合は上の図で穴の縁が赤くなるので確認してください。
+                </p>
+              </div>
+            );
+          })()}
+
           {result.unplacedHoles.length > 0 && (
             <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3">
               <div className="text-xs font-bold text-red-700 dark:text-red-300 mb-1.5">未配置（面・段の指定にエラーがあるか、面の実寸が未確認です）</div>
@@ -795,6 +949,16 @@ export default function HandholeKnockoutCalc() {
               <span>
                 配置できなかった穴が{result.unplacedHoles.length}件あるため、発注図面はダウンロードできません。
                 上の警告を確認し、段の配管を減らすか、別の面・段を選び直してから再度お試しください。
+              </span>
+            </div>
+          ) : allFaceViolations.length > 0 ? (
+            <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-xs text-red-700 dark:text-red-300">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>
+                ドラッグ・均等割付け等で調整した位置に、離隔不足や⊗マーク重なりなどの問題が
+                {new Set(allFaceViolations.map(v => v.face)).size}面に残っているため、発注図面はダウンロードできません
+                （{Array.from(new Set(allFaceViolations.map(v => v.face))).map(f => FACE_LABELS[f]).join('・')}）。
+                加工図で縁が赤い穴を確認し、位置を直してから再度お試しください。
               </span>
             </div>
           ) : null}
@@ -872,17 +1036,20 @@ export default function HandholeKnockoutCalc() {
                     </tr>
                   </thead>
                   <tbody>
-                    {result.placedHoles.map(h => (
-                      <tr key={h.id} className="border-b border-slate-50 dark:border-slate-800/60">
-                        <td className="py-1.5 text-slate-700 dark:text-slate-200">{h.label}</td>
-                        <td className="text-center font-bold text-blue-600 dark:text-blue-400">{FACE_LABELS[h.face]}</td>
-                        {anyMultiBlock && <td className="text-center tabular-nums text-slate-700 dark:text-slate-200">{h.block}</td>}
-                        <td className="text-center tabular-nums text-slate-700 dark:text-slate-200">{h.row}</td>
-                        <td className="text-right tabular-nums text-slate-700 dark:text-slate-200">{h.x}</td>
-                        <td className="text-right tabular-nums text-slate-700 dark:text-slate-200">{h.y}</td>
-                        <td className="text-right tabular-nums font-bold text-slate-800 dark:text-slate-100">φ{h.diameterMm}</td>
-                      </tr>
-                    ))}
+                    {displayedPlacedHoles.map(h => {
+                      const violating = allFaceViolations.some(v => v.holeId === h.id);
+                      return (
+                        <tr key={h.id} className={`border-b border-slate-50 dark:border-slate-800/60 ${violating ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
+                          <td className="py-1.5 text-slate-700 dark:text-slate-200">{h.label}{violating && <span className="ml-1 text-red-600 dark:text-red-400 font-bold">要確認</span>}</td>
+                          <td className="text-center font-bold text-blue-600 dark:text-blue-400">{FACE_LABELS[h.face]}</td>
+                          {anyMultiBlock && <td className="text-center tabular-nums text-slate-700 dark:text-slate-200">{h.block}</td>}
+                          <td className="text-center tabular-nums text-slate-700 dark:text-slate-200">{h.row}</td>
+                          <td className="text-right tabular-nums text-slate-700 dark:text-slate-200">{h.x}</td>
+                          <td className="text-right tabular-nums text-slate-700 dark:text-slate-200">{h.y}</td>
+                          <td className="text-right tabular-nums font-bold text-slate-800 dark:text-slate-100">φ{h.diameterMm}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
