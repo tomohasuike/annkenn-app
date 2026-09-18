@@ -149,6 +149,23 @@ export default function HandholeKnockoutCalc() {
     setManualPositions(prev => ({ ...prev, [holeId]: { x: xMm, y: yMm } }));
   };
 
+  // グループドラッグ（2026-09-18 社長ご指摘「グルーピングしたものは一緒に動くという前提」への
+  // 対応）。選択中の穴のうち1つをドラッグすると、選んだ穴全員が同じ移動量(dxMm,dyMm)だけ動く。
+  // 各穴の「現在表示中の位置」（既存のmanualPositionsオーバーライドを含む）を起点に加算するため、
+  // 個別ドラッグ(handleHoleMove)と挙動が揃う。
+  const handleHoleGroupMove = (holeIds: string[], dxMm: number, dyMm: number) => {
+    if (!displayedFaceResult) return;
+    setManualPositions(prev => {
+      const next = { ...prev };
+      holeIds.forEach(id => {
+        const current = displayedFaceResult.placedHoles.find(h => h.id === id);
+        if (!current) return;
+        next[id] = { x: current.x + dxMm, y: current.y + dyMm };
+      });
+      return next;
+    });
+  };
+
   // ── 複数選択→まとめて並べる（2026-09-18 社長ご要望） ──────────────────
   // 「それぞれ一個一個動かすのは難しい。グルーピングで均等割付け・指定割り付けができるといい」
   // への対応。選択自体は穴IDの集合(selectedHoleIds)を持つだけで、実際の並べ替えは
@@ -820,19 +837,25 @@ export default function HandholeKnockoutCalc() {
             placedHoles={displayedFaceResult?.placedHoles ?? []}
             rows={displayedFaceResult?.rows ?? []}
             onHoleMove={handleHoleMove}
+            onHoleGroupMove={handleHoleGroupMove}
+            selectedHoleIds={selectedHoleIds}
             violatingHoleIds={violatingHoleIds}
             gridMm={gridMm}
           />
 
-          {/* 複数選択→均等割付け・指定ピッチ（2026-09-18 社長ご要望「一個一個動かすのは
-              難しい。グルーピングで均等割付け・指定割り付けができるといい」への対応）。
-              チップで穴を選び、2個以上選ぶと下の2つのボタンが使えるようになる。 */}
+          {/* 複数選択→グループ化（2026-09-18 社長ご要望）。
+              最初は「選択→均等割付け／指定ピッチ」ボタンだけで実装したが、社長から
+              「俺が言ってるグルーピングは、グルーピングしたものは一緒に動くという前提。
+              これではグルーピングの意味がない、ただ離隔距離が取れますよというだけになってる」
+              とのご指摘を受け、選択＝グループとして「上の加工図で1つドラッグすると選んだ穴が
+              全部一緒に動く」機能をHandholeDrawing側に追加した（onHoleGroupMove）。
+              均等割付け・指定ピッチのボタンは、グループを整列させる別の手段として残している。 */}
           {displayedFaceResult && displayedFaceResult.placedHoles.length >= 2 && (() => {
             const selectedInFace = displayedFaceResult.placedHoles.filter(h => selectedHoleIds.has(h.id));
             return (
               <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2 bg-slate-50/60 dark:bg-slate-800/30">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <label className="text-xs font-semibold text-slate-500 block">複数の穴を選んでまとめて並べる</label>
+                  <label className="text-xs font-semibold text-slate-500 block">複数の穴を選んでグループ化</label>
                   {selectedInFace.length > 0 && (
                     <button
                       onClick={() => setSelectedHoleIds(new Set())}
@@ -854,7 +877,7 @@ export default function HandholeKnockoutCalc() {
                   ))}
                 </div>
                 {selectedInFace.length < 2 ? (
-                  <p className="text-[11px] text-slate-400">2つ以上選ぶと、均等割付け・指定ピッチでの並べ替えが使えます。</p>
+                  <p className="text-[11px] text-slate-400">2つ以上選ぶとグループになり、上の加工図でそのうちの1つをドラッグすると全部一緒に動きます（均等割付け・指定ピッチも使えるようになります）。</p>
                 ) : (
                   <div className="flex flex-wrap items-center gap-3 pt-1">
                     <button
@@ -885,9 +908,10 @@ export default function HandholeKnockoutCalc() {
                   </div>
                 )}
                 <p className="text-[11px] text-slate-400">
-                  どちらも選択した穴の中心位置(x)だけを並べ替えます（yは変えません）。グリッド単位に丸めるため、
-                  ピッチがグリッドの倍数でない場合はわずかにずれることがあります。離隔不足・⊗マーク重なりが
-                  出た場合は上の図で穴の縁が赤くなるので確認してください。
+                  選んだ穴は上の加工図で縁が青くなり、1つをドラッグすると選んだ穴全部が同じ量だけ一緒に動きます
+                  （相対位置は保ったまま平行移動）。均等割付け・指定ピッチのボタンは中心位置(x)だけを並べ替えます
+                  （yは変えません）。グリッド単位に丸めるため、ピッチがグリッドの倍数でない場合はわずかにずれる
+                  ことがあります。離隔不足・⊗マーク重なりが出た場合は上の図で穴の縁が赤くなるので確認してください。
                 </p>
               </div>
             );

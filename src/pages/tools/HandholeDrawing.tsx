@@ -35,6 +35,21 @@
 // violatingHoleIdsは呼び出し側(HandholeKnockoutCalc.tsx)がcheckPlacementViolations()で
 // 計算した「現在違反している穴のID」の集合。ドラッグを止める判定には使わず、あくまで
 // 縁の色を変えるだけ（方針2）。
+//
+// グルーピング（複数穴の一体ドラッグ）・高さ整列スナップ（2026-09-18追加）:
+// ドラッグ機能を実際に触った社長から「グルーピングしたものは両方一緒に動くっていう前提で、
+// 横方向の高さがカチッと揃う時が分かるといいなと思ってて。これでは（選択→均等割付けボタンでは）
+// グルーピングの意味がない、ただ単に離隔距離が取れますよっていうだけになっちゃってる」との
+// フィードバック。selectedHoleIdsで渡された穴の集合を「グループ」とみなし、そのうちの1つを
+// ドラッグすると他の全メンバーも同じ量だけ剛体移動する（相対位置を保ったまま一緒に動く）。
+// 実装は、ドラッグ中のリーダーのGroupノードのx/y(px)を、他メンバーのGroupノードにも
+// 命令的（node.x()/node.y()）にそのままコピーするだけ＝全員x=0,y=0起点で子要素が絶対座標
+// なので、同じオフセットを与えれば同じ量の平行移動になる。ドラッグ終了時にまとめて
+// onHoleGroupMoveへ通知し、各メンバーのノードもリーダーと同様に0へ戻す
+// （次の再描画でx={0}固定propが効くのでズレは残らない）。
+// 高さ整列スナップは、グループの有無に関わらず全ドラッグに効く：ドラッグ中の穴(リーダー)の
+// yが、グループ外の他の穴のyとALIGN_SNAP_MM以内に近づいたら、その値へ厳密にスナップし、
+// ガイド線（マゼンタの破線）を描いて「揃いました」を視覚的に示す。
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stage, Layer, Rect, Circle, Line, Text, Group } from 'react-konva';
@@ -44,12 +59,16 @@ import type { FaceRowResult, PlacedHole } from '../../utils/handholeLayoutEngine
 
 const MARGIN = { top: 40, right: 24, bottom: 30, left: 60 };
 const MAX_DRAW_H = 420;
+/** ドラッグ中の穴のyが他の穴のyとこの範囲(mm)以内に近づいたら、高さを揃えてスナップする。 */
+const ALIGN_SNAP_MM = 5;
 
 export default function HandholeDrawing({
   area,
   placedHoles,
   rows = [],
   onHoleMove,
+  onHoleGroupMove,
+  selectedHoleIds,
   violatingHoleIds,
   gridMm = 5,
 }: {
@@ -57,8 +76,12 @@ export default function HandholeDrawing({
   placedHoles: PlacedHole[];
   /** 段の区切り線を描くための段ごとの結果（省略時は区切り線を描かない）。 */
   rows?: FaceRowResult[];
-  /** 渡すと穴がドラッグ移動できるようになる。ドラッグ終了時に穴ID・新しいmm座標(面ローカル)を通知する。 */
+  /** 渡すと穴がドラッグ移動できるようになる。単独（グループに属さない）穴のドラッグ終了時に通知する。 */
   onHoleMove?: (holeId: string, xMm: number, yMm: number) => void;
+  /** selectedHoleIdsで2件以上まとまっている穴をドラッグした時、グループ全体の移動量(mm)を通知する。 */
+  onHoleGroupMove?: (holeIds: string[], dxMm: number, dyMm: number) => void;
+  /** 選択中（グループ化対象）の穴ID。2件以上ある時、そのうち1つをドラッグすると全員が一緒に動く。 */
+  selectedHoleIds?: Set<string>;
   /** checkPlacementViolations()で違反ありと判定された穴のID一覧。渡された穴は縁を赤くする。 */
   violatingHoleIds?: Set<string>;
   /** ドラッグ中の中心位置をこの単位(mm)でスナップする。省略時5mm。 */
@@ -67,6 +90,10 @@ export default function HandholeDrawing({
   const wrapRef = useRef<HTMLDivElement>(null);
   const [wrapWidth, setWrapWidth] = useState(760);
   const [isDark, setIsDark] = useState(false);
+  // ドラッグ中の高さ整列ガイド線のy(px)。揃っていない時はnull。
+  const [alignGuideYPx, setAlignGuideYPx] = useState<number | null>(null);
+  // 穴ID→Konva Groupノード。グループドラッグでリーダー以外のメンバーを命令的に追従させるために使う。
+  const holeNodeRefs = useRef<Map<string, Konva.Group>>(new Map());
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -212,7 +239,8 @@ export default function HandholeDrawing({
 
           {/* 配置済みの穴（実線＝穴/ビット径）＋コネクター外径（破線、定義がある銘柄のみ）
               onHoleMoveが渡された場合はドラッグで移動できる（Groupはx=0,y=0固定＝controlled、
-              子要素は現在のh.x/h.yから計算した絶対座標。ファイル冒頭コメント参照）。 */}
+              子要素は現在のh.x/h.yから計算した絶対座標。ファイル冒頭コメント参照）。
+              selectedHoleIdsに2件以上入っている穴どうしは「グループ」として一緒にドラッグされる。 */}
           {placedHoles.map(h => {
             const cx = areaLeftPx + h.x * scale;
             const cy = areaBottomPx - h.y * scale;
@@ -220,7 +248,20 @@ export default function HandholeDrawing({
             const outerDiameterMm = connectorOuterDiameterFor(h.brand, h.fepSize);
             const rOuter = outerDiameterMm != null ? Math.max((outerDiameterMm / 2) * scale, r) : null;
             const violating = violatingHoleIds?.has(h.id) ?? false;
-            const strokeColor = violating ? '#dc2626' : '#16a34a';
+            const selected = (selectedHoleIds?.size ?? 0) > 1 && (selectedHoleIds?.has(h.id) ?? false);
+            const strokeColor = violating ? '#dc2626' : selected ? '#2563eb' : '#16a34a';
+
+            // このグループのメンバー（自分含む）。2件以上の時だけ「グループドラッグ」の対象になる。
+            const groupIds = selected ? placedHoles.filter(x => selectedHoleIds!.has(x.id)).map(x => x.id) : [h.id];
+            const companionIds = groupIds.filter(id => id !== h.id);
+            // 高さ整列スナップの比較対象＝グループの外にある穴（自分たちの高さが動くたびズレるのを避ける）。
+            const otherHolesForAlign = placedHoles.filter(o => !groupIds.includes(o.id));
+            const findAlignYMm = (candidateYMm: number): number | null => {
+              for (const o of otherHolesForAlign) {
+                if (Math.abs(o.y - candidateYMm) <= ALIGN_SNAP_MM) return o.y;
+              }
+              return null;
+            };
 
             const dragBoundFunc = (pos: { x: number; y: number }) => {
               // posはGroupの親(Layer)座標系での提案位置。Groupは常にx=0,y=0起点なので
@@ -228,22 +269,50 @@ export default function HandholeDrawing({
               // px量に戻す（pyはmmが増えるほど画面yが減る向きなので符号を反転）。
               const dxMm = pos.x / scale;
               const dyMm = -pos.y / scale;
+              const rawYMm = h.y + dyMm;
               const snappedXMm = Math.round((h.x + dxMm) / gridMm) * gridMm;
-              const snappedYMm = Math.round((h.y + dyMm) / gridMm) * gridMm;
+              const alignYMm = findAlignYMm(rawYMm);
+              const snappedYMm = alignYMm ?? Math.round(rawYMm / gridMm) * gridMm;
               return {
                 x: (snappedXMm - h.x) * scale,
                 y: -(snappedYMm - h.y) * scale,
               };
             };
 
+            const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+              const dxPx = e.target.x();
+              const dyPx = e.target.y();
+              // グループの他メンバーへ、リーダーと同じpxオフセットをそのまま与えると
+              // 相対位置を保った剛体移動になる（全員x=0,y=0起点で子要素が絶対座標のため）。
+              companionIds.forEach(id => {
+                const node = holeNodeRefs.current.get(id);
+                if (node) { node.x(dxPx); node.y(dyPx); }
+              });
+              e.target.getLayer()?.batchDraw();
+              const dyMm = -dyPx / scale;
+              const alignYMm = findAlignYMm(h.y + dyMm);
+              setAlignGuideYPx(alignYMm != null ? areaBottomPx - alignYMm * scale : null);
+            };
+
+            const resetNode = (id: string) => {
+              const node = id === h.id ? undefined : holeNodeRefs.current.get(id);
+              if (node) { node.x(0); node.y(0); }
+            };
+
             const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
               const dxMm = e.target.x() / scale;
               const dyMm = -e.target.y() / scale;
-              onHoleMove?.(h.id, h.x + dxMm, h.y + dyMm);
+              setAlignGuideYPx(null);
+              if (companionIds.length > 0 && onHoleGroupMove) {
+                onHoleGroupMove(groupIds, dxMm, dyMm);
+              } else {
+                onHoleMove?.(h.id, h.x + dxMm, h.y + dyMm);
+              }
               // 次の再描画でGroupのx/y propが0に戻るまでの間、見た目がズレないよう
               // ノード自体も明示的に0へ戻しておく（親の状態更新が同フレームで反映されない場合の保険）。
               e.target.x(0);
               e.target.y(0);
+              companionIds.forEach(resetNode);
             };
 
             return (
@@ -251,14 +320,16 @@ export default function HandholeDrawing({
                 key={h.id}
                 x={0}
                 y={0}
+                ref={node => { if (node) holeNodeRefs.current.set(h.id, node); }}
                 draggable={!!onHoleMove}
                 dragBoundFunc={onHoleMove ? dragBoundFunc : undefined}
+                onDragMove={onHoleMove ? handleDragMove : undefined}
                 onDragEnd={onHoleMove ? handleDragEnd : undefined}
               >
                 {rOuter != null && (
                   <Circle x={cx} y={cy} radius={rOuter} stroke="#0891b2" strokeWidth={1.1} dash={[4, 3]} opacity={0.7} />
                 )}
-                <Circle x={cx} y={cy} radius={r} fill={c.hole} stroke={strokeColor} strokeWidth={violating ? 2.2 : 1.6} />
+                <Circle x={cx} y={cy} radius={r} fill={c.hole} stroke={strokeColor} strokeWidth={violating || selected ? 2.2 : 1.6} />
                 <Text x={cx - 40} y={cy - (rOuter ?? r) - 24} width={80} align="center" text={`φ${h.diameterMm}`} fontSize={10} fontStyle="bold" fill="#15803d" />
                 <Text x={cx - 40} y={cy - (rOuter ?? r) - 12} width={80} align="center" text={h.label} fontSize={8} fill={c.sub} />
                 {outerDiameterMm != null && (
@@ -270,6 +341,11 @@ export default function HandholeDrawing({
               </Group>
             );
           })}
+          {/* 高さ整列ガイド線（ドラッグ中、他の穴と高さ(y)がALIGN_SNAP_MM以内に揃った時だけ表示）。 */}
+          {alignGuideYPx != null && (
+            <Line points={[areaLeftPx, alignGuideYPx, areaLeftPx + areaWidthPx, alignGuideYPx]}
+              stroke="#db2777" strokeWidth={1.5} dash={[6, 3]} />
+          )}
           {/* 段内で隣り合うコネクターどうしの実際のすき間(mm)を数字で表示。
               北関東工業自身の配置例図(drawing_howto.pdf)も、円と円の間に赤字で
               すき間の数値を書き込むスタイルになっている。「見た目が近く見える」という
@@ -316,8 +392,9 @@ export default function HandholeDrawing({
       </Stage>
       {onHoleMove && (
         <p className="text-[11px] text-slate-400 mt-1">
-          穴をドラッグすると位置を微調整できます（{gridMm}mm刻みにスナップ）。
-          離隔不足や⊗マークと重なる位置に置くと、その穴の縁が赤くなります（移動自体は止めません。発注前に位置を直してください）。
+          穴をドラッグすると位置を微調整できます（{gridMm}mm刻みにスナップ）。下で2つ以上選ぶと縁が青くなり、
+          そのうちの1つをドラッグすると選んだ穴が全部一緒に動きます。他の穴と高さ(y)が揃うとマゼンタのガイド線が出て
+          ピタッと吸着します。離隔不足や⊗マークと重なる位置に置くと、その穴の縁が赤くなります（移動自体は止めません。発注前に位置を直してください）。
         </p>
       )}
     </div>
