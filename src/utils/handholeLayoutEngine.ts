@@ -194,10 +194,25 @@ function resolveConnectorSpec(
   return { diameterMm, footprintDiameterMm, clearanceMm };
 }
 
+/**
+ * 穴のID。面・ブロック・段・銘柄・FEP呼び径・グループ内の連番だけで決まる「意味のあるID」にする
+ * （2026-09-18、自由配置=ドラッグ位置の手動上書きをholeId単位で保存するようになったため、
+ * 配列の並び順が変わっても同じ穴が同じIDを保つ必要がある。以前は`r${runsのindex}-${count内index}`
+ * という配列位置ベースのIDだったため、無関係な行を編集しただけでIDがずれ、ドラッグで保存した
+ * 位置が別の穴に化けてしまう不具合の元だった）。
+ */
+function requiredHoleId(face: HandholeFace, block: number, row: number, brand: ConnectorBrand, fepSize: FepSize, n: number): string {
+  return `${face}-${block}-${row}-${brand}-${fepSize}-${n}`;
+}
+
 /** 配管条件から、発注に必要な穴の一覧を作る（銘柄×FEP呼び径のデータが無いものは警告してスキップ）。 */
 function buildRequiredHoles(runs: ConduitRun[], warnings: LayoutWarning[]): RequiredHole[] {
   const holes: RequiredHole[] = [];
-  runs.forEach((run, ri) => {
+  // 同じ(面,ブロック,段,銘柄,FEP呼び径)の組み合わせが複数のConduitRunに分かれていても
+  // （例：同じ段に同じ銘柄・呼び径を2回に分けて追加した場合）連番が重複しないよう、
+  // グループごとに現在の連番をここで追跡する。
+  const groupCounters = new Map<string, number>();
+  runs.forEach(run => {
     if (run.count <= 0) return;
     const spec = resolveConnectorSpec(run.brand, run.fepSize);
     if (spec == null) {
@@ -207,9 +222,13 @@ function buildRequiredHoles(runs: ConduitRun[], warnings: LayoutWarning[]): Requ
       });
       return;
     }
-    for (let n = 0; n < run.count; n++) {
+    const block = run.block ?? 1;
+    const groupKey = `${run.face}-${block}-${run.row}-${run.brand}-${run.fepSize}`;
+    const startN = groupCounters.get(groupKey) ?? 0;
+    for (let i = 0; i < run.count; i++) {
+      const n = startN + i;
       holes.push({
-        id: `r${ri}-${n}`,
+        id: requiredHoleId(run.face, block, run.row, run.brand, run.fepSize, n),
         label: holeLabel(run.brand, run.fepSize),
         brand: run.brand,
         fepSize: run.fepSize,
@@ -217,10 +236,11 @@ function buildRequiredHoles(runs: ConduitRun[], warnings: LayoutWarning[]): Requ
         footprintDiameterMm: spec.footprintDiameterMm,
         clearanceMm: spec.clearanceMm,
         face: run.face,
-        block: run.block ?? 1,
+        block,
         row: run.row,
       });
     }
+    groupCounters.set(groupKey, startN + run.count);
   });
   return holes;
 }
@@ -713,4 +733,78 @@ export function suggestConduitRuns(input: SuggestLayoutInput): SuggestLayoutResu
   }
 
   return { runs, unallocated, warnings };
+}
+
+// ── 自由配置（ドラッグでの手動位置調整）の違反チェック ────────────────────
+//
+// 2026-09-18、社長ご要望「グリッドで動かして、後から寸法をつけるみたいな感じ」への対応。
+// 段の自動計算とは別に、UI側で穴をドラッグして自由に動かせるようにする機能を追加するにあたり、
+// 「ドラッグ中のルール違反（離隔不足・⊗マーク重なり等）はどう扱うか」を確認したところ、
+// 「色で知らせるだけ（ドラッグ自体は常に自由にできる）」という方針になった。この関数は、
+// 現在の（ドラッグ後の）位置一覧を受け取り、面の加工可能エリアの範囲・⊗マーク等の
+// 避けるべき領域・ブロック間の隙間（接合部）・他の穴との離隔、の4種類の違反を判定する。
+// あくまで「表示用の判定」であり、computeHandholeLayoutの自動配置ロジック（段の積み上げ・
+// ⊗マーク回避の押し出し等）とは別物。自由に動かした結果を検証するためだけに使う。
+
+/** checkPlacementViolationsに渡す、位置が確定した穴1つぶんの情報。 */
+export interface PositionedHole {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  footprintDiameterMm: number;
+  clearanceMm: number;
+}
+
+/** 1つの穴について見つかった違反理由の一覧。 */
+export interface PlacementViolation {
+  holeId: string;
+  reasons: string[];
+}
+
+/**
+ * 現在の位置一覧(holes、面全体のローカル座標＝area.workableHeightMmの座標系)を、
+ * areaの加工可能エリア境界・⊗マーク等・ブロック間の隙間・穴同士の離隔と照らし合わせて、
+ * 違反している穴とその理由を返す。違反が無い穴はholeIdが結果に含まれない。
+ */
+export function checkPlacementViolations(holes: PositionedHole[], area: MachinableArea): PlacementViolation[] {
+  const violations: PlacementViolation[] = [];
+  for (const h of holes) {
+    const reasons: string[] = [];
+    const r = h.footprintDiameterMm / 2;
+
+    if (h.x - r < -1e-6 || h.x + r > area.workableWidthMm + 1e-6 || h.y - r < -1e-6 || h.y + r > area.workableHeightMm + 1e-6) {
+      reasons.push('加工可能エリア外');
+    }
+
+    for (const z of area.keepOutZones) {
+      if (Math.hypot(h.x - z.xMm, h.y - z.yMm) < r + z.radiusMm - 1e-6) {
+        reasons.push(`${z.label}と重なる`);
+      }
+    }
+
+    // ブロック間の隙間（ピース接合部、加工不可）に穴の一部でもかかっていないか。
+    for (let i = 0; i < area.gapsMm.length; i++) {
+      const gapBottom = area.blockBottomsMm[i] + area.blocks[i].heightMm;
+      const gapTop = gapBottom + area.gapsMm[i];
+      if (h.y + r > gapBottom - 1e-6 && h.y - r < gapTop + 1e-6) {
+        reasons.push('ブロック間の接合部(加工不可)と重なる');
+      }
+    }
+
+    for (const other of holes) {
+      if (other.id === h.id) continue;
+      const dist = Math.hypot(h.x - other.x, h.y - other.y);
+      const edgeGap = dist - h.footprintDiameterMm / 2 - other.footprintDiameterMm / 2;
+      const required = Math.max(h.clearanceMm, other.clearanceMm);
+      if (edgeGap < required - 1e-6) {
+        reasons.push(`${other.label}との離隔不足`);
+      }
+    }
+
+    if (reasons.length > 0) {
+      violations.push({ holeId: h.id, reasons: [...new Set(reasons)] });
+    }
+  }
+  return violations;
 }

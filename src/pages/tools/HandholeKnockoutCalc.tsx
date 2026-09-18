@@ -43,9 +43,11 @@ import {
   computeHandholeLayout,
   summarizeOrder,
   suggestConduitRuns,
+  checkPlacementViolations,
   type ConduitRun,
   type ConduitRequest,
   type UnallocatedGroup,
+  type PositionedHole,
 } from '../../utils/handholeLayoutEngine';
 import { generateHandholeOrderDxf, downloadDxfText, HandholeDxfExportError } from '../../utils/handholeDxfExport';
 import HandholeDrawing from './HandholeDrawing';
@@ -78,6 +80,20 @@ const blockRowsOf = (faceRows: FaceRowsState, face: HandholeFace, blockIdx: numb
  * 面・段カードのUIにそのまま反映し、その後は普通に手で編集・上書きできるようにするため
  * （2026-09-18、社長ご要望「配管の太さと本数を入れたら勝手に割り付けてほしい」への対応）。
  */
+/**
+ * 配置済みの穴一覧に、ドラッグで手動調整した位置(manualPositions、穴IDキー)があれば
+ * x/yを上書きする。手動調整していない穴はそのまま。
+ */
+function applyManualPositions<T extends { id: string; x: number; y: number }>(
+  holes: T[],
+  manualPositions: Record<string, { x: number; y: number }>,
+): T[] {
+  return holes.map(h => {
+    const p = manualPositions[h.id];
+    return p ? { ...h, x: p.x, y: p.y } : h;
+  });
+}
+
 function runsToFaceRows(runs: ConduitRun[]): FaceRowsState {
   const result: FaceRowsState = { A: [], B: [], C: [], D: [] };
   for (const run of runs) {
@@ -120,6 +136,18 @@ export default function HandholeKnockoutCalc() {
   const [suggestFep, setSuggestFep] = useState<FepSize>(50);
   const [suggestCount, setSuggestCount] = useState(1);
   const [suggestUnallocated, setSuggestUnallocated] = useState<UnallocatedGroup[] | null>(null);
+
+  // ── 自由配置（ドラッグでの微調整、2026-09-18） ──────────────────────
+  // 「手でドラックで移動できるといいんだけどね。グリッドで動かして、後から寸法をつけるみたいな
+  // 感じ」への対応。AskUserQuestionで確定した方針により、これは自動配置の結果を「並び替える」
+  // ものであって、面・段の枠組み自体を作り直す独立モードではない。そのため、ここではrunsや
+  // faceRowsは一切変えず、穴ID→ドラッグ後のmm座標のオーバーライドだけを別に持つ。
+  // 穴IDが安定していること（requiredHoleId、handholeLayoutEngine.ts参照）が前提。
+  const [manualPositions, setManualPositions] = useState<Record<string, { x: number; y: number }>>({});
+
+  const handleHoleMove = (holeId: string, xMm: number, yMm: number) => {
+    setManualPositions(prev => ({ ...prev, [holeId]: { x: xMm, y: yMm } }));
+  };
 
   const heightVariants = useMemo(() => heightVariantsFor(width), [width]);
   const areas = useMemo(() => machinableAreasFor(width, heightVariantCode), [width, heightVariantCode]);
@@ -174,6 +202,28 @@ export default function HandholeKnockoutCalc() {
   const activeFaceArea = areas[activeFace] ?? null;
   const activeBlockCount = activeFaceArea?.blocks.length ?? 1;
 
+  // ドラッグで手動調整した位置を反映した表示用の結果。runs・faceRows自体は変えないので、
+  // 面・段の切り替えやリロード後は自動配置の結果に戻る（manualPositionsはこの面の表示専用）。
+  const displayedFaceResult = useMemo(() => {
+    if (!activeFaceResult) return null;
+    return {
+      ...activeFaceResult,
+      placedHoles: applyManualPositions(activeFaceResult.placedHoles, manualPositions),
+      rows: activeFaceResult.rows.map(r => ({ ...r, placedHoles: applyManualPositions(r.placedHoles, manualPositions) })),
+    };
+  }, [activeFaceResult, manualPositions]);
+
+  // 現在表示中の位置(ドラッグ後含む)で、離隔不足・⊗マーク重なり・エリア外等の違反が
+  // 無いかをチェックする。ドラッグ自体は止めず、違反している穴だけ縁を赤くする
+  // （AskUserQuestionで確定した方針「色で知らせるだけ」）。
+  const violatingHoleIds = useMemo(() => {
+    if (!activeFaceArea || !displayedFaceResult) return new Set<string>();
+    const positioned: PositionedHole[] = displayedFaceResult.placedHoles.map(h => ({
+      id: h.id, label: h.label, x: h.x, y: h.y, footprintDiameterMm: h.footprintDiameterMm, clearanceMm: h.clearanceMm,
+    }));
+    return new Set(checkPlacementViolations(positioned, activeFaceArea).map(v => v.holeId));
+  }, [activeFaceArea, displayedFaceResult]);
+
   // 選択中の面・バリエーションでブロック数が減った（例：ブロック2を選んだ状態で450に切り替えた）
   // 場合、存在するブロックへ戻す。
   useEffect(() => {
@@ -219,7 +269,14 @@ export default function HandholeKnockoutCalc() {
     setFaceRows(emptyFaceRows());
     setSuggestRequests([]);
     setSuggestUnallocated(null);
+    setManualPositions({});
   };
+
+  // サイズ・高さバリエーションを切り替えると加工可能エリア自体が変わり、ドラッグで
+  // 調整した位置の意味が無くなる（面の大きさ・⊗マーク位置が違うため）ので、都度クリアする。
+  useEffect(() => {
+    setManualPositions({});
+  }, [width, heightVariantCode]);
 
   // ── おすすめ割り付けの操作 ──────────────────────────────────
   const addSuggestRequest = () => {
@@ -676,8 +733,11 @@ export default function HandholeKnockoutCalc() {
           </div>
           <HandholeDrawing
             area={activeFaceResult?.area ?? null}
-            placedHoles={activeFaceResult?.placedHoles ?? []}
-            rows={activeFaceResult?.rows ?? []}
+            placedHoles={displayedFaceResult?.placedHoles ?? []}
+            rows={displayedFaceResult?.rows ?? []}
+            onHoleMove={handleHoleMove}
+            violatingHoleIds={violatingHoleIds}
+            gridMm={gridMm}
           />
           {result.unplacedHoles.length > 0 && (
             <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3">

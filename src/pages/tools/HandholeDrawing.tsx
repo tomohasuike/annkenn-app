@@ -18,9 +18,27 @@
 // 分かれ、ブロック間の接合部（ピースの継ぎ目）は加工不可（handholeKitakanto.tsのMachinableArea
 // 参照）。area.blocks/gapsMm/blockBottomsMmを使い、ブロック間の隙間を加工不可帯として描画し、
 // 段ラベルにもブロック番号を出す（ブロックが1つしか無い面では従来通りブロック番号は省略）。
+//
+// 自由配置・ドラッグ（2026-09-18追加）:
+// 「手でドラックで移動できるといいんだけどね。直感操作みたいな。グリッドで動かして、
+//  後から寸法をつけるみたいな感じ」という社長ご要望への対応。
+// AskUserQuestionで確定した2つの設計方針:
+//   1) ドラッグは既存の自動配置結果を並び替えるもの（面・段の枠組み自体は変えない）
+//   2) ルール違反（離隔不足・⊗マーク重なり等）はドラッグ自体を止めず、色で知らせるだけ
+// onHoleMoveが渡された穴だけdraggableにする。Groupをx=0,y=0固定（controlled）にし、
+// ドラッグ中はKonva内部状態だけがずれ、onDragEndで穴のmm座標に変換して親へ通知→
+// 親が状態を更新して再描画されると、Groupのx/y propが0に戻り（＝押し戻され）、
+// 子要素(cx/cy)側が新しいmm座標を反映するので二重にズレない。
+// dragBoundFunc内でgridMm単位に丸めて返すことで、ドラッグ中からグリッドにスナップする
+// （プルボックス計算エンジンの丸め方針＝ceilToとは異なり、ここは自由配置なので単純に最も近い
+// グリッド線に丸める＝Math.round）。
+// violatingHoleIdsは呼び出し側(HandholeKnockoutCalc.tsx)がcheckPlacementViolations()で
+// 計算した「現在違反している穴のID」の集合。ドラッグを止める判定には使わず、あくまで
+// 縁の色を変えるだけ（方針2）。
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stage, Layer, Rect, Circle, Line, Text, Group } from 'react-konva';
+import type Konva from 'konva';
 import { connectorOuterDiameterFor, footprintDiameterFor, type MachinableArea } from '../../constants/handholeKitakanto';
 import type { FaceRowResult, PlacedHole } from '../../utils/handholeLayoutEngine';
 
@@ -31,11 +49,20 @@ export default function HandholeDrawing({
   area,
   placedHoles,
   rows = [],
+  onHoleMove,
+  violatingHoleIds,
+  gridMm = 5,
 }: {
   area: MachinableArea | null;
   placedHoles: PlacedHole[];
   /** 段の区切り線を描くための段ごとの結果（省略時は区切り線を描かない）。 */
   rows?: FaceRowResult[];
+  /** 渡すと穴がドラッグ移動できるようになる。ドラッグ終了時に穴ID・新しいmm座標(面ローカル)を通知する。 */
+  onHoleMove?: (holeId: string, xMm: number, yMm: number) => void;
+  /** checkPlacementViolations()で違反ありと判定された穴のID一覧。渡された穴は縁を赤くする。 */
+  violatingHoleIds?: Set<string>;
+  /** ドラッグ中の中心位置をこの単位(mm)でスナップする。省略時5mm。 */
+  gridMm?: number;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [wrapWidth, setWrapWidth] = useState(760);
@@ -183,23 +210,62 @@ export default function HandholeDrawing({
             );
           })}
 
-          {/* 配置済みの穴（実線＝穴/ビット径）＋コネクター外径（破線、定義がある銘柄のみ） */}
+          {/* 配置済みの穴（実線＝穴/ビット径）＋コネクター外径（破線、定義がある銘柄のみ）
+              onHoleMoveが渡された場合はドラッグで移動できる（Groupはx=0,y=0固定＝controlled、
+              子要素は現在のh.x/h.yから計算した絶対座標。ファイル冒頭コメント参照）。 */}
           {placedHoles.map(h => {
             const cx = areaLeftPx + h.x * scale;
             const cy = areaBottomPx - h.y * scale;
             const r = Math.max((h.diameterMm / 2) * scale, 3);
             const outerDiameterMm = connectorOuterDiameterFor(h.brand, h.fepSize);
             const rOuter = outerDiameterMm != null ? Math.max((outerDiameterMm / 2) * scale, r) : null;
+            const violating = violatingHoleIds?.has(h.id) ?? false;
+            const strokeColor = violating ? '#dc2626' : '#16a34a';
+
+            const dragBoundFunc = (pos: { x: number; y: number }) => {
+              // posはGroupの親(Layer)座標系での提案位置。Groupは常にx=0,y=0起点なので
+              // posそのものがドラッグ量(px)にあたる。mmに変換してグリッドへスナップしてから
+              // px量に戻す（pyはmmが増えるほど画面yが減る向きなので符号を反転）。
+              const dxMm = pos.x / scale;
+              const dyMm = -pos.y / scale;
+              const snappedXMm = Math.round((h.x + dxMm) / gridMm) * gridMm;
+              const snappedYMm = Math.round((h.y + dyMm) / gridMm) * gridMm;
+              return {
+                x: (snappedXMm - h.x) * scale,
+                y: -(snappedYMm - h.y) * scale,
+              };
+            };
+
+            const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+              const dxMm = e.target.x() / scale;
+              const dyMm = -e.target.y() / scale;
+              onHoleMove?.(h.id, h.x + dxMm, h.y + dyMm);
+              // 次の再描画でGroupのx/y propが0に戻るまでの間、見た目がズレないよう
+              // ノード自体も明示的に0へ戻しておく（親の状態更新が同フレームで反映されない場合の保険）。
+              e.target.x(0);
+              e.target.y(0);
+            };
+
             return (
-              <Group key={h.id}>
+              <Group
+                key={h.id}
+                x={0}
+                y={0}
+                draggable={!!onHoleMove}
+                dragBoundFunc={onHoleMove ? dragBoundFunc : undefined}
+                onDragEnd={onHoleMove ? handleDragEnd : undefined}
+              >
                 {rOuter != null && (
                   <Circle x={cx} y={cy} radius={rOuter} stroke="#0891b2" strokeWidth={1.1} dash={[4, 3]} opacity={0.7} />
                 )}
-                <Circle x={cx} y={cy} radius={r} fill={c.hole} stroke="#16a34a" strokeWidth={1.6} />
+                <Circle x={cx} y={cy} radius={r} fill={c.hole} stroke={strokeColor} strokeWidth={violating ? 2.2 : 1.6} />
                 <Text x={cx - 40} y={cy - (rOuter ?? r) - 24} width={80} align="center" text={`φ${h.diameterMm}`} fontSize={10} fontStyle="bold" fill="#15803d" />
                 <Text x={cx - 40} y={cy - (rOuter ?? r) - 12} width={80} align="center" text={h.label} fontSize={8} fill={c.sub} />
                 {outerDiameterMm != null && (
                   <Text x={cx - 40} y={cy + (rOuter ?? r) + 2} width={80} align="center" text={`外径φ${outerDiameterMm}`} fontSize={8} fill="#0891b2" />
+                )}
+                {violating && (
+                  <Text x={cx - 40} y={cy + (rOuter ?? r) + (outerDiameterMm != null ? 14 : 2)} width={80} align="center" text="要確認（重なり等）" fontSize={8} fontStyle="bold" fill="#dc2626" />
                 )}
               </Group>
             );
@@ -248,6 +314,12 @@ export default function HandholeDrawing({
           })}
         </Layer>
       </Stage>
+      {onHoleMove && (
+        <p className="text-[11px] text-slate-400 mt-1">
+          穴をドラッグすると位置を微調整できます（{gridMm}mm刻みにスナップ）。
+          離隔不足や⊗マークと重なる位置に置くと、その穴の縁が赤くなります（移動自体は止めません。発注前に位置を直してください）。
+        </p>
+      )}
     </div>
   );
 }

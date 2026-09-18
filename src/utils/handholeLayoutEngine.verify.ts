@@ -8,13 +8,16 @@
 // テーブル値の引き当てと、配置アルゴリズムが守るべき不変条件（離隔・エリア内・
 // エリア外はエラー・⊗マーク回避）をプログラムで検証する。
 // 根拠: hitec-ai-team（社長指示 2026-09-15/09-16、北関東工業カタログ・加工図面）
-import { computeHandholeLayout, summarizeOrder, suggestConduitRuns, type ConduitRun } from './handholeLayoutEngine';
+import {
+  computeHandholeLayout, summarizeOrder, suggestConduitRuns, checkPlacementViolations,
+  type ConduitRun, type PositionedHole,
+} from './handholeLayoutEngine';
 import {
   HOLE_DIAMETER_MM, holeDiameterFor, minClearanceFor, machinableAreasFor,
   HANDHOLE_FACE_ORDER, KKE_450_FACE_DXF_ORIGIN,
   KKE_OUTER_SPEC, CONNECTOR_OUTER_DIAMETER_MM, connectorOuterDiameterFor, footprintDiameterFor,
   likelyNeedsTightenToolFor,
-  type ConnectorBrand, type FepSize, type HandholeFace,
+  type ConnectorBrand, type FepSize,
 } from '../constants/handholeKitakanto';
 
 let ng = 0;
@@ -647,6 +650,57 @@ console.log('\n■ おすすめ割り付け：カタログに無い組み合わ�
   const hasDataError = r.warnings.some(w => w.level === 'error' && w.message.includes('穴径データがありません'));
   ok_('データ欠落エラーが出る', hasDataError, r.warnings.map(w => w.message).join(' | '));
   ok_('正常な方(2本)は割り付けられる', r.runs.reduce((s, run) => s + run.count, 0) === 2);
+}
+
+console.log('\n■ 自由配置(ドラッグ)の違反チェック(checkPlacementViolations)：離れた穴は違反なし');
+{
+  const area = machinableAreasFor(450).A!;
+  const holes: PositionedHole[] = [
+    { id: 'h1', label: 'テスト1', x: 50, y: 50, footprintDiameterMm: 74, clearanceMm: 10 },
+    { id: 'h2', label: 'テスト2', x: 300, y: 500, footprintDiameterMm: 74, clearanceMm: 10 },
+  ];
+  const violations = checkPlacementViolations(holes, area);
+  ok_('離れた2本は違反なし', violations.length === 0, JSON.stringify(violations));
+}
+
+console.log('\n■ 自由配置の違反チェック：⊗マークと重なる位置に動かすと違反になること');
+{
+  const area = machinableAreasFor(450).A!; // ⊗マークはローカル(175,274)半径22.5
+  const holes: PositionedHole[] = [
+    { id: 'h1', label: 'テスト', x: 175, y: 274, footprintDiameterMm: 74, clearanceMm: 10 }, // ⊗マークの真上
+  ];
+  const violations = checkPlacementViolations(holes, area);
+  ok_('⊗マークと重なる違反が出る', violations.length === 1 && violations[0].reasons.some(r => r.includes('⊗マーク')),
+    JSON.stringify(violations));
+}
+
+console.log('\n■ 自由配置の違反チェック：離隔不足・エリア外もそれぞれ検出できること');
+{
+  const area = machinableAreasFor(450).A!; // 加工可能エリア350×600
+  const holes: PositionedHole[] = [
+    { id: 'h1', label: 'A', x: 50, y: 50, footprintDiameterMm: 74, clearanceMm: 10 },
+    { id: 'h2', label: 'B', x: 60, y: 50, footprintDiameterMm: 74, clearanceMm: 10 }, // h1に近すぎる(10mm離れているだけで外径74同士は重なる)
+    { id: 'h3', label: 'C', x: 340, y: 50, footprintDiameterMm: 74, clearanceMm: 10 }, // 右端300+37=377>350ではみ出す
+  ];
+  const violations = checkPlacementViolations(holes, area);
+  const v1 = violations.find(v => v.holeId === 'h1');
+  const v2 = violations.find(v => v.holeId === 'h2');
+  const v3 = violations.find(v => v.holeId === 'h3');
+  ok_('h1・h2は互いに離隔不足の違反が出る', !!v1?.reasons.some(r => r.includes('離隔不足')) && !!v2?.reasons.some(r => r.includes('離隔不足')),
+    JSON.stringify(violations));
+  ok_('h3はエリア外の違反が出る', !!v3?.reasons.some(r => r.includes('エリア外')), JSON.stringify(violations));
+}
+
+console.log('\n■ 自由配置の違反チェック：600E-1200でブロック間の接合部に動かすと違反になること');
+{
+  const area = machinableAreasFor(600, '600E-1200').A!;
+  // 接合部はblockBottomsMm[0]+blocks[0].heightMm(=620)からgapsMm[0](150)ぶん、つまりy=620〜770。
+  const holes: PositionedHole[] = [
+    { id: 'h1', label: 'テスト', x: 225, y: 695, footprintDiameterMm: 50, clearanceMm: 10 }, // 接合部の真ん中
+  ];
+  const violations = checkPlacementViolations(holes, area);
+  ok_('接合部と重なる違反が出る', violations.length === 1 && violations[0].reasons.some(r => r.includes('接合部')),
+    JSON.stringify(violations));
 }
 
 console.log(`\n${ng === 0 ? '✅ 全件一致' : `❌ 不一致 ${ng} 件`}`);
