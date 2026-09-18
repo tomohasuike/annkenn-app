@@ -12,6 +12,12 @@
 // 段（2026-09-16追加）: rowsが渡されたら、各段の境界（bandBottomMm）に横の区切り線を引き、
 // 「N段目」ラベルを出す。横幅・高さ超過でその段が配置できなかった場合(fits=false)は
 // 区切り線とラベルを赤くして、どの段が問題かひと目で分かるようにする。
+//
+// ブロック（2026-09-18追加）: 北関東工業のKK-E型は「分割式」（縁塊+スラブ+継胴+ベースを
+// 上下に積み重ねる構造）で、600E-1200等サイズによっては加工可能エリアが上下複数「ブロック」に
+// 分かれ、ブロック間の接合部（ピースの継ぎ目）は加工不可（handholeKitakanto.tsのMachinableArea
+// 参照）。area.blocks/gapsMm/blockBottomsMmを使い、ブロック間の隙間を加工不可帯として描画し、
+// 段ラベルにもブロック番号を出す（ブロックが1つしか無い面では従来通りブロック番号は省略）。
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stage, Layer, Rect, Circle, Line, Text, Group } from 'react-konva';
@@ -124,6 +130,23 @@ export default function HandholeDrawing({
             text={`加工可能エリア ${area.workableWidthMm}×${area.workableHeightMm}mm`}
             fontSize={10} fontStyle="bold" fill="#2563eb" />
 
+          {/* ブロック間の隙間（分割ピースの接合部＝加工不可帯。600E-1200等の複数ブロック構成のみ）。
+              area.blockBottomsMm[i]はi番目ブロックの下端(area全体ローカル)、その上端は
+              +blocks[i].heightMmで求まる。隙間はその上端からgapsMm[i]ぶん。 */}
+          {area.gapsMm.map((gap, i) => {
+            const gapBottomMm = area.blockBottomsMm[i] + area.blocks[i].heightMm;
+            const gapTopPx = py(gapBottomMm + gap);
+            const gapBottomPx = py(gapBottomMm);
+            return (
+              <Group key={`gap-block-${i}`}>
+                <Rect x={areaLeftPx} y={gapTopPx} width={areaWidthPx} height={gapBottomPx - gapTopPx}
+                  fill={isDark ? '#1e293b' : '#f1f5f9'} opacity={0.7}
+                  stroke={c.line} strokeWidth={0.8} dash={[3, 2]} />
+                <Text x={areaLeftPx + 4} y={gapTopPx + 4} text={`接合部(加工不可) ${gap}mm`} fontSize={9} fill={c.sub} />
+              </Group>
+            );
+          })}
+
           {/* 避けるべき領域（⊗マーク＝内部インサート等） */}
           {area.keepOutZones.map((z, i) => {
             const zx = areaLeftPx + z.xMm * scale;
@@ -139,23 +162,26 @@ export default function HandholeDrawing({
             );
           })}
 
-          {/* 段の区切り線（1段目の下端＝加工可能エリアの下端は既に枠線で示されているので省く） */}
-          {rows.filter(r => r.bandBottomMm > 1e-6).map(r => {
+          {/* 段の区切り線・ラベル。ブロックが複数ある面（600E-1200等）ではブロック番号も表示する。
+              各ブロックの一番下の段（bandBottomMmがそのブロックの下端と一致）は区切り線を引かず
+              ラベルだけ表示する（下端は既に面の外枠かブロック間隙間の枠で示されているため）。 */}
+          {rows.map(r => {
+            const blockBottomMm = area.blockBottomsMm[r.block - 1] ?? 0;
+            const isBlockBottom = Math.abs(r.bandBottomMm - blockBottomMm) < 1e-6;
             const lineY = areaBottomPx - r.bandBottomMm * scale;
             const col = r.fits ? '#2563eb' : '#dc2626';
+            const labelPrefix = area.blocks.length > 1 ? `ブロック${r.block} ` : '';
             return (
-              <Group key={`row-${r.row}`}>
-                <Line points={[areaLeftPx, lineY, areaLeftPx + areaWidthPx, lineY]}
-                  stroke={col} strokeWidth={1} dash={[5, 3]} opacity={0.65} />
-                <Text x={areaLeftPx + 4} y={lineY - 13} text={`${r.row}段目${r.fits ? '' : '（エラー）'}`}
+              <Group key={`row-${r.block}-${r.row}`}>
+                {!isBlockBottom && (
+                  <Line points={[areaLeftPx, lineY, areaLeftPx + areaWidthPx, lineY]}
+                    stroke={col} strokeWidth={1} dash={[5, 3]} opacity={0.65} />
+                )}
+                <Text x={areaLeftPx + 4} y={lineY - 13} text={`${labelPrefix}${r.row}段目${r.fits ? '' : '（エラー）'}`}
                   fontSize={9} fontStyle="bold" fill={col} />
               </Group>
             );
           })}
-          {rows.length > 0 && (
-            <Text x={areaLeftPx + 4} y={areaBottomPx - 13}
-              text={`1段目`} fontSize={9} fontStyle="bold" fill={rows.find(r => r.row === 1)?.fits === false ? '#dc2626' : '#2563eb'} />
-          )}
 
           {/* 配置済みの穴（実線＝穴/ビット径）＋コネクター外径（破線、定義がある銘柄のみ） */}
           {placedHoles.map(h => {

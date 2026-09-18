@@ -4,27 +4,35 @@
 // プルボックスの計算（現場でホールソーを開ける位置を出す）とは目的が違う。こちらは
 // 「発注時にコネクター図を加工可能エリアのどこへ置くか」という発注仕様を組み立てる。
 //
-// 面・段の選び方（2026-09-16 社長ご指摘で「段」対応化）:
+// 面・ブロック・段の選び方（2026-09-16「段」対応化、2026-09-18「ブロック」対応化）:
 //   以前は「A面がいっぱいになったら自動でB面へ、C面へ…」という完全自動振り分けだったが、
 //   「FEP100なら何段詰まるかを見せて、上段/中段/下段のどこに置くかを選べるようにしたい」という
 //   要望を受け、面（A/B/C/D）に加えて面の中の「段」もユーザーが明示的に選ぶ方式に変更した。
-//   配管条件(ConduitRun)は必ずどの面(face)・何段目(row。1始まり、1段目=一番下)かを持つ。
+//   さらに北関東工業のKK-E型が「分割式」（縁塊+スラブ+継胴+ベースを上下に積み重ねる構造）だと
+//   判明し、600E-1200等では面の中の加工可能エリア自体が上下複数「ブロック」に分かれ、ブロックの
+//   接合部（ピースの継ぎ目）は加工不可であることが実物図面調査で確定した（handholeKitakanto.ts
+//   のMachinableArea/machinableAreasForのコメント参照）。そのため配管条件(ConduitRun)は
+//   面(face)・ブロック番号(block。1始まり、1ブロック目=面の中で一番下)・段番号(row。1始まり、
+//   1段目=そのブロックの中で一番下)の3つを持つ。ブロックが1つしか無い面（450・600E-600等）では
+//   block=1固定でよく、UIもブロック選択を表示しない。
 //   段の中の配置（左から右に何個並ぶか）だけは今まで通り自動（径・離隔からピッチを計算し、
 //   グリッドに丸める＝プルボックス計算エンジンの丸め方針と同じ考え方）。
 //
 // 配置アルゴリズム:
-//   1. 面ごとに、その面に割り当てられた配管をさらに段番号でグループ化する。
-//   2. 段は面の中で1段目から順に下から積み上げる（段の高さ＝その段の中の一番大きい径。
-//      次の段との間の隙間＝その段とその上の段の中の最大離隔）。プルボックス計算エンジンの
+//   1. 面ごとに、その面に割り当てられた配管をさらにブロック番号→段番号でグループ化する。
+//   2. 段はブロックの中で1段目から順に下から積み上げる（段の高さ＝その段の中の一番大きい径。
+//      次の段との間の隙間＝その段とその上の段の中の最大離隔）。ブロックをまたいだ積み上げは
+//      しない（ブロック間の隙間＝ピース接合部は加工不可のため）。プルボックス計算エンジンの
 //      「行（棚詰め）」ロジックと同じ考え方を、自動で次の行へ回すのではなく
-//      ユーザーが選んだ段番号ごとに適用する。
+//      ユーザーが選んだブロック番号・段番号ごとに適用する。
 //   3. 段の中の左右位置は、径の大きい順に並べ、中心間ピッチ＝(径A+径B)/2+離隔を
 //      「切り上げ」でグリッドに丸めて計算する（切り捨てると離隔が指定値を下回るため）。
-//   4. 面・段はユーザーが選んだ以上、自動で他の面・段へ逃がさない。
+//   4. 面・ブロック・段はユーザーが選んだ以上、自動で他の面・ブロック・段へ逃がさない。
 //      次のいずれかに該当する場合は、その場でエラーとして返す（呼び出し側は必ず表示すること）：
-//        - その段の配管が面の横幅に収まらない
-//        - 段を積み上げた高さが面の縦方向の加工可能エリアを超える
+//        - その段の配管がブロックの横幅に収まらない
+//        - 段を積み上げた高さがそのブロックの縦方向の加工可能高さを超える
 //        - 配置した穴が⊗マーク等の避けるべき領域(keepOutZones)と重なる
+//        - 存在しないブロック番号が指定された（そのareaのblocks配列の範囲外）
 //      面の実寸が未確認（machinableAreasForがnullを返す面）を選んだ場合は、これまで通り
 //      警告(warn)を出して配置対象外にする（エラーではなく警告のまま。データが無いだけで
 //      ユーザーの選択ミスではないため）。
@@ -43,16 +51,19 @@ import {
   type FepSize,
   type KkEWidth,
   type MachinableArea,
+  type MachinableBlock,
   type HandholeFace,
   type PlacementGridMm,
   DEFAULT_PLACEMENT_GRID_MM,
   CONNECTOR_BRAND_LABELS,
 } from '../constants/handholeKitakanto';
 
-/** 配管条件1行分：この面・この段に、この銘柄・このFEP呼び径の配管が何本あるか。 */
+/** 配管条件1行分：この面・このブロック・この段に、この銘柄・このFEP呼び径の配管が何本あるか。 */
 export interface ConduitRun {
   face: HandholeFace;
-  /** 段番号。1始まり。1段目＝その面の中で一番下。 */
+  /** ブロック番号。1始まり。1ブロック目＝その面の中で一番下のブロック。省略時は1（ブロックが1つしか無い面向けの既定値）。 */
+  block?: number;
+  /** 段番号。1始まり。1段目＝そのブロックの中で一番下。 */
   row: number;
   brand: ConnectorBrand;
   fepSize: FepSize;
@@ -61,6 +72,12 @@ export interface ConduitRun {
 
 export interface HandholeLayoutInput {
   width: KkEWidth;
+  /**
+   * 内空高さバリエーション（品名規格の末尾。例:"600E-1200"）。省略時はwidthの既定バリエーション
+   * （KKE_HEIGHT_VARIANTSの先頭）を使う。450のようにバリエーションが1つしか無いサイズでは
+   * 省略してよい（既存の呼び出し元コード・検証スクリプトの互換性のため）。
+   */
+  heightVariantCode?: string;
   runs: ConduitRun[];
   /** 中心位置の丸め単位(mm)。既定5mm。 */
   gridMm?: PlacementGridMm;
@@ -92,6 +109,8 @@ export interface RequiredHole {
   /** この穴が要求する最低離隔(mm)。隣の穴との実際の離隔判定は両者のmaxを取る。 */
   clearanceMm: number;
   face: HandholeFace;
+  /** ブロック番号。1始まり、1=面の中で一番下のブロック。 */
+  block: number;
   row: number;
 }
 
@@ -103,6 +122,8 @@ export interface PlacedHole extends RequiredHole {
 
 /** 1段ぶんの配置結果。 */
 export interface FaceRowResult {
+  /** ブロック番号。1始まり、1=面の中で一番下のブロック。 */
+  block: number;
   row: number;
   /** この段に割り当てられた配管（配置できたかどうかに関わらず全件）。 */
   requiredHoles: RequiredHole[];
@@ -185,6 +206,7 @@ function buildRequiredHoles(runs: ConduitRun[], warnings: LayoutWarning[]): Requ
         footprintDiameterMm: footprintDiameter,
         clearanceMm,
         face: run.face,
+        block: run.block ?? 1,
         row: run.row,
       });
     }
@@ -250,22 +272,29 @@ function pushUnconfirmedFaceWarnings(
   }
 }
 
-/** 1面ぶんの配置。段番号ごとに下から積み上げ、段内はlayoutRowXで横方向を計算する。 */
-function computeFaceLayout(
+/**
+ * 1ブロックぶんの配置。段番号ごとに下から積み上げ、段内はlayoutRowXで横方向を計算する。
+ * y座標はすべて「ブロックローカル」（0=このブロックの下端）で計算し、呼び出し側
+ * (computeFaceLayout)がarea.blockBottomsMmで面全体のローカル座標へ変換する。
+ */
+function computeBlockLayout(
   face: HandholeFace,
-  area: MachinableArea,
-  faceHoles: RequiredHole[],
+  blockNum: number,
+  block: MachinableBlock,
+  workableWidthMm: number,
+  blockHoles: RequiredHole[],
   gridMm: number,
   extraClearanceMm: number,
   warnings: LayoutWarning[],
-): { rows: FaceRowResult[]; placedHoles: PlacedHole[] } {
-  const rowNumbers = [...new Set(faceHoles.map(h => h.row))].sort((a, b) => a - b);
-  const rows: FaceRowResult[] = [];
+): { rows: Omit<FaceRowResult, 'block'>[]; placedHoles: PlacedHole[] } {
+  const rowNumbers = [...new Set(blockHoles.map(h => h.row))].sort((a, b) => a - b);
+  const rows: Omit<FaceRowResult, 'block'>[] = [];
   const placedHoles: PlacedHole[] = [];
+  const blockLabel = `${FACE_LABELS[face]} ブロック${blockNum}`;
   let rowBaseY = 0;
 
   for (const rowNum of rowNumbers) {
-    const rowHoles = faceHoles.filter(h => h.row === rowNum);
+    const rowHoles = blockHoles.filter(h => h.row === rowNum);
     if (rowHoles.length === 0) continue;
 
     // 段の高さ(bandTopMm)は、段の中の最大の「実効直径」(footprintDiameterMm)で決める
@@ -278,25 +307,25 @@ function computeFaceLayout(
     const bandTopMm = absCenterY + rowMaxFootprint / 2;
 
     let fits = true;
-    if (bandTopMm > area.workableHeightMm + 1e-9) {
+    if (bandTopMm > block.heightMm + 1e-9) {
       fits = false;
       warnings.push({
         level: 'error',
         message:
-          `${FACE_LABELS[face]} ${rowNum}段目: 積み上げた高さ${bandTopMm}mmが加工可能エリアの高さ${area.workableHeightMm}mmを超えます。` +
+          `${blockLabel} ${rowNum}段目: 積み上げた高さ${bandTopMm}mmがこのブロックの加工可能高さ${block.heightMm}mmを超えます。` +
           `段数を減らすか、より下の段の配管径を小さくしてください。`,
       });
     }
 
     const rowLayout = layoutRowX(rowHoles, gridMm, extraClearanceMm);
     const usedWidthMm = rowLayout.length > 0 ? Math.max(...rowLayout.map(r => r.rightEdge)) : 0;
-    const overflow = rowLayout.find(r => r.rightEdge > area.workableWidthMm + 1e-9);
+    const overflow = rowLayout.find(r => r.rightEdge > workableWidthMm + 1e-9);
     if (overflow) {
       fits = false;
       warnings.push({
         level: 'error',
         message:
-          `${FACE_LABELS[face]} ${rowNum}段目: ${overflow.hole.label}を含む配管が、加工可能エリアの横幅${area.workableWidthMm}mmに` +
+          `${blockLabel} ${rowNum}段目: ${overflow.hole.label}を含む配管が、加工可能エリアの横幅${workableWidthMm}mmに` +
           `収まりません（この段に必要な幅は約${Math.ceil(usedWidthMm)}mm）。本数を減らすか、径の小さい配管に変更してください。`,
       });
     }
@@ -305,15 +334,16 @@ function computeFaceLayout(
     if (fits) {
       for (const r of rowLayout) {
         // ⊗マーク(内部インサート)との干渉判定も実効直径(コネクター外径基準)で行う。
+        // block.keepOutZonesはブロックローカル座標なので、absCenterY(ブロックローカル)と直接比較できる。
         const rad = r.hole.footprintDiameterMm / 2;
-        const conflict = area.keepOutZones.find(
+        const conflict = block.keepOutZones.find(
           z => Math.hypot(r.x - z.xMm, absCenterY - z.yMm) < rad + z.radiusMm,
         );
         if (conflict) {
           warnings.push({
             level: 'error',
             message:
-              `${FACE_LABELS[face]} ${rowNum}段目: ${r.hole.label}(x=${r.x}, y=${absCenterY})が${conflict.label}と重なります。` +
+              `${blockLabel} ${rowNum}段目: ${r.hole.label}(x=${r.x}, y=${absCenterY})が${conflict.label}と重なります。` +
               `段内の配管の並び順・本数を変えて、この位置を避けてください。`,
           });
           continue;
@@ -331,11 +361,64 @@ function computeFaceLayout(
   return { rows, placedHoles };
 }
 
+/**
+ * 1面ぶんの配置。ブロック番号ごとにグループ化し、ブロックごとにcomputeBlockLayoutを呼ぶ。
+ * ブロックローカルで計算された段のy座標(bandBottomMm/bandTopMm/穴のy)は、
+ * area.blockBottomsMm[blockIdx]を足して面全体のローカル座標（＝area.workableHeightMmの
+ * 座標系。HandholeDrawing.tsx・handholeDxfExport.tsが前提とする座標系と同じ）に変換する。
+ * 存在しないブロック番号（そのareaのblocks配列の範囲外）が指定された場合はエラーにする。
+ */
+function computeFaceLayout(
+  face: HandholeFace,
+  area: MachinableArea,
+  faceHoles: RequiredHole[],
+  gridMm: number,
+  extraClearanceMm: number,
+  warnings: LayoutWarning[],
+): { rows: FaceRowResult[]; placedHoles: PlacedHole[] } {
+  const blockNumbers = [...new Set(faceHoles.map(h => h.block))].sort((a, b) => a - b);
+  const rows: FaceRowResult[] = [];
+  const placedHoles: PlacedHole[] = [];
+
+  for (const blockNum of blockNumbers) {
+    const blockHoles = faceHoles.filter(h => h.block === blockNum);
+    const blockIdx = blockNum - 1;
+    const block = area.blocks[blockIdx];
+    if (!block) {
+      warnings.push({
+        level: 'error',
+        message:
+          `${FACE_LABELS[face]} ブロック${blockNum}: このブロックは存在しません（${FACE_LABELS[face]}は` +
+          `${area.blocks.length}ブロック構成です）。ブロック番号を選び直してください。`,
+      });
+      continue;
+    }
+
+    const blockBaseY = area.blockBottomsMm[blockIdx];
+    const { rows: blockRows, placedHoles: blockPlaced } = computeBlockLayout(
+      face, blockNum, block, area.workableWidthMm, blockHoles, gridMm, extraClearanceMm, warnings,
+    );
+
+    for (const r of blockRows) {
+      rows.push({
+        ...r,
+        block: blockNum,
+        bandBottomMm: blockBaseY + r.bandBottomMm,
+        bandTopMm: blockBaseY + r.bandTopMm,
+        placedHoles: r.placedHoles.map(h => ({ ...h, y: blockBaseY + h.y })),
+      });
+    }
+    placedHoles.push(...blockPlaced.map(h => ({ ...h, y: blockBaseY + h.y })));
+  }
+
+  return { rows, placedHoles };
+}
+
 export function computeHandholeLayout(input: HandholeLayoutInput): HandholeLayoutResult {
-  const { width, runs, gridMm = DEFAULT_PLACEMENT_GRID_MM, extraClearanceMm = 0 } = input;
+  const { width, heightVariantCode, runs, gridMm = DEFAULT_PLACEMENT_GRID_MM, extraClearanceMm = 0 } = input;
   const warnings: LayoutWarning[] = [];
   const requiredHoles = buildRequiredHoles(runs, warnings);
-  const areasByFace = machinableAreasFor(width);
+  const areasByFace = machinableAreasFor(width, heightVariantCode);
 
   pushUnconfirmedFaceWarnings(width, areasByFace, warnings);
 

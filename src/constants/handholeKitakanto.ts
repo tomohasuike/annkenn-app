@@ -237,20 +237,64 @@ export const FACE_LABELS: Record<HandholeFace, 'A面' | 'B面' | 'C面' | 'D面'
   A: 'A面', B: 'B面', C: 'C面', D: 'D面',
 };
 
+// ── 内空高さバリエーション（品名規格の末尾。縁塊+スラブ+継胴+ベースの組み合わせ） ──────
+//
+// 北関東工業のKK-E型は「分割式」（縁塊+スラブ+継胴+ベース、最大4ピースを上下に積み重ねる構造。
+// カタログ本文いわく「分割式であるため、大型ラフタークレーンが不要」）が標準仕様。同じ内空幅
+// (width)でも、この組み合わせ（品名規格の末尾。例:"600E-1200"）によって内空高さ・ピース構成・
+// 加工可能エリアのブロック構造が変わる（2026-09-17/18、社長ご指摘・実物図面調査で判明）。
+//
+// 出典: https://kitakanto.co.jp/pages/1292/ （2026-09-18確認、「縁塊付き」のみ）。
+// 600サイズはこのページで6つの高さバリエーションを確認したが、実際に加工図面をDXF解析して
+// 加工可能エリアを確定できたのは600E-600と600E-1200の2つのみ。残り4つ（750/900mm×2通り/
+// 1050mm、いずれも「縁塊付き」）は一覧の存在だけ確認し、正確な品名規格コード・加工可能エリアの
+// 実寸は未確認のため、ここには載せない（それらしいコードを補って埋めることは捏造にあたる）。
+// 「角枠付き」「化粧蓋付き」等リッド種別違いの高さバリエーションも未調査。
+export interface KkEHeightVariant {
+  /** 品名規格（例:"600E-1200"）。加工図面のタイトル注記に実在する文字列そのもの。machinableAreasForに渡すキー。 */
+  code: string;
+  width: KkEWidth;
+  /** 内空高さ(mm)。 */
+  innerHeightMm: number;
+  /** ピース構成（縁塊+スラブ+継胴+ベースの組み合わせ）。参考表示用。 */
+  pieceCombo: string;
+}
+
+export const KKE_HEIGHT_VARIANTS: Record<KkEWidth, KkEHeightVariant[]> = {
+  450: [{ code: '450E-750', width: 450, innerHeightMm: 750, pieceCombo: '(未確認)' }],
+  600: [
+    { code: '600E-600', width: 600, innerHeightMm: 600, pieceCombo: 'S15+B45' },
+    { code: '600E-1200', width: 600, innerHeightMm: 1200, pieceCombo: 'S45+B75' },
+  ],
+  800: [], 900: [], 1000: [], 1200: [], 1500: [], 1800: [], 2000: [],
+};
+
+/** widthの高さバリエーション一覧（実寸確認済みのものだけ）。無ければ空配列。 */
+export function heightVariantsFor(width: KkEWidth): KkEHeightVariant[] {
+  return KKE_HEIGHT_VARIANTS[width];
+}
+
+/** widthの既定バリエーション（一覧の先頭）。1件も無ければnull。 */
+export function defaultHeightVariantFor(width: KkEWidth): KkEHeightVariant | null {
+  return KKE_HEIGHT_VARIANTS[width][0] ?? null;
+}
+
 // ── 加工可能エリア（発注時にコネクター図を配置できる範囲） ──────────────
 //
-// **確認できているのはKK-E型450（品名規格「450E-750」＝内空高さ750mm）のA/B/C/D全4面。**
-// それ以外のサイズ（600/800/900/1000/1200/1500/1800/2000）は加工可能エリアの実寸が未確認。
-// 450サイズの比率を他サイズへ流用・外挿することは行わない（サイズごとに比率が異なる可能性が
-// 高いため、それは捏造にあたる、と社長より厳命）。
+// **確認できているのは以下3バリエーションのA/B/C/D全4面のみ**（他は加工可能エリアの実寸が
+// 未確認）。450サイズの比率を他サイズへ流用・外挿することは行わない（サイズ・高さ構成ごとに
+// 比率が異なる可能性が高いため、それは捏造にあたる、と社長より厳命）。
 //
-// 450E-750のA面（最初に確認済みだった面）:
-//   全幅530mm中、加工可能エリア幅350mm（左右各90mmは加工不可）。
+// 【450E-750】単一ブロック。全幅530mm中、加工可能エリア幅350mm（左右各90mmは加工不可）。
 //   高さは、DXF実物（KKE450_B75.dxf、2026-09-15にDXFプロトタイプ検証で解析）内に
 //   「加工可能エリア」として明示的に描画されている矩形そのものの寸法を直接採用：600mm。
 //   この600mmは、上端からの寸法チェーン 100+120+600+100=920mm（DXFのDIMENSIONエンティティの
 //   実測値と完全一致）の中央区間そのもの。上端除外220mm(=100+120)、下端除外100mm、
 //   合計920mmの中の可動域600mmという、単一の寸法チェーンで自己整合する値。
+//   B/C/D面もA面と同一形状の矩形・外枠ジオメトリが独立して描画されていることを確認済み
+//   （面ラベルMTEXTで裏取り。B/D面はA面からX+1350mm、C/D面はA面からY-1237.5mmの位置）。
+//   ⊗マーク（内部インサート、タイトル注記「※AC面にあるこのマークは外側にあるインサートです。
+//   このインサートで吊らないでください。」）はA面・C面のみ、ローカル(175,274)半径22.5mm。
 //
 //   【訂正履歴】当初は「内空高さ750mm（品名規格の末尾"-750"）を全高とみなし、
 //   上端100+120mm・下端70+100mmを除外」として360mmと計算していたが、この「70mm」は
@@ -258,38 +302,41 @@ export const FACE_LABELS: Record<HandholeFace, 'A面' | 'B面' | 'C面' | 'D面'
 //   誤って混同したものだった。DXFに直接描画された矩形（動かぬ証拠）で確認したところ600mmが正しく、
 //   360mmは誤りだったため訂正した。
 //
-// 450E-750のB/C/D面（2026-09-15、4面対応化にあたって追加調査）:
-//   KKE450_B75.dxf 1ファイルの中に、A面と全く同じ「加工可能エリア」矩形（レイヤーD-STR-STR5の
-//   LINE4本）が、シート上でB面・C面・D面それぞれの位置にも独立して描画されていることを確認した。
-//   各面の位置は、面ラベルMTEXT（'A'/'B'/'C'/'D'、レイヤーD-STR-TXT）が各矩形の直上に実在すること
-//   で直接裏取りした（推測ではない）。4面とも矩形の実寸は幅350mm×高さ600mmで完全に一致する
-//   （各面ごとに個別に実測した結果であり、A面の値を外挿したものではない）。
-//   さらに、A面の920mm寸法チェーンが紐付く外枠ジオメトリ（レイヤーD-STR、ステップ形状含む）も、
-//   B/C/D面の位置に同一形状のまま独立して描画されていることを確認した（B/D面はA面から
-//   X+1350mm、C/D面はA面からY-1237.5mmの位置に、寸法チェーンの数値注記こそ無いが同一形状の
-//   図形が存在する）。よって全高920mm・上端除外220mm・下端除外100mmという内訳も4面共通と
-//   判断できる（＝図面内で複製されている同一図形を機械的に確認したものであり、異なる製品規格間
-//   の比率流用とは性質が異なる）。
+// 【600E-600（S15+B45、最も単純な高さ組み合わせ）】単一ブロック。全幅680mm中、加工可能エリア幅
+//   450mm。全高840mm、上端除外395mm(100+220+75)、下端除外125mm、可動域320mm。
+//   ⊗マークはA/C面のみ、ブロックローカル(225,65)半径22.5mm（450と同じ半径）。
 //
-//   ⊗マーク（内部インサート。工場が「干渉しないように削孔」する避けるべき位置。KKE450_B75.dxf
-//   タイトル注記「※AC面にあるこのマークは外側にあるインサートです。このインサートで吊らないで
-//   ください。」より）は、A面とC面の加工可能エリア内（レイヤーD-STR-STR5の対角線2本）にのみ
-//   存在し、B面・D面には存在しないことを実測で確認済み（B/D面の同レイヤーには矩形4本のLINEしか
-//   無く、対角線が無いことを確認した）。位置はA面・C面とも加工可能エリア左下から
-//   ローカル座標(175, 274)、対角線の半分＝22.5mmを半径とする円で近似。
+// 【600E-1200（S45+B75）】上下2ブロック。全幅680mm・可動域450mmは600E-600と同じ。全高1440mm、
+//   上端除外320mm(100+220)、下端除外125mm。下ブロック(index0)450×620mm、接合部
+//   （継胴/ベースの接合部＝製品情報プレート位置、加工不可）150mm、上ブロック(index1)450×225mm。
+//   ⊗マークは下ブロックのみ（A/C面）、ブロックローカル(225,199)半径22.5mm。上ブロックには無し。
+//   タイトル注記は450と共通（「ABCD面及びステップの位置は変更出来ません」「加工可能エリア外の
+//   加工についてはご相談ください」等）。
 //
-// 出典: 北関東工業 KK-E型ハンドホール 450E-750 加工図面（HP掲載）実物DXF解析
-//       （scratchpad: KKE450_B75.dxf、2026-09-15）。
+//   自己整合チェック（buildMachinableAreaの計算と一致することを手計算でも確認済み）:
+//     600E-600:  395(top) + 320(block) + 125(bottom) = 840 ✓
+//     600E-1200: 320(top) + 225(上block) + 150(gap) + 620(下block) + 125(bottom) = 1440 ✓
+//
+// 出典: 北関東工業 KK-E型ハンドホール加工図面（HP掲載）実物DXF解析
+//       （scratchpad: KKE450_B75.dxf 2026-09-15、KKE600_S15B45.dxf/KKE600_S45B75.dxf 2026-09-18）。
 export interface FaceKeepOutZone {
   /** UI表示用ラベル。 */
   label: string;
-  /** 中心のローカル座標(mm)。加工可能エリア左下を原点とする。 */
+  /** 中心のローカル座標(mm)。定義元のブロックの左下を原点とする（buildMachinableAreaが全体座標に変換する）。 */
   xMm: number;
   yMm: number;
   /** 避けるべき半径(mm)。DXF実測（⊗マークの対角線の半分）。 */
   radiusMm: number;
   /** 出典・注記。 */
   sourceNote: string;
+}
+
+/** 1つの分割ピース（縁塊/スラブ/継胴/ベース等）に対応する加工可能エリアの矩形1つぶん。 */
+export interface MachinableBlock {
+  /** このブロックの加工可能高さ(mm)。 */
+  heightMm: number;
+  /** ブロック内の避けるべき領域。ローカル座標(yMmはこのブロックの下端を0とする)。 */
+  keepOutZones: FaceKeepOutZone[];
 }
 
 export interface MachinableArea {
@@ -301,26 +348,63 @@ export interface MachinableArea {
   totalWidthMm: number;
   /** 加工可能エリアの幅(mm) */
   workableWidthMm: number;
-  /** この寸法チェーンの全高(mm)。DXF実物のDIMENSIONエンティティが示す920mm（内空高さ750mmとは別系統）。 */
+  /** この寸法チェーンの全高(mm)。 */
   totalHeightMm: number;
-  /**
-   * 上端からの加工不可帯(mm)。100+120。
-   * 【450専用の単純化】450サイズは分割ピースが1枚扱いのため単一の除外帯で表現できているが、
-   * 600以上・ピラ用等の複数ピース構成では、この「単一のtop/bottomExclude」という形のまま
-   * 拡張しないこと。ピースごと（縁塊/スラブ/継胴/ベース、組み合わせ次第で個数も変わる）に
-   * 除外帯・接合部の離隔が異なりうる（2026-09-17、社長ご指摘）。将来600以上を実装する際は、
-   * この2フィールドを「ブロックの配列（各ブロックが自分のtop/bottomExclude・高さを持つ）」に
-   * 置き換え、決め打ちの単一定数にしないこと。machinableAreasFor直上のコメントも参照。
-   */
+  /** 面の上端から一番上のブロックの上端までの加工不可帯(mm)。 */
   topExcludeMm: number;
-  /** 下端からの加工不可帯(mm)。上記topExcludeMmの注記と同じ制約が適用される。 */
+  /** 一番下のブロックの下端から面の下端までの加工不可帯(mm)。 */
   bottomExcludeMm: number;
-  /** 加工可能エリアの高さ(mm)。totalHeightMm - topExcludeMm - bottomExcludeMm。 */
+  /**
+   * ブロック一覧。先頭(index 0)＝一番下のブロック（段番号の「1段目＝一番下」と同じ向き）。
+   * 450やシンプルな600E-600のように分割ピースの接合部が加工可能エリアに掛からない場合は
+   * 要素数1。600E-1200のように接合部が加工可能エリアの途中に来る場合は要素数2以上になり、
+   * ブロックとブロックの間はgapsMmぶん加工不可（コネクター配置不可）になる。
+   */
+  blocks: MachinableBlock[];
+  /** ブロック間の隙間(mm)＝ピース接合部の加工不可帯。長さ=blocks.length-1。 */
+  gapsMm: number[];
+  /**
+   * blocksの合計高さ+ブロック間の隙間(mm)＝一番下のブロック下端から一番上のブロック上端まで。
+   * buildMachinableAreaが自動計算する。段(row)の積み上げ判定・図面描画の座標系の上限として使う
+   * （blocks.length===1の場合は単にそのブロックの高さと同じ）。
+   */
   workableHeightMm: number;
-  /** 避けるべき領域（⊗マーク＝内部インサート等）。無い面は空配列。 */
+  /**
+   * 各ブロックのkeepOutZoneを、このMachinableArea全体のローカル座標(y=0が一番下のブロックの
+   * 下端)に変換して1つにまとめたもの。buildMachinableAreaが自動計算する。描画・簡易表示用。
+   * 段の配置判定(computeFaceLayout)は隙間をまたいだ誤判定を避けるため、この配列ではなく
+   * 個別ブロックのblocks[i].keepOutZones（ブロックローカル座標）を使うこと。
+   */
   keepOutZones: FaceKeepOutZone[];
+  /** blocks[i]のこのMachinableArea全体でのローカル下端(mm)。buildMachinableAreaが自動計算。 */
+  blockBottomsMm: number[];
   /** 出典・注記。UIにそのまま出す。 */
   sourceNote: string;
+}
+
+/**
+ * blocks/gapsMmから、workableHeightMm・keepOutZones（全体ローカル座標に変換済み）・
+ * blockBottomsMmを自動計算する。面ごとのデータは必ずこの関数を通して組み立てること
+ * （手計算で埋めるとブロック数・寸法を変えた時に食い違いが起きるため）。
+ */
+function buildMachinableArea(
+  input: Omit<MachinableArea, 'workableHeightMm' | 'keepOutZones' | 'blockBottomsMm'>,
+): MachinableArea {
+  const blockBottomsMm: number[] = [];
+  let cursor = 0;
+  input.blocks.forEach((b, i) => {
+    blockBottomsMm.push(cursor);
+    cursor += b.heightMm;
+    if (i < input.gapsMm.length) cursor += input.gapsMm[i];
+  });
+  const keepOutZones = input.blocks.flatMap((b, i) =>
+    b.keepOutZones.map(z => ({ ...z, yMm: z.yMm + blockBottomsMm[i] })),
+  );
+  return { ...input, workableHeightMm: cursor, keepOutZones, blockBottomsMm };
+}
+
+function insertMarkZone(xMm: number, yMm: number, sourceNote: string): FaceKeepOutZone {
+  return { label: '⊗マーク（内部インサート）', xMm, yMm, radiusMm: 22.5, sourceNote };
 }
 
 const KKE_450_INSERT_MARK_SOURCE_NOTE =
@@ -329,22 +413,12 @@ const KKE_450_INSERT_MARK_SOURCE_NOTE =
   'タイトル注記「※AC面にあるこのマークは外側にあるインサートです。このインサートで吊らないでください。' +
   '（干渉しないように削孔させていただきます。）」の裏付けあり。';
 
-function insertMarkZone(): FaceKeepOutZone {
-  return {
-    label: '⊗マーク（内部インサート）',
-    xMm: 175,
-    yMm: 274,
-    radiusMm: 22.5,
-    sourceNote: KKE_450_INSERT_MARK_SOURCE_NOTE,
-  };
-}
-
 const KKE_450_SOURCE_NOTE_COMMON =
   '北関東工業 KK-E型ハンドホール 450E-750の加工図面DXF実物解析による実測値' +
   '（2026-09-15、加工可能エリアの描画矩形そのものを各面ごとに直接測定。' +
   '450以外のサイズ・450の別の深さ（-500/-1000等）は加工可能エリア未確認のため、この数値は流用しないこと。';
 
-const KKE_450_MACHINABLE_AREA_A: MachinableArea = {
+const KKE_450_MACHINABLE_AREA_A: MachinableArea = buildMachinableArea({
   face: 'A',
   faceLabel: 'A面',
   totalWidthMm: 530,
@@ -352,14 +426,14 @@ const KKE_450_MACHINABLE_AREA_A: MachinableArea = {
   totalHeightMm: 920,
   topExcludeMm: 100 + 120,
   bottomExcludeMm: 100,
-  workableHeightMm: 920 - (100 + 120) - 100,
-  keepOutZones: [insertMarkZone()],
+  blocks: [{ heightMm: 600, keepOutZones: [insertMarkZone(175, 274, KKE_450_INSERT_MARK_SOURCE_NOTE)] }],
+  gapsMm: [],
   sourceNote:
     KKE_450_SOURCE_NOTE_COMMON +
     ' A面は加工可能エリア矩形に加え、920mm寸法チェーン（DIMENSIONエンティティ）も直接確認済み。訂正履歴ありコード上部コメント参照。',
-};
+});
 
-const KKE_450_MACHINABLE_AREA_B: MachinableArea = {
+const KKE_450_MACHINABLE_AREA_B: MachinableArea = buildMachinableArea({
   face: 'B',
   faceLabel: 'B面',
   totalWidthMm: 530,
@@ -367,15 +441,15 @@ const KKE_450_MACHINABLE_AREA_B: MachinableArea = {
   totalHeightMm: 920,
   topExcludeMm: 100 + 120,
   bottomExcludeMm: 100,
-  workableHeightMm: 600,
-  keepOutZones: [],
+  blocks: [{ heightMm: 600, keepOutZones: [] }],
+  gapsMm: [],
   sourceNote:
     KKE_450_SOURCE_NOTE_COMMON +
     ' B面は加工可能エリア矩形(350×600mm)を直接測定。920mm寸法チェーンの数値注記(DIMENSION)はこの図面ではA面にしか描かれていないが、' +
     '注記が紐付く外枠ジオメトリ自体がB面の位置にも同一形状で独立して描画されていることを確認済み。⊗マークは無し（実測で確認済み）。',
-};
+});
 
-const KKE_450_MACHINABLE_AREA_C: MachinableArea = {
+const KKE_450_MACHINABLE_AREA_C: MachinableArea = buildMachinableArea({
   face: 'C',
   faceLabel: 'C面',
   totalWidthMm: 530,
@@ -383,15 +457,15 @@ const KKE_450_MACHINABLE_AREA_C: MachinableArea = {
   totalHeightMm: 920,
   topExcludeMm: 100 + 120,
   bottomExcludeMm: 100,
-  workableHeightMm: 600,
-  keepOutZones: [insertMarkZone()],
+  blocks: [{ heightMm: 600, keepOutZones: [insertMarkZone(175, 274, KKE_450_INSERT_MARK_SOURCE_NOTE)] }],
+  gapsMm: [],
   sourceNote:
     KKE_450_SOURCE_NOTE_COMMON +
     ' C面は加工可能エリア矩形(350×600mm)を直接測定。920mm寸法チェーンの数値注記(DIMENSION)はこの図面ではA面にしか描かれていないが、' +
     '注記が紐付く外枠ジオメトリ自体がC面の位置にも同一形状で独立して描画されていることを確認済み。⊗マークあり（A面と同じくローカル(175,274)に実測）。',
-};
+});
 
-const KKE_450_MACHINABLE_AREA_D: MachinableArea = {
+const KKE_450_MACHINABLE_AREA_D: MachinableArea = buildMachinableArea({
   face: 'D',
   faceLabel: 'D面',
   totalWidthMm: 530,
@@ -399,46 +473,103 @@ const KKE_450_MACHINABLE_AREA_D: MachinableArea = {
   totalHeightMm: 920,
   topExcludeMm: 100 + 120,
   bottomExcludeMm: 100,
-  workableHeightMm: 600,
-  keepOutZones: [],
+  blocks: [{ heightMm: 600, keepOutZones: [] }],
+  gapsMm: [],
   sourceNote:
     KKE_450_SOURCE_NOTE_COMMON +
     ' D面は加工可能エリア矩形(350×600mm)を直接測定。920mm寸法チェーンの数値注記(DIMENSION)はこの図面ではA面にしか描かれていないが、' +
     '注記が紐付く外枠ジオメトリ自体がD面の位置にも同一形状で独立して描画されていることを確認済み。⊗マークは無し（実測で確認済み）。',
+});
+
+const KKE600_SOURCE_NOTE_COMMON =
+  '北関東工業 KK-E型ハンドホール600サイズの加工図面DXF実物解析による実測値（2026-09-18、' +
+  'サブエージェントがezdxfでブロック参照を再帰explodeし座標・寸法エンティティ・PDFテキスト層から' +
+  '直接抽出。全高＝上端除外+ブロック高さ+隙間+下端除外の自己整合を検算済み）。' +
+  '600の他の高さバリエーション（750/900mm×2通り/1050mm）は未確認のため流用しないこと。';
+
+const KKE600_600_SOURCE_NOTE =
+  KKE600_SOURCE_NOTE_COMMON + ' 品名規格「ＫＫ-Ｅ型ハンドホール　６００Ｅ-６００」（S15+B45、単一ブロック）。' +
+  '出典ファイル: KKE600_S15B45.dxf（元ファイル名202512150829306474.dxf）、' +
+  'https://kitakanto.co.jp/pages/1329/#block1157-4117';
+
+const KKE600_1200_SOURCE_NOTE =
+  KKE600_SOURCE_NOTE_COMMON + ' 品名規格「ＫＫ-Ｅ型ハンドホール　６００Ｅ-１２００」（S45+B75、上下2ブロック）。' +
+  '出典ファイル: KKE600_S45B75.dxf（元ファイル名202512150911265534.dxf）、' +
+  'https://kitakanto.co.jp/pages/1329/#block1157-4122';
+
+function build600_600Area(face: HandholeFace, faceLabel: MachinableArea['faceLabel'], hasInsertMark: boolean): MachinableArea {
+  return buildMachinableArea({
+    face,
+    faceLabel,
+    totalWidthMm: 680,
+    workableWidthMm: 450,
+    totalHeightMm: 840,
+    topExcludeMm: 395,
+    bottomExcludeMm: 125,
+    blocks: [{ heightMm: 320, keepOutZones: hasInsertMark ? [insertMarkZone(225, 65, KKE600_600_SOURCE_NOTE)] : [] }],
+    gapsMm: [],
+    sourceNote: KKE600_600_SOURCE_NOTE + ` ${faceLabel}は加工可能エリア矩形(450×320mm)を直接測定。`,
+  });
+}
+
+function build600_1200Area(face: HandholeFace, faceLabel: MachinableArea['faceLabel'], hasInsertMark: boolean): MachinableArea {
+  return buildMachinableArea({
+    face,
+    faceLabel,
+    totalWidthMm: 680,
+    workableWidthMm: 450,
+    totalHeightMm: 1440,
+    topExcludeMm: 320,
+    bottomExcludeMm: 125,
+    // index0=下ブロック(620mm、⊗マークがあればここ)、index1=上ブロック(225mm、⊗マーク無し)。
+    blocks: [
+      { heightMm: 620, keepOutZones: hasInsertMark ? [insertMarkZone(225, 199, KKE600_1200_SOURCE_NOTE)] : [] },
+      { heightMm: 225, keepOutZones: [] },
+    ],
+    gapsMm: [150],
+    sourceNote: KKE600_1200_SOURCE_NOTE + ` ${faceLabel}は加工可能エリアが上下2ブロック(下620mm/接合部150mm/上225mm)に分かれる。`,
+  });
+}
+
+const KKE600_600_AREA: Record<HandholeFace, MachinableArea> = {
+  A: build600_600Area('A', 'A面', true),
+  B: build600_600Area('B', 'B面', false),
+  C: build600_600Area('C', 'C面', true),
+  D: build600_600Area('D', 'D面', false),
+};
+
+const KKE600_1200_AREA: Record<HandholeFace, MachinableArea> = {
+  A: build600_1200Area('A', 'A面', true),
+  B: build600_1200Area('B', 'B面', false),
+  C: build600_1200Area('C', 'C面', true),
+  D: build600_1200Area('D', 'D面', false),
 };
 
 /**
- * サイズ×面ごとの加工可能エリア。450以外はnull＝未確認。
+ * サイズ(width)×高さバリエーション(heightVariantCode)ごとの面別加工可能エリア。
+ * heightVariantCodeを省略した場合はそのwidthの既定バリエーション（KKE_HEIGHT_VARIANTSの先頭）を使う。
+ * 該当データが無い（未確認の組み合わせ、または存在しないコードを渡した）場合は4面ともnullを返す。
  * 呼び出し側（計算エンジン・UI）は必ずnullを「未確認」として扱い、それらしい値で埋めないこと。
  *
- * 【重要・450以外を実装する前に必ず読むこと（2026-09-17、社長ご指摘・サブエージェント調査）】
- * 北関東工業のKK-E型は「分割式」（縁塊+スラブ+継胴+ベース、最大4ピースを上下に積み重ねる構造。
- * カタログ本文いわく「分割式であるため、大型ラフタークレーンが不要」）が標準仕様。450サイズは
- * 組み合わせ表が無い単純構成のため、たまたま「加工可能エリア＝単一矩形」というこの
- * `MachinableArea`のデータモデルで表現できているだけ。
- *
- * 実際にピラ用1000サイズ（KK-E型ピラ用ハンドホール 1000E-900）の加工図面PDFを直接確認したところ、
- * A〜D面すべてで加工可能エリアが**上下2ブロックに分かれ、ピース同士の接合部（製品情報プレート
- * 位置）は加工不可**という構造だった。600以上の標準ラインも同様に縁塊+スラブ+継胴+ベースの
- * 組み合わせ表を持つため、選んだ高さ構成によってブロック数・各ブロックの寸法が変わる可能性が高い。
- *
- * つまり600以上を実装する際は、「450の比率を外挿しない」というこれまでの注意に加えて、
- * **`MachinableArea`を単一矩形のままにせず、複数ブロック（gapを挟んだ配列）に対応する
- * データモデルへ拡張する必要がある**（そうしないと実物の接合部を加工可能領域に含めてしまう）。
- * 高さ構成（縁塊+スラブ+継胴+ベースの組み合わせ）ごとに個別の加工図面PDFが用意されているため、
- * サイズ×高さ構成の組み合わせごとに実物図面を確認しないと正しいブロック配置は分からない。
- *
- * 【設計指針（2026-09-17、社長ご指摘）】ブロックごとの上下除外帯・ブロック間の離隔（接合部の
- * 幅）は、450のtopExcludeMm/bottomExcludeMmのような「サイズ全体で共通の単一定数」にせず、
- * ブロックごとに個別の値を持てる構造にすること。組み合わせ（P/B/S/Tの選び方）によって
- * ピース数・各ピースの高さ・接合部の位置が変わるため、単一値に決め打ちすると別の組み合わせで
- * 破綻する。実装イメージ：`blocks: { heightMm: number; topExcludeMm: number; bottomExcludeMm:
- * number; keepOutZones: FaceKeepOutZone[] }[]` のような、ブロックごとに閉じたレコードの配列。
- * 詳細はObsidianメモ project_handhole_knockout_app.md 参照。
+ * 【確認済みデータ】上のコメント（加工可能エリアのセクション）参照。
+ * - 450 (既定"450E-750"): 単一ブロック。
+ * - 600 "600E-600"（既定、S15+B45）: 単一ブロック、可動域450×320mm。
+ * - 600 "600E-1200"（S45+B75）: 上下2ブロック、⊗マークは下ブロックのみ。
+ * それ以外のwidth・heightVariantCodeは未確認。450/600の比率を他へ流用・外挿することはしない。
  */
-export function machinableAreasFor(width: KkEWidth): Record<HandholeFace, MachinableArea | null> {
-  if (width === 450) {
+export function machinableAreasFor(
+  width: KkEWidth,
+  heightVariantCode?: string,
+): Record<HandholeFace, MachinableArea | null> {
+  const code = heightVariantCode ?? defaultHeightVariantFor(width)?.code;
+  if (code === '450E-750') {
     return { A: KKE_450_MACHINABLE_AREA_A, B: KKE_450_MACHINABLE_AREA_B, C: KKE_450_MACHINABLE_AREA_C, D: KKE_450_MACHINABLE_AREA_D };
+  }
+  if (code === '600E-600') {
+    return { ...KKE600_600_AREA };
+  }
+  if (code === '600E-1200') {
+    return { ...KKE600_1200_AREA };
   }
   return { A: null, B: null, C: null, D: null };
 }

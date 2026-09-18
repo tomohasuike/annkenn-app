@@ -142,16 +142,20 @@ console.log('\n■ 加工可能エリア：450はA/B/C/D全4面に値がある�
   const originKeys = new Set(origins.map(o => `${o.dxfOriginX},${o.dxfOriginY}`));
   ok_('450 4面のDXF原点はすべて異なる', originKeys.size === 4, `${[...originKeys].join(' / ')}`);
 
-  for (const w of [600, 800, 900, 1000, 1200, 1500, 1800, 2000] as const) {
+  // 600は600E-600/600E-1200の2バリエーションを実装済みなので未確認リストから除外。
+  for (const w of [800, 900, 1000, 1200, 1500, 1800, 2000] as const) {
     const areas = machinableAreasFor(w);
     ok_(`${w}サイズは4面とも加工可能エリア未確認(null)`, HANDHOLE_FACE_ORDER.every(f => areas[f] === null));
   }
+  // 600サイズでも、実装していない高さバリエーション（コード不一致）を渡すと未確認扱いになること。
+  const areas600Unknown = machinableAreasFor(600, '600E-9999');
+  ok_('600サイズでも未知のheightVariantCodeを渡すと4面ともnull', HANDHOLE_FACE_ORDER.every(f => areas600Unknown[f] === null));
 }
 
-console.log('\n■ 450サイズ以外は自動配置せず「未確認」警告になること（面・段を指定していても）');
+console.log('\n■ 450サイズ以外（未確認サイズ）は自動配置せず「未確認」警告になること（面・段を指定していても）');
 {
   const runs: ConduitRun[] = [{ face: 'A', row: 1, brand: 'kkfit', fepSize: 50, count: 2 }];
-  for (const w of [600, 900, 1800] as const) {
+  for (const w of [900, 1800] as const) {
     const r = computeHandholeLayout({ width: w, runs });
     ok_(`${w}: 4面ともareaはnull`, r.faces.every(f => f.area === null));
     ok_(`${w}: 配置0件`, r.placedHoles.length === 0);
@@ -159,6 +163,88 @@ console.log('\n■ 450サイズ以外は自動配置せず「未確認」警告�
     const hasWarn = r.warnings.some(w2 => w2.level === 'warn' && w2.message.includes('未確認'));
     ok_(`${w}: 未確認の警告が出る`, hasWarn);
   }
+}
+
+console.log('\n■ 600サイズ：600E-600（既定、単一ブロック）の加工可能エリア実測値');
+{
+  const areas = machinableAreasFor(600); // heightVariantCode省略＝既定の600E-600
+  for (const face of HANDHOLE_FACE_ORDER) {
+    const a = areas[face];
+    ok_(`600E-600 ${face}面の加工可能エリアが取れる`, a != null);
+    if (!a) continue;
+    eq(`600E-600 ${face}面 全幅`, a.totalWidthMm, 680);
+    eq(`600E-600 ${face}面 加工可能幅`, a.workableWidthMm, 450);
+    eq(`600E-600 ${face}面 全高`, a.totalHeightMm, 840);
+    eq(`600E-600 ${face}面 上端除外`, a.topExcludeMm, 395);
+    eq(`600E-600 ${face}面 下端除外`, a.bottomExcludeMm, 125);
+    eq(`600E-600 ${face}面 ブロック数`, a.blocks.length, 1);
+    eq(`600E-600 ${face}面 加工可能高さ`, a.workableHeightMm, 320);
+    ok_(`600E-600 ${face}面 自己整合(上端+ブロック+下端=全高)`, a.topExcludeMm + a.workableHeightMm + a.bottomExcludeMm === a.totalHeightMm);
+  }
+  ok_('600E-600 A面に⊗マークがある', (areas.A?.keepOutZones.length ?? 0) === 1);
+  ok_('600E-600 C面に⊗マークがある', (areas.C?.keepOutZones.length ?? 0) === 1);
+  ok_('600E-600 B面に⊗マークは無い', (areas.B?.keepOutZones.length ?? 0) === 0);
+  ok_('600E-600 D面に⊗マークは無い', (areas.D?.keepOutZones.length ?? 0) === 0);
+}
+
+console.log('\n■ 600サイズ：600E-1200（上下2ブロック）の加工可能エリア実測値・ブロック間ギャップ');
+{
+  const areas = machinableAreasFor(600, '600E-1200');
+  for (const face of HANDHOLE_FACE_ORDER) {
+    const a = areas[face];
+    ok_(`600E-1200 ${face}面の加工可能エリアが取れる`, a != null);
+    if (!a) continue;
+    eq(`600E-1200 ${face}面 全高`, a.totalHeightMm, 1440);
+    eq(`600E-1200 ${face}面 上端除外`, a.topExcludeMm, 320);
+    eq(`600E-1200 ${face}面 下端除外`, a.bottomExcludeMm, 125);
+    eq(`600E-1200 ${face}面 ブロック数`, a.blocks.length, 2);
+    eq(`600E-1200 ${face}面 下ブロック(index0)高さ`, a.blocks[0]?.heightMm, 620);
+    eq(`600E-1200 ${face}面 上ブロック(index1)高さ`, a.blocks[1]?.heightMm, 225);
+    eq(`600E-1200 ${face}面 ブロック間ギャップ`, a.gapsMm[0], 150);
+    eq(`600E-1200 ${face}面 加工可能高さ(=620+150+225)`, a.workableHeightMm, 995);
+    ok_(`600E-1200 ${face}面 自己整合(上端+可動域+下端=全高)`, a.topExcludeMm + a.workableHeightMm + a.bottomExcludeMm === a.totalHeightMm);
+    eq(`600E-1200 ${face}面 下ブロックの下端(blockBottomsMm[0])`, a.blockBottomsMm[0], 0);
+    eq(`600E-1200 ${face}面 上ブロックの下端(blockBottomsMm[1]=620+150)`, a.blockBottomsMm[1], 770);
+  }
+  // ⊗マークは下ブロック(index0)のみ、A/C面のみ。全体ローカルy=199(ブロックローカル199+ブロック下端0)。
+  ok_('600E-1200 A面の⊗マークは下ブロックにある', areas.A?.keepOutZones.length === 1 && areas.A.keepOutZones[0].yMm === 199);
+  ok_('600E-1200 C面の⊗マークは下ブロックにある', areas.C?.keepOutZones.length === 1 && areas.C.keepOutZones[0].yMm === 199);
+  ok_('600E-1200 B面に⊗マークは無い', (areas.B?.keepOutZones.length ?? 0) === 0);
+  ok_('600E-1200 D面に⊗マークは無い', (areas.D?.keepOutZones.length ?? 0) === 0);
+}
+
+console.log('\n■ 600E-1200：ブロック選択（block）で上下ブロックそれぞれに配置でき、段はブロックをまたいで積み上がらないこと');
+{
+  // ブロック1(下、620mm)に2段、ブロック2(上、225mm)に1段。
+  const runs: ConduitRun[] = [
+    { face: 'A', block: 1, row: 1, brand: 'kkfit', fepSize: 50, count: 1 },
+    { face: 'A', block: 1, row: 2, brand: 'kkfit', fepSize: 50, count: 1 },
+    { face: 'A', block: 2, row: 1, brand: 'kkfit', fepSize: 50, count: 1 },
+  ];
+  const r = computeHandholeLayout({ width: 600, heightVariantCode: '600E-1200', runs });
+  const faceA = r.faces.find(f => f.face === 'A')!;
+  ok_('エラーは出ない', !r.warnings.some(w => w.level === 'error'), r.warnings.map(w => w.message).join(' | '));
+  ok_('3段とも配置できる(3個)', r.placedHoles.length === 3, `${r.placedHoles.length}`);
+  const block1Row1 = faceA.rows.find(x => x.block === 1 && x.row === 1)!;
+  const block1Row2 = faceA.rows.find(x => x.block === 1 && x.row === 2)!;
+  const block2Row1 = faceA.rows.find(x => x.block === 2 && x.row === 1)!;
+  ok_('ブロック1 1段目のbandBottomMmは0(面全体ローカルでもブロック1の下端=0)', block1Row1.bandBottomMm === 0, `${block1Row1.bandBottomMm}`);
+  ok_('ブロック2 1段目のbandBottomMmはブロック間ギャップの先(>=770)', block2Row1.bandBottomMm >= 770, `${block2Row1.bandBottomMm}`);
+  ok_('ブロック1の2段はブロック1の高さ(620mm)以内で積み上がる', block1Row2.bandTopMm <= 620, `${block1Row2.bandTopMm}`);
+  if (faceA.area) checkInvariants('A面(600E-1200・全ブロック合算)', faceA.placedHoles, faceA.area.workableWidthMm, faceA.area.workableHeightMm);
+
+  // 存在しないブロック番号(3)を指定するとエラーになること。
+  const badRuns: ConduitRun[] = [{ face: 'A', block: 3, row: 1, brand: 'kkfit', fepSize: 50, count: 1 }];
+  const rBad = computeHandholeLayout({ width: 600, heightVariantCode: '600E-1200', runs: badRuns });
+  ok_('存在しないブロック番号はエラーになり配置されない', rBad.placedHoles.length === 0 && rBad.unplacedHoles.length === 1);
+  const hasBlockError = rBad.warnings.some(w => w.level === 'error' && w.message.includes('ブロック3') && w.message.includes('存在しません'));
+  ok_('存在しないブロックのエラーメッセージが出る', hasBlockError, rBad.warnings.map(w => w.message).join(' | '));
+
+  // block省略時は既定で1扱いになること（450等、単一ブロックの既存呼び出し方との後方互換）。
+  const implicitRuns: ConduitRun[] = [{ face: 'B', row: 1, brand: 'kkfit', fepSize: 50, count: 1 }];
+  const rImplicit = computeHandholeLayout({ width: 600, heightVariantCode: '600E-1200', runs: implicitRuns });
+  const faceB = rImplicit.faces.find(f => f.face === 'B')!;
+  ok_('blockを省略すると1(下ブロック)扱いになる', faceB.rows[0]?.block === 1, `${faceB.rows[0]?.block}`);
 }
 
 /**

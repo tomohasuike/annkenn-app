@@ -28,6 +28,8 @@ import {
   PLACEMENT_GRID_OPTIONS_MM,
   DEFAULT_PLACEMENT_GRID_MM,
   machinableAreasFor,
+  heightVariantsFor,
+  defaultHeightVariantFor,
   HANDHOLE_FACE_ORDER,
   FACE_LABELS,
   type ConnectorBrand,
@@ -46,17 +48,30 @@ import HandholeDrawing from './HandholeDrawing';
 
 const KKE450_TEMPLATE_URL = '/handhole-templates/KKE450_B75.dxf';
 
-/** 1段ぶんの入力：この段に足した配管条件の一覧。段番号は面ごとの配列の並び順(index+1)で決まる。 */
+/** 1段ぶんの入力：この段に足した配管条件の一覧。段番号はブロック内配列の並び順(index+1)で決まる。 */
 interface RowInput {
   runs: { brand: ConnectorBrand; fepSize: FepSize; count: number }[];
 }
 
-type FaceRowsState = Record<HandholeFace, RowInput[]>;
+/**
+ * 面ごとの「ブロックの配列」。ブロック番号は配列index+1（1ブロック目＝面の中で一番下）。
+ * 450・600E-600のようにブロックが1つしか無い面は常にblocks[0]だけを使う。
+ * 600E-1200のように複数ブロックある面では、UIがブロックタブを出して選ばせる
+ * （2026-09-18、北関東工業の「分割式」構造への対応）。
+ */
+type FaceRowsState = Record<HandholeFace, RowInput[][]>;
 
-const emptyFaceRows = (): FaceRowsState => ({ A: [{ runs: [] }], B: [], C: [], D: [] });
+const emptyFaceRows = (): FaceRowsState => ({ A: [[{ runs: [] }]], B: [[]], C: [[]], D: [[]] });
+
+/** face配下のblockIdxのRowInput配列を取得する。まだ無ければ空配列（ブロックを増やした直後等）。 */
+const blockRowsOf = (faceRows: FaceRowsState, face: HandholeFace, blockIdx: number): RowInput[] =>
+  faceRows[face][blockIdx] ?? [];
 
 export default function HandholeKnockoutCalc() {
   const [width, setWidth] = useState<KkEWidth>(450);
+  // 内空高さバリエーション（品名規格の末尾。北関東工業の「分割式」構造により、同じwidthでも
+  // 組み合わせ次第で加工可能エリアのブロック構成が変わる。2026-09-18対応）。
+  const [heightVariantCode, setHeightVariantCode] = useState<string>(() => defaultHeightVariantFor(450)?.code ?? '');
   const [gridMm, setGridMm] = useState<PlacementGridMm>(DEFAULT_PLACEMENT_GRID_MM);
   // 工具（ベルトレンチ等）用の追加離隔(mm)。メーカー資料に数値の定めが無いため既定0=補正なし。
   // 大径コネクターは手締めだけでなく工具が必要になる場合があり、その分の余裕を現場判断で
@@ -69,18 +84,31 @@ export default function HandholeKnockoutCalc() {
   const [dxfBusy, setDxfBusy] = useState(false);
   const [dxfError, setDxfError] = useState<string | null>(null);
   const [activeFace, setActiveFace] = useState<HandholeFace>('A');
+  const [activeBlockIndex, setActiveBlockIndex] = useState(0);
 
-  const areas = useMemo(() => machinableAreasFor(width), [width]);
+  const heightVariants = useMemo(() => heightVariantsFor(width), [width]);
+  const areas = useMemo(() => machinableAreasFor(width, heightVariantCode), [width, heightVariantCode]);
   const allFacesUnconfirmed = HANDHOLE_FACE_ORDER.every(f => areas[f] == null);
+  const anyMultiBlock = HANDHOLE_FACE_ORDER.some(f => (areas[f]?.blocks.length ?? 1) > 1);
 
-  // 面ごとの段配列(faceRows)を、計算エンジンが受け取るフラットなConduitRun[]に変換する。
-  // 段番号はUI側の配列index+1（1段目＝一番下）。
+  // サイズを切り替えたら、そのサイズの既定バリエーションに戻す（サイズごとにバリエーションの
+  // 品名規格コードが違うため、前のサイズのコードを引き継ぐと必ず未確認扱いになってしまう）。
+  useEffect(() => {
+    setHeightVariantCode(defaultHeightVariantFor(width)?.code ?? '');
+  }, [width]);
+
+  // 面ごとのブロック配列(faceRows)を、計算エンジンが受け取るフラットなConduitRun[]に変換する。
+  // ブロック番号・段番号はUI側の配列index+1（1ブロック目・1段目＝一番下）。
   const runs = useMemo<ConduitRun[]>(() => {
     const out: ConduitRun[] = [];
     HANDHOLE_FACE_ORDER.forEach(face => {
-      faceRows[face].forEach((row, idx) => {
-        row.runs.forEach(r => {
-          if (r.count > 0) out.push({ face, row: idx + 1, brand: r.brand, fepSize: r.fepSize, count: r.count });
+      faceRows[face].forEach((blockRows, blockIdx) => {
+        blockRows.forEach((row, rowIdx) => {
+          row.runs.forEach(r => {
+            if (r.count > 0) {
+              out.push({ face, block: blockIdx + 1, row: rowIdx + 1, brand: r.brand, fepSize: r.fepSize, count: r.count });
+            }
+          });
         });
       });
     });
@@ -88,8 +116,8 @@ export default function HandholeKnockoutCalc() {
   }, [faceRows]);
 
   const result = useMemo(
-    () => computeHandholeLayout({ width, runs, gridMm, extraClearanceMm }),
-    [width, runs, gridMm, extraClearanceMm],
+    () => computeHandholeLayout({ width, heightVariantCode, runs, gridMm, extraClearanceMm }),
+    [width, heightVariantCode, runs, gridMm, extraClearanceMm],
   );
   const orderLines = useMemo(() => summarizeOrder(result), [result]);
   const totalHoles = result.requiredHoles.length;
@@ -97,47 +125,69 @@ export default function HandholeKnockoutCalc() {
   const errors = result.warnings.filter(w => w.level === 'error');
   const warns = result.warnings.filter(w => w.level === 'warn');
 
-  // サイズを切り替えた時など、選択中の面が確認できない面になっていたら、確認できている
-  // 最初の面（無ければA面）に戻す。
+  // サイズ・高さバリエーションを切り替えた時など、選択中の面が確認できない面になっていたら、
+  // 確認できている最初の面（無ければA面）に戻す。
   useEffect(() => {
     if (areas[activeFace] == null) {
       const firstConfirmed = HANDHOLE_FACE_ORDER.find(f => areas[f] != null);
       setActiveFace(firstConfirmed ?? 'A');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width]);
+  }, [width, heightVariantCode]);
 
   const activeFaceResult = result.faces.find(f => f.face === activeFace) ?? null;
   const activeFaceArea = areas[activeFace] ?? null;
+  const activeBlockCount = activeFaceArea?.blocks.length ?? 1;
 
-  // ── 段・配管条件の操作 ──────────────────────────────────
-  const addRow = (face: HandholeFace) =>
-    setFaceRows(prev => ({ ...prev, [face]: [...prev[face], { runs: [] }] }));
+  // 選択中の面・バリエーションでブロック数が減った（例：ブロック2を選んだ状態で450に切り替えた）
+  // 場合、存在するブロックへ戻す。
+  useEffect(() => {
+    if (activeBlockIndex > activeBlockCount - 1) setActiveBlockIndex(Math.max(activeBlockCount - 1, 0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFace, activeBlockCount]);
 
-  const removeRow = (face: HandholeFace, rowIdx: number) =>
-    setFaceRows(prev => ({ ...prev, [face]: prev[face].filter((_, i) => i !== rowIdx) }));
+  // ── ブロック・段・配管条件の操作 ──────────────────────────────────
+  const addRow = (face: HandholeFace, blockIdx: number) =>
+    setFaceRows(prev => {
+      const blocks = [...prev[face]];
+      while (blocks.length <= blockIdx) blocks.push([]);
+      blocks[blockIdx] = [...blocks[blockIdx], { runs: [] }];
+      return { ...prev, [face]: blocks };
+    });
 
-  const addRunToRow = (face: HandholeFace, rowIdx: number) => {
+  const removeRow = (face: HandholeFace, blockIdx: number, rowIdx: number) =>
+    setFaceRows(prev => {
+      const blocks = [...prev[face]];
+      blocks[blockIdx] = (blocks[blockIdx] ?? []).filter((_, i) => i !== rowIdx);
+      return { ...prev, [face]: blocks };
+    });
+
+  const addRunToRow = (face: HandholeFace, blockIdx: number, rowIdx: number) => {
     if (addCount <= 0) return;
-    setFaceRows(prev => ({
-      ...prev,
-      [face]: prev[face].map((r, i) =>
+    setFaceRows(prev => {
+      const blocks = [...prev[face]];
+      blocks[blockIdx] = (blocks[blockIdx] ?? []).map((r, i) =>
         i === rowIdx ? { runs: [...r.runs, { brand: addBrand, fepSize: addFep, count: addCount }] } : r,
-      ),
-    }));
+      );
+      return { ...prev, [face]: blocks };
+    });
   };
 
-  const removeRunFromRow = (face: HandholeFace, rowIdx: number, runIdx: number) =>
-    setFaceRows(prev => ({
-      ...prev,
-      [face]: prev[face].map((r, i) => (i === rowIdx ? { runs: r.runs.filter((_, j) => j !== runIdx) } : r)),
-    }));
+  const removeRunFromRow = (face: HandholeFace, blockIdx: number, rowIdx: number, runIdx: number) =>
+    setFaceRows(prev => {
+      const blocks = [...prev[face]];
+      blocks[blockIdx] = (blocks[blockIdx] ?? []).map((r, i) => (i === rowIdx ? { runs: r.runs.filter((_, j) => j !== runIdx) } : r));
+      return { ...prev, [face]: blocks };
+    });
 
   const reset = () => setFaceRows(emptyFaceRows());
 
   // 発注図面(DXF)ダウンロード可否。配置済みの穴が1件以上あり、
   // 未配置の穴が無い場合のみ許可する（穴が足りないまま発注してしまう事故を防ぐ）。
-  const canDownloadDxf = result.placedHoles.length > 0 && result.unplacedHoles.length === 0;
+  // 発注図面(DXF)への自動書き込みはKK-E型450サイズのテンプレートのみ用意されている
+  // （handholeDxfExport.tsのgenerateHandholeOrderDxfが450以外を明示的に拒否する）。
+  // 600等は加工可能エリア自体は実装済みでもDXFテンプレートが無いため、widthで別途ガードする。
+  const canDownloadDxf = width === 450 && result.placedHoles.length > 0 && result.unplacedHoles.length === 0;
 
   const downloadOrderDxf = async () => {
     if (!canDownloadDxf) return;
@@ -222,9 +272,26 @@ export default function HandholeKnockoutCalc() {
           <span>蓋開口: {KKE_OUTER_SPEC[width].lidOpening}</span>
           <span>壁厚: {KKE_OUTER_SPEC[width].wallThicknessMm}mm</span>
         </div>
+
+        {/* 内空高さバリエーション（品名規格の末尾）。北関東工業の「分割式」構造により、同じ幅でも
+            組み合わせ次第で加工可能エリアのブロック構成が変わるため、バリエーションが2つ以上ある
+            サイズだけ選ばせる（1つしか無いサイズでは表示しない）。 */}
+        {heightVariants.length > 1 && (
+          <div className="space-y-1.5 pt-1">
+            <label className="text-xs font-semibold text-slate-500 block">内空高さ（分割ピースの組み合わせ）</label>
+            <div className="flex flex-wrap gap-2">
+              {heightVariants.map(v => (
+                <button key={v.code} onClick={() => setHeightVariantCode(v.code)} className={chip(heightVariantCode === v.code) + ' !text-xs'}>
+                  {v.innerHeightMm}mm（{v.pieceCombo}）
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {!allFacesUnconfirmed ? (
           <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-800 dark:text-blue-300 space-y-1">
-            <div className="font-bold">加工可能エリア（面・段はここでは自動で動かしません。下で面と段を選んで配管条件を入れてください）</div>
+            <div className="font-bold">加工可能エリア（面・ブロック・段はここでは自動で動かしません。下で選んで配管条件を入れてください）</div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               {HANDHOLE_FACE_ORDER.map(f => {
                 const a = areas[f];
@@ -232,7 +299,11 @@ export default function HandholeKnockoutCalc() {
                   <span key={f}>
                     {FACE_LABELS[f]}:{' '}
                     {a ? (
-                      <>幅{a.workableWidthMm}×高さ{a.workableHeightMm}mm{a.keepOutZones.length > 0 ? '（⊗マーク回避あり）' : ''}</>
+                      <>
+                        幅{a.workableWidthMm}×高さ{a.workableHeightMm}mm
+                        {a.blocks.length > 1 ? `（${a.blocks.length}ブロック構成）` : ''}
+                        {a.keepOutZones.length > 0 ? '（⊗マーク回避あり）' : ''}
+                      </>
                     ) : (
                       <span className="text-amber-700 dark:text-amber-400 font-bold">未確認</span>
                     )}
@@ -252,7 +323,7 @@ export default function HandholeKnockoutCalc() {
         )}
       </div>
 
-      {/* 面タブ＋段カード */}
+      {/* 面タブ＋ブロックタブ＋段カード */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-4 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <label className="text-xs font-semibold text-slate-500 block">面・段ごとの配管条件</label>
@@ -260,7 +331,7 @@ export default function HandholeKnockoutCalc() {
             {HANDHOLE_FACE_ORDER.map(f => {
               const fr = result.faces.find(x => x.face === f);
               const count = fr?.placedHoles.length ?? 0;
-              const rowCount = faceRows[f].length;
+              const rowCount = faceRows[f].reduce((sum, block) => sum + block.length, 0);
               return (
                 <button key={f} onClick={() => setActiveFace(f)} className={chip(activeFace === f) + ' !text-sm'}>
                   {FACE_LABELS[f]}
@@ -278,17 +349,37 @@ export default function HandholeKnockoutCalc() {
           </div>
         )}
 
+        {/* ブロックタブ（北関東工業の「分割式」構造で、面の中の加工可能エリアが上下複数ブロックに
+            分かれる場合のみ表示。ブロック間はピースの接合部で加工不可のため、段はブロックをまたいで
+            積み上がらない。ブロックが1つしかない面（450・600E-600等）ではタブ自体を出さない。 */}
+        {activeBlockCount > 1 && (
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: activeBlockCount }, (_, blockIdx) => {
+              const rowCount = blockRowsOf(faceRows, activeFace, blockIdx).length;
+              const blockHeightMm = activeFaceArea?.blocks[blockIdx]?.heightMm;
+              return (
+                <button key={blockIdx} onClick={() => setActiveBlockIndex(blockIdx)} className={chip(activeBlockIndex === blockIdx) + ' !text-xs'}>
+                  ブロック{blockIdx + 1}（{blockIdx === 0 ? '下' : blockIdx === activeBlockCount - 1 ? '上' : '中'}
+                  {blockHeightMm != null ? `・高さ${blockHeightMm}mm` : ''}）
+                  {rowCount > 0 && <span className={activeBlockIndex === blockIdx ? 'text-blue-100' : 'text-slate-400'}> {rowCount}段</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* 段カード（配列の並び順＝下から1段目、2段目…） */}
-        {faceRows[activeFace].map((row, rowIdx) => {
+        {blockRowsOf(faceRows, activeFace, activeBlockIndex).map((row, rowIdx) => {
           const rowNum = rowIdx + 1;
-          const rowResult = activeFaceResult?.rows.find(r => r.row === rowNum) ?? null;
+          const blockNum = activeBlockIndex + 1;
+          const rowResult = activeFaceResult?.rows.find(r => r.block === blockNum && r.row === rowNum) ?? null;
           return (
             <div key={rowIdx} className="rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 bg-slate-50/60 dark:bg-slate-800/30">
               <div className="flex items-center justify-between">
                 <span className={`text-sm font-bold ${rowResult && !rowResult.fits ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
-                  {FACE_LABELS[activeFace]} {rowNum}段目
+                  {FACE_LABELS[activeFace]} {activeBlockCount > 1 ? `ブロック${blockNum} ` : ''}{rowNum}段目
                 </span>
-                <button onClick={() => removeRow(activeFace, rowIdx)} className="text-xs font-bold text-slate-400 hover:text-red-500 px-2 py-1">
+                <button onClick={() => removeRow(activeFace, activeBlockIndex, rowIdx)} className="text-xs font-bold text-slate-400 hover:text-red-500 px-2 py-1">
                   この段を消す
                 </button>
               </div>
@@ -302,7 +393,7 @@ export default function HandholeKnockoutCalc() {
                 {row.runs.map((r, ri) => (
                   <button
                     key={`${r.brand}-${r.fepSize}-${ri}`}
-                    onClick={() => removeRunFromRow(activeFace, rowIdx, ri)}
+                    onClick={() => removeRunFromRow(activeFace, activeBlockIndex, rowIdx, ri)}
                     className="group flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white dark:bg-slate-800 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-red-50 dark:hover:bg-red-900/30 border border-slate-200 dark:border-slate-700"
                   >
                     {CONNECTOR_BRAND_LABELS[r.brand]} FEP{r.fepSize} × {r.count}
@@ -349,7 +440,7 @@ export default function HandholeKnockoutCalc() {
                     />
                   </div>
                   <button
-                    onClick={() => addRunToRow(activeFace, rowIdx)}
+                    onClick={() => addRunToRow(activeFace, activeBlockIndex, rowIdx)}
                     className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-colors"
                   >
                     <Plus className="w-4 h-4" />
@@ -362,11 +453,11 @@ export default function HandholeKnockoutCalc() {
         })}
 
         <button
-          onClick={() => addRow(activeFace)}
+          onClick={() => addRow(activeFace, activeBlockIndex)}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-500 hover:border-blue-400 hover:text-blue-600"
         >
           <Plus className="w-4 h-4" />
-          {FACE_LABELS[activeFace]}に段を足す（面の中で一番上に追加されます）
+          {FACE_LABELS[activeFace]}{activeBlockCount > 1 ? `のブロック${activeBlockIndex + 1}` : ''}に段を足す（一番上に追加されます）
         </button>
       </div>
 
@@ -425,11 +516,14 @@ export default function HandholeKnockoutCalc() {
             <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3">
               <div className="text-xs font-bold text-red-700 dark:text-red-300 mb-1.5">未配置（面・段の指定にエラーがあるか、面の実寸が未確認です）</div>
               <div className="flex flex-wrap gap-2">
-                {result.unplacedHoles.map(h => (
-                  <span key={h.id} className="text-[11px] px-2 py-1 rounded bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 font-bold">
-                    {FACE_LABELS[h.face]}{h.row}段目 φ{h.diameterMm} {h.label}
-                  </span>
-                ))}
+                {result.unplacedHoles.map(h => {
+                  const showBlock = (areas[h.face]?.blocks.length ?? 1) > 1;
+                  return (
+                    <span key={h.id} className="text-[11px] px-2 py-1 rounded bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 font-bold">
+                      {FACE_LABELS[h.face]}{showBlock ? `ブロック${h.block} ` : ''}{h.row}段目 φ{h.diameterMm} {h.label}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -459,12 +553,13 @@ export default function HandholeKnockoutCalc() {
       {totalHoles > 0 && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-4 space-y-3">
           <label className="text-xs font-semibold text-slate-500 block">発注図面（DXF）</label>
-          {allFacesUnconfirmed ? (
+          {width !== 450 ? (
             <div className="flex items-start gap-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-3 text-xs text-slate-500">
               <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
               <span>
                 このサイズ（{width}）は加工図面への自動書き込みに<span className="font-bold">未対応</span>です
-                （加工可能エリアの実寸がKK-E型450サイズ以外は未確認のため）。450サイズのみ対応しています。
+                （北関東工業の空白発注図面テンプレートはKK-E型450サイズぶんしか用意していないため）。
+                {!allFacesUnconfirmed && '加工可能エリアの計算・図の表示・穴一覧は使えます。'}450サイズのみDXF自動生成に対応しています。
               </span>
             </div>
           ) : result.unplacedHoles.length > 0 ? (
@@ -542,6 +637,7 @@ export default function HandholeKnockoutCalc() {
                     <tr className="text-[11px] text-slate-400 border-b border-slate-100 dark:border-slate-800">
                       <th className="text-left py-1.5 font-semibold">穴</th>
                       <th className="text-center font-semibold">面</th>
+                      {anyMultiBlock && <th className="text-center font-semibold">ブロック</th>}
                       <th className="text-center font-semibold">段</th>
                       <th className="text-right font-semibold">X</th>
                       <th className="text-right font-semibold">Y</th>
@@ -553,6 +649,7 @@ export default function HandholeKnockoutCalc() {
                       <tr key={h.id} className="border-b border-slate-50 dark:border-slate-800/60">
                         <td className="py-1.5 text-slate-700 dark:text-slate-200">{h.label}</td>
                         <td className="text-center font-bold text-blue-600 dark:text-blue-400">{FACE_LABELS[h.face]}</td>
+                        {anyMultiBlock && <td className="text-center tabular-nums text-slate-700 dark:text-slate-200">{h.block}</td>}
                         <td className="text-center tabular-nums text-slate-700 dark:text-slate-200">{h.row}</td>
                         <td className="text-right tabular-nums text-slate-700 dark:text-slate-200">{h.x}</td>
                         <td className="text-right tabular-nums text-slate-700 dark:text-slate-200">{h.y}</td>
@@ -581,10 +678,16 @@ export default function HandholeKnockoutCalc() {
           北関東工業に伝えて加工してもらいます。
         </p>
         <p>
-          <span className="font-semibold">面(A/B/C/D)と段は自動では動かしません。</span>
-          面の中で「段」を足すと、その段は面の中で一番上に積まれます（1段目が一番下）。段の中の配管の左右の並びだけは、
-          径の大きい順・離隔をグリッドに切り上げる方式で自動計算します。段の配管が面の横幅に収まらない・段を積み上げた高さが
-          面の高さを超える・⊗マークと重なる、のいずれかに該当する場合は、他の面・段へは動かさずその場でエラーとして表示します。
+          <span className="font-semibold">面(A/B/C/D)・ブロック・段は自動では動かしません。</span>
+          面の中で「段」を足すと、その段は（選んでいるブロックの中で）一番上に積まれます（1段目が一番下）。段の中の配管の左右の並びだけは、
+          径の大きい順・離隔をグリッドに切り上げる方式で自動計算します。段の配管がブロックの横幅に収まらない・段を積み上げた高さが
+          ブロックの高さを超える・⊗マークと重なる、のいずれかに該当する場合は、他の面・ブロック・段へは動かさずその場でエラーとして表示します。
+        </p>
+        <p>
+          <span className="font-semibold">「ブロック」とは何か:</span> 北関東工業のKK-E型は「分割式」（縁塊+スラブ+継胴+ベースを上下に
+          積み重ねる構造。大型ラフタークレーンが不要になる標準仕様）で、サイズ・内空高さの組み合わせによっては、面の中の加工可能エリア自体が
+          上下複数の「ブロック」に分かれ、ブロック同士の接合部（ピースの継ぎ目）は加工不可になります。段はブロックをまたいで積み上がりません。
+          ブロックが1つしかない面（450・600E-600等）ではブロック選択自体を表示しません。
         </p>
         <p>
           穴径は「配管のFEP呼び径×使用するコネクター銘柄」の2軸で決まります。出典は北関東工業のカタログ・コネクター一覧（2026-09-15確認）。
@@ -593,11 +696,12 @@ export default function HandholeKnockoutCalc() {
           コネクター同士の離隔は最低10mm以上（コネクターを使わない「穴のみ」加工は30mm以上）。中心位置は5mmまたは10mm刻みに丸めて配置します。
         </p>
         <p>
-          <span className="font-semibold">加工可能エリアの実寸はKK-E型450サイズ（品名規格「450E-750」）のA/B/C/D全4面が確認できています。</span>
+          <span className="font-semibold">加工可能エリアの実寸が確認できているのは、KK-E型450サイズ（品名規格「450E-750」、単一ブロック）、
+          600サイズ「600E-600」（S15+B45、単一ブロック）、600サイズ「600E-1200」（S45+B75、上下2ブロック）の3バリエーションのみです。</span>
           A面・C面には⊗マーク（内部インサート）があり、この位置に穴を置こうとするとエラーになります（B面・D面には⊗マークはありません）。
-          それ以外のサイズ（600・800・900・1000・1200・1500・1800・2000）は加工可能エリアの実寸が未確認のため、
-          自動配置は行わず穴の一覧のみを参考値として出します。450サイズの比率をそのまま他サイズへ流用・外挿することはしていません
-          （サイズごとに比率が異なる可能性が高いため）。発注前に必ず北関東工業へ現物の加工図面を確認してください。
+          それ以外のサイズ・高さバリエーション（800・900・1000・1200・1500・1800・2000サイズ、および600サイズの残り4つの高さバリエーション）
+          は加工可能エリアの実寸が未確認のため、自動配置は行わず穴の一覧のみを参考値として出します。確認済みバリエーションの比率をそのまま
+          他へ流用・外挿することはしていません（サイズ・高さ構成ごとに比率が異なる可能性が高いため）。発注前に必ず北関東工業へ現物の加工図面を確認してください。
         </p>
         <p>
           KK-R型・国交省型は今回未対応です（型だけ用意し、データは投入していません）。
