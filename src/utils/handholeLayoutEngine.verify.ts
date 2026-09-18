@@ -8,7 +8,7 @@
 // テーブル値の引き当てと、配置アルゴリズムが守るべき不変条件（離隔・エリア内・
 // エリア外はエラー・⊗マーク回避）をプログラムで検証する。
 // 根拠: hitec-ai-team（社長指示 2026-09-15/09-16、北関東工業カタログ・加工図面）
-import { computeHandholeLayout, summarizeOrder, type ConduitRun } from './handholeLayoutEngine';
+import { computeHandholeLayout, summarizeOrder, suggestConduitRuns, type ConduitRun } from './handholeLayoutEngine';
 import {
   HOLE_DIAMETER_MM, holeDiameterFor, minClearanceFor, machinableAreasFor,
   HANDHOLE_FACE_ORDER, KKE_450_FACE_DXF_ORIGIN,
@@ -580,6 +580,73 @@ console.log('\n■ extraClearanceMm: メーカー規定の離隔に上乗せさ�
   const baseBand2 = baseFace?.rows.find(r => r.row === 2)?.bandBottomMm ?? NaN;
   const extraBand2 = extraFace?.rows.find(r => r.row === 2)?.bandBottomMm ?? NaN;
   ok_('追加離隔20mmぶん2段目の下端も上がる', extraBand2 - baseBand2 >= 20, `base=${baseBand2} extra=${extraBand2}`);
+}
+
+console.log('\n■ おすすめ割り付け(suggestConduitRuns)：面・段を指定せず本数だけ渡すと自動で割り付けられること');
+{
+  // 単純なケース：450サイズ、350mm幅に余裕で収まる本数(3本)を1つのリクエストで渡す。
+  const r1 = suggestConduitRuns({ width: 450, requests: [{ brand: 'kkfit', fepSize: 30, count: 3 }] });
+  ok_('エラーは出ない', !r1.warnings.some(w => w.level === 'error'), r1.warnings.map(w => w.message).join(' | '));
+  ok_('未割り付けは無い', r1.unallocated.length === 0, JSON.stringify(r1.unallocated));
+  ok_('runsの合計本数は3', r1.runs.reduce((s, run) => s + run.count, 0) === 3);
+  ok_('A面ブロック1段目に割り付けられる', r1.runs.every(run => run.face === 'A' && (run.block ?? 1) === 1 && run.row === 1));
+  // ラウンドトリップ検証：suggestConduitRunsが返したrunsをそのままcomputeHandholeLayoutに渡すと
+  // 実際に全て配置できるはず（＝suggestConduitRunsの「入る」判定がcomputeHandholeLayoutの
+  // 実際の配置ロジックと矛盾していないことの検証）。
+  const check1 = computeHandholeLayout({ width: 450, runs: r1.runs });
+  ok_('ラウンドトリップ: 全て配置できる(未配置0件)', check1.unplacedHoles.length === 0, `未配置=${check1.unplacedHoles.length}`);
+  ok_('ラウンドトリップ: 3件配置される', check1.placedHoles.length === 3);
+}
+
+console.log('\n■ おすすめ割り付け：1段に収まらない本数は複数の段・ブロック・面に自動で分散されること');
+{
+  // 600E-1200(上下2ブロック)に、kkfit FEP50(実効直径98mm、1段4本が限度)を25本要求。
+  // 1面(A面)だけでも複数段・複数ブロックにまたがるはずの本数。
+  const r = suggestConduitRuns({
+    width: 600, heightVariantCode: '600E-1200',
+    requests: [{ brand: 'kkfit', fepSize: 50, count: 25 }],
+  });
+  ok_('エラーは出ない', !r.warnings.some(w => w.level === 'error'), r.warnings.map(w => w.message).join(' | '));
+  ok_('未割り付けは無い(25本くらいは複数面で十分収まる容量のはず)', r.unallocated.length === 0, JSON.stringify(r.unallocated));
+  const totalAssigned = r.runs.reduce((s, run) => s + run.count, 0);
+  ok_('runsの合計本数は25', totalAssigned === 25, `${totalAssigned}`);
+  const usedRows = new Set(r.runs.map(run => `${run.face}-${run.block ?? 1}-${run.row}`));
+  ok_('複数の段(面+ブロック+段の組み合わせ)に分散されている', usedRows.size > 1, `${usedRows.size}種類`);
+  // ラウンドトリップ検証
+  const check = computeHandholeLayout({ width: 600, heightVariantCode: '600E-1200', runs: r.runs });
+  ok_('ラウンドトリップ: 全て配置できる(未配置0件)', check.unplacedHoles.length === 0, `未配置=${check.unplacedHoles.length}`);
+  ok_('ラウンドトリップ: 25件配置される', check.placedHoles.length === 25, `${check.placedHoles.length}`);
+}
+
+console.log('\n■ おすすめ割り付け：どこにも入りきらない超過分は正直にunallocatedとして報告されること');
+{
+  // 450サイズ1面あたりの容量をはるかに超える本数(kkfit FEP150、実効直径246mmの大径を50本)を要求。
+  const r = suggestConduitRuns({ width: 450, requests: [{ brand: 'kkfit', fepSize: 150, count: 50 }] });
+  ok_('未割り付けが発生する', r.unallocated.length > 0, JSON.stringify(r.unallocated));
+  const totalRequested = 50;
+  const totalAssigned = r.runs.reduce((s, run) => s + run.count, 0);
+  const totalUnallocated = r.unallocated.reduce((s, u) => s + u.count, 0);
+  ok_('割り付け済み+未割り付け=要求本数(本数の保存則)', totalAssigned + totalUnallocated === totalRequested,
+    `assigned=${totalAssigned} unallocated=${totalUnallocated} requested=${totalRequested}`);
+  const hasUnallocatedWarn = r.warnings.some(w => w.level === 'warn' && w.message.includes('どの面・ブロックにも収まりませんでした'));
+  ok_('未割り付けの警告が出る', hasUnallocatedWarn, r.warnings.map(w => w.message).join(' | '));
+  // 割り付けられた分だけをcomputeHandholeLayoutに渡すと、それらは全て配置できるはず。
+  const check = computeHandholeLayout({ width: 450, runs: r.runs });
+  ok_('ラウンドトリップ: 割り付けられた分は全て配置できる', check.unplacedHoles.length === 0, `未配置=${check.unplacedHoles.length}`);
+}
+
+console.log('\n■ おすすめ割り付け：カタログに無い組み合わせはエラーになり、他のリクエストは正常に処理されること');
+{
+  const r = suggestConduitRuns({
+    width: 450,
+    requests: [
+      { brand: 'kkfit', fepSize: 200, count: 1 }, // カタログに無い組み合わせ
+      { brand: 'kkfit', fepSize: 30, count: 2 }, // 正常
+    ],
+  });
+  const hasDataError = r.warnings.some(w => w.level === 'error' && w.message.includes('穴径データがありません'));
+  ok_('データ欠落エラーが出る', hasDataError, r.warnings.map(w => w.message).join(' | '));
+  ok_('正常な方(2本)は割り付けられる', r.runs.reduce((s, run) => s + run.count, 0) === 2);
 }
 
 console.log(`\n${ng === 0 ? '✅ 全件一致' : `❌ 不一致 ${ng} 件`}`);

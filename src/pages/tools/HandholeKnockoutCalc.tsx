@@ -41,7 +41,10 @@ import {
 import {
   computeHandholeLayout,
   summarizeOrder,
+  suggestConduitRuns,
   type ConduitRun,
+  type ConduitRequest,
+  type UnallocatedGroup,
 } from '../../utils/handholeLayoutEngine';
 import { generateHandholeOrderDxf, downloadDxfText, HandholeDxfExportError } from '../../utils/handholeDxfExport';
 import HandholeDrawing from './HandholeDrawing';
@@ -67,6 +70,25 @@ const emptyFaceRows = (): FaceRowsState => ({ A: [[{ runs: [] }]], B: [[]], C: [
 const blockRowsOf = (faceRows: FaceRowsState, face: HandholeFace, blockIdx: number): RowInput[] =>
   faceRows[face][blockIdx] ?? [];
 
+/**
+ * suggestConduitRuns()が返したConduitRun[]（面・ブロック・段を指定済み）を、UIが持つ
+ * FaceRowsState（面→ブロック配列→段配列）に変換する。「おすすめ割り付け」を実行した結果を
+ * 面・段カードのUIにそのまま反映し、その後は普通に手で編集・上書きできるようにするため
+ * （2026-09-18、社長ご要望「配管の太さと本数を入れたら勝手に割り付けてほしい」への対応）。
+ */
+function runsToFaceRows(runs: ConduitRun[]): FaceRowsState {
+  const result: FaceRowsState = { A: [], B: [], C: [], D: [] };
+  for (const run of runs) {
+    const blockIdx = (run.block ?? 1) - 1;
+    const rowIdx = run.row - 1;
+    const blocks = result[run.face];
+    while (blocks.length <= blockIdx) blocks.push([]);
+    while (blocks[blockIdx].length <= rowIdx) blocks[blockIdx].push({ runs: [] });
+    blocks[blockIdx][rowIdx].runs.push({ brand: run.brand, fepSize: run.fepSize, count: run.count });
+  }
+  return result;
+}
+
 export default function HandholeKnockoutCalc() {
   const [width, setWidth] = useState<KkEWidth>(450);
   // 内空高さバリエーション（品名規格の末尾。北関東工業の「分割式」構造により、同じwidthでも
@@ -85,6 +107,17 @@ export default function HandholeKnockoutCalc() {
   const [dxfError, setDxfError] = useState<string | null>(null);
   const [activeFace, setActiveFace] = useState<HandholeFace>('A');
   const [activeBlockIndex, setActiveBlockIndex] = useState(0);
+
+  // ── おすすめ割り付け（2026-09-18 社長ご要望） ──────────────────────
+  // 「配管の太さと本数だけ入力して、面・段はプログラムに割り付けさせたい」という要望への対応。
+  // ここで作ったリクエスト一覧はUI専用の入力用状態で、実際の計算はsuggestConduitRuns()に委ねる。
+  // 結果は面・段カードのfaceRowsにそのまま書き込むので、実行後は普通に手で調整できる
+  // （ブラックボックスの自動配置ではなく、あくまで叩き台）。
+  const [suggestRequests, setSuggestRequests] = useState<ConduitRequest[]>([]);
+  const [suggestBrand, setSuggestBrand] = useState<ConnectorBrand>('kkfit');
+  const [suggestFep, setSuggestFep] = useState<FepSize>(50);
+  const [suggestCount, setSuggestCount] = useState(1);
+  const [suggestUnallocated, setSuggestUnallocated] = useState<UnallocatedGroup[] | null>(null);
 
   const heightVariants = useMemo(() => heightVariantsFor(width), [width]);
   const areas = useMemo(() => machinableAreasFor(width, heightVariantCode), [width, heightVariantCode]);
@@ -180,7 +213,32 @@ export default function HandholeKnockoutCalc() {
       return { ...prev, [face]: blocks };
     });
 
-  const reset = () => setFaceRows(emptyFaceRows());
+  const reset = () => {
+    setFaceRows(emptyFaceRows());
+    setSuggestRequests([]);
+    setSuggestUnallocated(null);
+  };
+
+  // ── おすすめ割り付けの操作 ──────────────────────────────────
+  const addSuggestRequest = () => {
+    if (suggestCount <= 0) return;
+    setSuggestRequests(prev => [...prev, { brand: suggestBrand, fepSize: suggestFep, count: suggestCount }]);
+  };
+
+  const removeSuggestRequest = (idx: number) =>
+    setSuggestRequests(prev => prev.filter((_, i) => i !== idx));
+
+  const applySuggestion = () => {
+    if (suggestRequests.length === 0) return;
+    const result = suggestConduitRuns({ width, heightVariantCode, requests: suggestRequests, gridMm, extraClearanceMm });
+    setFaceRows(runsToFaceRows(result.runs));
+    setSuggestUnallocated(result.unallocated);
+    const firstFace = HANDHOLE_FACE_ORDER.find(f => result.runs.some(r => r.face === f));
+    if (firstFace) {
+      setActiveFace(firstFace);
+      setActiveBlockIndex(0);
+    }
+  };
 
   // 発注図面(DXF)ダウンロード可否。配置済みの穴が1件以上あり、
   // 未配置の穴が無い場合のみ許可する（穴が足りないまま発注してしまう事故を防ぐ）。
@@ -319,6 +377,93 @@ export default function HandholeKnockoutCalc() {
               このサイズ（{width}）は加工可能エリアの実寸が全4面（A〜D）とも<span className="font-bold">未確認</span>です。
               自動配置は行わず、穴一覧のみを参考値として出します。発注前に必ず北関東工業へ現物の加工図面を確認してください。
             </span>
+          </div>
+        )}
+      </div>
+
+      {/* おすすめ割り付け（配管の太さ・本数だけ入れて自動で割り付ける） */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-4 space-y-3">
+        <label className="text-xs font-semibold text-slate-500 block">配管本数から自動割り付け（おすすめ）</label>
+        <p className="text-[11px] text-slate-400">
+          面・ブロック・段を決めずに、配管の銘柄・FEP呼び径・本数だけ入れると、プログラムが空いている面・段に
+          自動で詰めます。実行すると下の「面・段ごとの配管条件」が上書きされますが、その後は普通に手で調整できます
+          （面の順番はA→B→C→Dの固定です。配管ルートの都合で特定の面を避けたい場合は、実行後に手で移動してください）。
+        </p>
+
+        <div className="flex flex-wrap gap-2 empty:hidden">
+          {suggestRequests.map((r, i) => (
+            <button
+              key={`${r.brand}-${r.fepSize}-${i}`}
+              onClick={() => removeSuggestRequest(i)}
+              className="group flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white dark:bg-slate-800 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-red-50 dark:hover:bg-red-900/30 border border-slate-200 dark:border-slate-700"
+            >
+              {CONNECTOR_BRAND_LABELS[r.brand]} FEP{r.fepSize} × {r.count}
+              <X className="w-3.5 h-3.5 text-slate-400 group-hover:text-red-500" />
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-2 pt-1">
+          <label className="text-[11px] font-semibold text-slate-400 block">コネクター銘柄</label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {CONNECTOR_BRAND_ORDER.map(b => (
+              <button key={b} onClick={() => setSuggestBrand(b)} className={chip(suggestBrand === b) + ' !text-xs'}>
+                {CONNECTOR_BRAND_LABELS[b]}
+              </button>
+            ))}
+          </div>
+          <label className="text-[11px] font-semibold text-slate-400 block">FEP呼び径</label>
+          <div className="grid grid-cols-5 sm:grid-cols-9 gap-2">
+            {FEP_SIZES.map(f => (
+              <button key={f} onClick={() => setSuggestFep(f)} className={chip(suggestFep === f) + ' !text-sm'}>
+                {f}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-end gap-3 pt-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500">本数</span>
+              <input
+                type="number" inputMode="numeric" min={1} value={suggestCount}
+                onChange={e => setSuggestCount(Math.max(Number(e.target.value) || 0, 0))}
+                className="w-20 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold"
+              />
+            </div>
+            <button
+              onClick={addSuggestRequest}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-slate-600 hover:bg-slate-700 text-white text-sm font-bold transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              リクエストに追加
+            </button>
+            <button
+              onClick={applySuggestion}
+              disabled={suggestRequests.length === 0}
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                suggestRequests.length > 0
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
+              }`}
+            >
+              おすすめ割り付けを作成（下を上書き）
+            </button>
+          </div>
+        </div>
+
+        {suggestUnallocated != null && (
+          <div className="empty:hidden">
+            {suggestUnallocated.length > 0 ? (
+              <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 text-xs text-amber-800 dark:text-amber-300">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>
+                  どの面・ブロックにも入りきらなかった分:{' '}
+                  {suggestUnallocated.map(u => `${CONNECTOR_BRAND_LABELS[u.brand]} FEP${u.fepSize} × ${u.count}本`).join('、')}。
+                  本数を減らすか、サイズ・高さバリエーションを見直してください。
+                </span>
+              </div>
+            ) : (
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">全て割り付けられました。</p>
+            )}
           </div>
         )}
       </div>

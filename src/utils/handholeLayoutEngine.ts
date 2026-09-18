@@ -180,32 +180,42 @@ function holeLabel(brand: ConnectorBrand, fep: FepSize): string {
   return `${CONNECTOR_BRAND_LABELS[brand]} FEP${fep}`;
 }
 
+/** 銘柄×FEP呼び径から穴径・実効直径・離隔を引く。カタログに無い組み合わせはnull。 */
+function resolveConnectorSpec(
+  brand: ConnectorBrand,
+  fepSize: FepSize,
+): { diameterMm: number; footprintDiameterMm: number; clearanceMm: number } | null {
+  const diameterMm = holeDiameterFor(brand, fepSize);
+  if (diameterMm == null) return null;
+  const clearanceMm = minClearanceFor(brand);
+  // 穴径(diameterMm)が取れている以上、footprintDiameterForは必ず非null（コネクター外径が
+  // 無ければ穴径そのものにフォールバックするため）。念のためdiameterMmへのフォールバックを残す。
+  const footprintDiameterMm = footprintDiameterFor(brand, fepSize) ?? diameterMm;
+  return { diameterMm, footprintDiameterMm, clearanceMm };
+}
+
 /** 配管条件から、発注に必要な穴の一覧を作る（銘柄×FEP呼び径のデータが無いものは警告してスキップ）。 */
 function buildRequiredHoles(runs: ConduitRun[], warnings: LayoutWarning[]): RequiredHole[] {
   const holes: RequiredHole[] = [];
   runs.forEach((run, ri) => {
     if (run.count <= 0) return;
-    const diameter = holeDiameterFor(run.brand, run.fepSize);
-    if (diameter == null) {
+    const spec = resolveConnectorSpec(run.brand, run.fepSize);
+    if (spec == null) {
       warnings.push({
         level: 'error',
         message: `${CONNECTOR_BRAND_LABELS[run.brand]} × FEP${run.fepSize} は穴径データがありません（北関東工業カタログに記載が無い組み合わせです）。`,
       });
       return;
     }
-    const clearanceMm = minClearanceFor(run.brand);
-    // 穴径(diameter)が取れている以上、footprintDiameterForは必ず非null（コネクター外径が
-    // 無ければ穴径そのものにフォールバックするため）。念のためdiameterへのフォールバックを残す。
-    const footprintDiameter = footprintDiameterFor(run.brand, run.fepSize) ?? diameter;
     for (let n = 0; n < run.count; n++) {
       holes.push({
         id: `r${ri}-${n}`,
         label: holeLabel(run.brand, run.fepSize),
         brand: run.brand,
         fepSize: run.fepSize,
-        diameterMm: diameter,
-        footprintDiameterMm: footprintDiameter,
-        clearanceMm,
+        diameterMm: spec.diameterMm,
+        footprintDiameterMm: spec.footprintDiameterMm,
+        clearanceMm: spec.clearanceMm,
         face: run.face,
         block: run.block ?? 1,
         row: run.row,
@@ -538,4 +548,169 @@ export function summarizeOrder(result: HandholeLayoutResult): OrderLine[] {
     else m.set(key, { brand: h.brand, fepSize: h.fepSize, diameterMm: h.diameterMm, count: 1 });
   });
   return [...m.values()].sort((a, b) => a.fepSize - b.fepSize || a.brand.localeCompare(b.brand));
+}
+
+// ── おすすめ割り付け（2026-09-18、社長ご要望） ──────────────────────────
+//
+// 「配管の太さと本数を事前に入力して、プログラムの方で勝手に割り付け」という要望を受けて追加。
+// computeHandholeLayoutの「面・ブロック・段はユーザーが選んだ通りに配置し、自動では動かさない」
+// という方針（2026-09-16に社長要望で確立、実際の配管ルーティング＝直進/L字の都合で
+// 面を自由に選びたいというニーズがある）は変更しない。この関数はあくまで「叩き台」を作るだけで、
+// 出力はcomputeHandholeLayoutと同じConduitRun[]なので、UI側で普通に編集・上書きできる
+// （ブラックボックスの自動配置ではなく、後から調整できる「提案」として位置づける）。
+//
+// アルゴリズム（棚詰め＝shelf packingの簡易版）:
+//   1. 全リクエストを個別の穴に展開し、実効直径(footprintDiameterMm)の大きい順に並べる。
+//   2. 面(A→B→C→D)→その中のブロック(下から上)の順に、入る場所を探しながら詰める。
+//   3. 各ブロックでは、段を1段目から積み上げる。新しい段は残りの中で一番大きい穴から始め、
+//      その段の高さ(=先頭の穴の実効直径)がブロックの残り高さに収まらなければそのブロックを諦めて
+//      次のブロックへ。収まるなら、残りの穴を大きい順に「その段の横幅に入るなら足す、入らなければ
+//      次の(より小さい)穴を試す」という貪欲法で段を埋め、段を確定させたら次の段へ進む。
+//   4. 全ての面・ブロックを試しても入らなかった穴は`unallocated`として返す（推測で押し込まない）。
+// 段内の詰め方(layoutRowX・avoidKeepOutZones)はcomputeHandholeLayoutと完全に同じロジックを使うため、
+// ここで「入る」と判定された配置はcomputeHandholeLayoutに渡しても同じ結果（配置成功）になるはず。
+
+/** おすすめ割り付けへの入力1行分：面・ブロック・段を指定しない、銘柄×FEP呼び径×本数だけの要求。 */
+export interface ConduitRequest {
+  brand: ConnectorBrand;
+  fepSize: FepSize;
+  count: number;
+}
+
+/** 割り付けできなかった分の集計（銘柄×FEP呼び径ごと）。 */
+export interface UnallocatedGroup {
+  brand: ConnectorBrand;
+  fepSize: FepSize;
+  count: number;
+}
+
+export interface SuggestLayoutInput {
+  width: KkEWidth;
+  heightVariantCode?: string;
+  requests: ConduitRequest[];
+  gridMm?: PlacementGridMm;
+  extraClearanceMm?: number;
+}
+
+export interface SuggestLayoutResult {
+  /** 提案された配置。そのままcomputeHandholeLayoutのrunsに渡せる（UI側でさらに編集可能）。 */
+  runs: ConduitRun[];
+  /** どの面・ブロックにも入らなかった分（銘柄×FEP呼び径ごとに集計）。 */
+  unallocated: UnallocatedGroup[];
+  warnings: LayoutWarning[];
+}
+
+export function suggestConduitRuns(input: SuggestLayoutInput): SuggestLayoutResult {
+  const { width, heightVariantCode, requests, gridMm = DEFAULT_PLACEMENT_GRID_MM, extraClearanceMm = 0 } = input;
+  const warnings: LayoutWarning[] = [];
+
+  // 個別の穴に展開（面・ブロック・段はまだ決めないのでダミー値。ConduitRunを組み立てる際は
+  // 実際のface/block/rowをその場で指定するので、ここのダミー値が結果に混ざることはない）。
+  const pending: RequiredHole[] = [];
+  requests.forEach((req, ri) => {
+    if (req.count <= 0) return;
+    const spec = resolveConnectorSpec(req.brand, req.fepSize);
+    if (spec == null) {
+      warnings.push({
+        level: 'error',
+        message: `${CONNECTOR_BRAND_LABELS[req.brand]} × FEP${req.fepSize} は穴径データがありません（北関東工業カタログに記載が無い組み合わせです）。`,
+      });
+      return;
+    }
+    for (let n = 0; n < req.count; n++) {
+      pending.push({
+        id: `req${ri}-${n}`,
+        label: holeLabel(req.brand, req.fepSize),
+        brand: req.brand,
+        fepSize: req.fepSize,
+        diameterMm: spec.diameterMm,
+        footprintDiameterMm: spec.footprintDiameterMm,
+        clearanceMm: spec.clearanceMm,
+        face: 'A',
+        block: 1,
+        row: 1,
+      });
+    }
+  });
+  pending.sort((a, b) => b.footprintDiameterMm - a.footprintDiameterMm);
+
+  const areasByFace = machinableAreasFor(width, heightVariantCode);
+  pushUnconfirmedFaceWarnings(width, areasByFace, warnings);
+
+  const runs: ConduitRun[] = [];
+
+  for (const face of HANDHOLE_FACE_ORDER) {
+    const area = areasByFace[face];
+    if (!area || pending.length === 0) continue;
+
+    for (let blockIdx = 0; blockIdx < area.blocks.length && pending.length > 0; blockIdx++) {
+      const block = area.blocks[blockIdx];
+      const blockNum = blockIdx + 1;
+      let rowBaseY = 0;
+      let rowNum = 1;
+
+      while (true) {
+        if (pending.length === 0) break;
+        const first = pending[0]; // 残りの中で最大の実効直径（降順ソート済み）
+        const centerYOffset = ceilTo(first.footprintDiameterMm / 2, gridMm);
+        const absCenterY = rowBaseY + centerYOffset;
+        const bandTop = absCenterY + first.footprintDiameterMm / 2;
+        if (bandTop > block.heightMm + 1e-9) break; // このブロックにはもう(最大の残り穴すら)入らない→次のブロックへ
+
+        const rowItems: RequiredHole[] = [first];
+        let layout = layoutRowX(rowItems, gridMm, extraClearanceMm, absCenterY, block.keepOutZones);
+        if (layout[0].rightEdge > area.workableWidthMm + 1e-9) break; // 1個も入らない横幅→次のブロックへ
+
+        // 残りを大きい順に試し、その段の横幅に収まるものだけ足していく（貪欲法）。
+        let idx = 1;
+        while (idx < pending.length) {
+          const candidateItems = [...rowItems, pending[idx]];
+          const candLayout = layoutRowX(candidateItems, gridMm, extraClearanceMm, absCenterY, block.keepOutZones);
+          const maxRight = Math.max(...candLayout.map(r => r.rightEdge));
+          if (maxRight <= area.workableWidthMm + 1e-9) {
+            rowItems.push(pending[idx]);
+            pending.splice(idx, 1);
+            layout = candLayout;
+          } else {
+            idx++;
+          }
+        }
+        pending.splice(0, 1); // firstを確定分として取り除く
+
+        // この段に決まった穴を、銘柄×FEP呼び径ごとにグループ化してConduitRunにまとめる。
+        const grouped = new Map<string, ConduitRun>();
+        for (const item of rowItems) {
+          const key = `${item.brand}-${item.fepSize}`;
+          const cur = grouped.get(key);
+          if (cur) cur.count++;
+          else grouped.set(key, { face, block: blockNum, row: rowNum, brand: item.brand, fepSize: item.fepSize, count: 1 });
+        }
+        runs.push(...grouped.values());
+
+        const rowMaxClearance = Math.max(...rowItems.map(h => h.clearanceMm));
+        rowBaseY = ceilTo(bandTop + rowMaxClearance + extraClearanceMm, gridMm);
+        rowNum++;
+      }
+    }
+  }
+
+  // 最後まで残った分＝どの面・ブロックにも入らなかった分。銘柄×FEP呼び径ごとに集計して報告する
+  // （推測で押し込まず、正直に「入りませんでした」と伝える）。
+  const unallocatedMap = new Map<string, UnallocatedGroup>();
+  for (const item of pending) {
+    const key = `${item.brand}-${item.fepSize}`;
+    const cur = unallocatedMap.get(key);
+    if (cur) cur.count++;
+    else unallocatedMap.set(key, { brand: item.brand, fepSize: item.fepSize, count: 1 });
+  }
+  const unallocated = [...unallocatedMap.values()];
+  if (unallocated.length > 0) {
+    const detail = unallocated.map(u => `${CONNECTOR_BRAND_LABELS[u.brand]} FEP${u.fepSize} × ${u.count}本`).join('、');
+    warnings.push({
+      level: 'warn',
+      message: `おすすめ割り付け: ${detail} は、どの面・ブロックにも収まりませんでした。本数を減らすか、大きいサイズ・別の高さバリエーションを検討してください。`,
+    });
+  }
+
+  return { runs, unallocated, warnings };
 }
