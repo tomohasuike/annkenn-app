@@ -838,24 +838,30 @@ export default function HandholeKnockoutCalc() {
             rows={displayedFaceResult?.rows ?? []}
             onHoleMove={handleHoleMove}
             onHoleGroupMove={handleHoleGroupMove}
+            onToggleHoleSelect={toggleHoleSelect}
             selectedHoleIds={selectedHoleIds}
             violatingHoleIds={violatingHoleIds}
             gridMm={gridMm}
           />
 
-          {/* 複数選択→グループ化（2026-09-18 社長ご要望）。
+          {/* 複数選択→グループ化（2026-09-18〜19 社長ご要望・ご指摘）。
               最初は「選択→均等割付け／指定ピッチ」ボタンだけで実装したが、社長から
               「俺が言ってるグルーピングは、グルーピングしたものは一緒に動くという前提。
               これではグルーピングの意味がない、ただ離隔距離が取れますよというだけになってる」
               とのご指摘を受け、選択＝グループとして「上の加工図で1つドラッグすると選んだ穴が
               全部一緒に動く」機能をHandholeDrawing側に追加した（onHoleGroupMove）。
+              さらにその直後「選択ができない」との報告→原因は加工図の穴を直接クリックして
+              選ぼうとしていたが、その手段が無くチップ一覧のタップしか無かったこと（バグではなく
+              機能不足）と判明。onToggleHoleSelectで加工図の穴を直接クリック/タップしても選べる
+              ようにし、こちらを主な選択手段として案内文言も直した。下のチップ一覧は選択状態を
+              見比べる一覧として残す（同じselectedHoleIds stateを共有、どちらで選んでも同じ）。
               均等割付け・指定ピッチのボタンは、グループを整列させる別の手段として残している。 */}
           {displayedFaceResult && displayedFaceResult.placedHoles.length >= 2 && (() => {
             const selectedInFace = displayedFaceResult.placedHoles.filter(h => selectedHoleIds.has(h.id));
             return (
               <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2 bg-slate-50/60 dark:bg-slate-800/30">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <label className="text-xs font-semibold text-slate-500 block">複数の穴を選んでグループ化</label>
+                  <label className="text-xs font-semibold text-slate-500 block">複数の穴を選んでグループ化（上の加工図で穴をクリックして選べます）</label>
                   {selectedInFace.length > 0 && (
                     <button
                       onClick={() => setSelectedHoleIds(new Set())}
@@ -865,6 +871,9 @@ export default function HandholeKnockoutCalc() {
                     </button>
                   )}
                 </div>
+                <p className="text-[11px] text-slate-400">
+                  上の加工図で穴をクリック（タップ）すると選べます。下のチップでも同じように選べます（一覧で確認したい時に）。
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {displayedFaceResult.placedHoles.map(h => (
                     <button

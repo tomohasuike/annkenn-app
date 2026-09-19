@@ -50,6 +50,16 @@
 // 高さ整列スナップは、グループの有無に関わらず全ドラッグに効く：ドラッグ中の穴(リーダー)の
 // yが、グループ外の他の穴のyとALIGN_SNAP_MM以内に近づいたら、その値へ厳密にスナップし、
 // ガイド線（マゼンタの破線）を描いて「揃いました」を視覚的に示す。
+//
+// 穴の直接クリック選択（2026-09-19追加）:
+// グルーピング機能を追加した直後、社長が「選択ができない」と報告。原因を調べたところバグでは
+// なく、選択手段が加工図の下にあるチップ一覧のタップしか無く、社長は加工図の穴そのものを
+// クリックして選ぼうとしていて機能が存在しなかったことが判明（「配管を選択したくてもできない。
+// 一個ずつしか動かせない。チップは関係ない」）。そこで、穴を直接クリック/タップしても
+// selectedHoleIdsに追加・削除できるようにonToggleHoleSelectを追加した。Konvaはdraggableな
+// 要素でも、ドラッグ判定の閾値を超える移動が無ければclick/tapイベントを発火する仕組みなので、
+// 「動かす」ドラッグと「選ぶ」クリックは同じ丸に対して自然に両立する。チップ一覧は選択状態を
+// 見比べる一覧としてそのまま残す（同じselectedHoleIds stateを共有）。
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stage, Layer, Rect, Circle, Line, Text, Group } from 'react-konva';
@@ -68,6 +78,7 @@ export default function HandholeDrawing({
   rows = [],
   onHoleMove,
   onHoleGroupMove,
+  onToggleHoleSelect,
   selectedHoleIds,
   violatingHoleIds,
   gridMm = 5,
@@ -80,7 +91,10 @@ export default function HandholeDrawing({
   onHoleMove?: (holeId: string, xMm: number, yMm: number) => void;
   /** selectedHoleIdsで2件以上まとまっている穴をドラッグした時、グループ全体の移動量(mm)を通知する。 */
   onHoleGroupMove?: (holeIds: string[], dxMm: number, dyMm: number) => void;
-  /** 選択中（グループ化対象）の穴ID。2件以上ある時、そのうち1つをドラッグすると全員が一緒に動く。 */
+  /** 渡すと穴を直接クリック/タップして選択状態をトグルできるようになる（ドラッグとは独立）。 */
+  onToggleHoleSelect?: (holeId: string) => void;
+  /** 選択中（グループ化対象）の穴ID。1件以上あれば縁を青くする。2件以上ある時、そのうち1つを
+      ドラッグすると全員が一緒に動く。 */
   selectedHoleIds?: Set<string>;
   /** checkPlacementViolations()で違反ありと判定された穴のID一覧。渡された穴は縁を赤くする。 */
   violatingHoleIds?: Set<string>;
@@ -248,11 +262,15 @@ export default function HandholeDrawing({
             const outerDiameterMm = connectorOuterDiameterFor(h.brand, h.fepSize);
             const rOuter = outerDiameterMm != null ? Math.max((outerDiameterMm / 2) * scale, r) : null;
             const violating = violatingHoleIds?.has(h.id) ?? false;
-            const selected = (selectedHoleIds?.size ?? 0) > 1 && (selectedHoleIds?.has(h.id) ?? false);
-            const strokeColor = violating ? '#dc2626' : selected ? '#2563eb' : '#16a34a';
+            // 選択中かどうか（1件でも選ばれていれば見た目に反映＝クリックした瞬間に分かるように）。
+            const isMember = selectedHoleIds?.has(h.id) ?? false;
+            const strokeColor = violating ? '#dc2626' : isMember ? '#2563eb' : '#16a34a';
 
-            // このグループのメンバー（自分含む）。2件以上の時だけ「グループドラッグ」の対象になる。
-            const groupIds = selected ? placedHoles.filter(x => selectedHoleIds!.has(x.id)).map(x => x.id) : [h.id];
+            // このグループのメンバー（自分含む）。2件以上選ばれている時だけ「グループドラッグ」の対象になる
+            // （1件だけ選んだ状態でドラッグしても、単独ドラッグと同じ挙動でよい）。
+            const groupIds = isMember && (selectedHoleIds?.size ?? 0) > 1
+              ? placedHoles.filter(x => selectedHoleIds!.has(x.id)).map(x => x.id)
+              : [h.id];
             const companionIds = groupIds.filter(id => id !== h.id);
             // 高さ整列スナップの比較対象＝グループの外にある穴（自分たちの高さが動くたびズレるのを避ける）。
             const otherHolesForAlign = placedHoles.filter(o => !groupIds.includes(o.id));
@@ -315,6 +333,8 @@ export default function HandholeDrawing({
               companionIds.forEach(resetNode);
             };
 
+            const handleToggleSelect = onToggleHoleSelect ? () => onToggleHoleSelect(h.id) : undefined;
+
             return (
               <Group
                 key={h.id}
@@ -325,11 +345,13 @@ export default function HandholeDrawing({
                 dragBoundFunc={onHoleMove ? dragBoundFunc : undefined}
                 onDragMove={onHoleMove ? handleDragMove : undefined}
                 onDragEnd={onHoleMove ? handleDragEnd : undefined}
+                onClick={handleToggleSelect}
+                onTap={handleToggleSelect}
               >
                 {rOuter != null && (
                   <Circle x={cx} y={cy} radius={rOuter} stroke="#0891b2" strokeWidth={1.1} dash={[4, 3]} opacity={0.7} />
                 )}
-                <Circle x={cx} y={cy} radius={r} fill={c.hole} stroke={strokeColor} strokeWidth={violating || selected ? 2.2 : 1.6} />
+                <Circle x={cx} y={cy} radius={r} fill={c.hole} stroke={strokeColor} strokeWidth={violating || isMember ? 2.2 : 1.6} />
                 <Text x={cx - 40} y={cy - (rOuter ?? r) - 24} width={80} align="center" text={`φ${h.diameterMm}`} fontSize={10} fontStyle="bold" fill="#15803d" />
                 <Text x={cx - 40} y={cy - (rOuter ?? r) - 12} width={80} align="center" text={h.label} fontSize={8} fill={c.sub} />
                 {outerDiameterMm != null && (
@@ -392,9 +414,11 @@ export default function HandholeDrawing({
       </Stage>
       {onHoleMove && (
         <p className="text-[11px] text-slate-400 mt-1">
-          穴をドラッグすると位置を微調整できます（{gridMm}mm刻みにスナップ）。下で2つ以上選ぶと縁が青くなり、
-          そのうちの1つをドラッグすると選んだ穴が全部一緒に動きます。他の穴と高さ(y)が揃うとマゼンタのガイド線が出て
-          ピタッと吸着します。離隔不足や⊗マークと重なる位置に置くと、その穴の縁が赤くなります（移動自体は止めません。発注前に位置を直してください）。
+          穴をドラッグすると位置を微調整できます（{gridMm}mm刻みにスナップ）。
+          {onToggleHoleSelect && '穴をクリック（タップ）すると縁が青くなり選択できます。'}
+          2つ以上選んだ状態でそのうちの1つをドラッグすると、選んだ穴が全部一緒に動きます。他の穴と高さ(y)が揃うと
+          マゼンタのガイド線が出てピタッと吸着します。離隔不足や⊗マークと重なる位置に置くと、その穴の縁が赤くなります
+          （移動自体は止めません。発注前に位置を直してください）。
         </p>
       )}
     </div>
