@@ -18,9 +18,26 @@
 // A→B→C→Dと呼ぶ一般的な命名規則そのものを直接証明するものではない（北関東工業の資料に
 // 「時計回り/反時計回り」の明記は無い）。この模式図は、社長の実務知見（直進の相手はA⇔C・B⇔D）
 // をそのまま採用したものであり、将来メーカー資料で矛盾する記載が見つかった場合は要修正。
+//
+// 蓋開口（丸）の表示（2026-09-19追加）:
+// 社長ご指摘「真四角のハンドホールなら真ん中に丸があるからいいんだけど、それ以外は多分入り口が
+// 変わるはずなので、そこら辺も表示してくれないと、どこに何があるってわからずに作っちゃう可能性
+// あるよね」への対応。KKE_OUTER_SPEC[width].lidOpeningの実データ（カタログ記載の「φ870/φ600」
+// 等）から蓋開口を円で描画する。
+// 【重要な前提と限界】現在実装済みのKK-E型は全サイズ、A〜D面の加工可能エリア実寸
+// （machinableAreasFor）がどのサイズも4面とも同一寸法であることを確認済み＝実物は正方形。
+// 蓋開口もカタログ上「箱の中心」以外の記載が無いため、この模式図では中心に描く。
+// もし将来「正方形ではないサイズ・型式（国交省型・他社品等）」を追加する場合、蓋開口が
+// 中心からズレている可能性があるため、この前提（中心固定）を実物の加工図面で必ず裏取りしてから
+// 変更すること（未確認のまま中心固定を流用しない）。
 
 import { useEffect, useState } from 'react';
 import { FACE_OPPOSITE, type HandholeFace } from '../../constants/handholeKitakanto';
+
+/** 「φ870/φ600」のようなカタログ表記から、mm数値をすべて抽出する（無ければ空配列）。 */
+function parseLidDiametersMm(lidOpening: string): number[] {
+  return Array.from(lidOpening.matchAll(/φ\s*(\d+)/g)).map(m => Number(m[1]));
+}
 
 interface FaceRegion {
   face: HandholeFace;
@@ -40,11 +57,17 @@ export default function HandholePlanView({
   activeFace,
   onSelectFace,
   faceHoleCounts,
+  lidOpening,
+  outerMm,
 }: {
   activeFace: HandholeFace;
   onSelectFace: (face: HandholeFace) => void;
   /** 面ごとの配置済み穴数（バッジ表示用）。省略可。 */
   faceHoleCounts?: Partial<Record<HandholeFace, number>>;
+  /** KKE_OUTER_SPEC[width].lidOpening（例: "φ870/φ600"、または「丸蓋」）。渡すと中心に蓋開口の円を描く。 */
+  lidOpening?: string;
+  /** KKE_OUTER_SPEC[width].outerMm。蓋開口の円を実寸比で描くのに使う（lidOpeningとセットで渡す）。 */
+  outerMm?: number;
 }) {
   const [isDark, setIsDark] = useState(false);
   useEffect(() => {
@@ -60,6 +83,14 @@ export default function HandholePlanView({
     : { border: '#cbd5e1', axis: '#94a3b8', activeFill: '#2563eb', oppositeFill: '#dbeafe', idleFill: '#ffffff', idleHover: '#f1f5f9', activeText: '#ffffff', idleText: '#475569' };
 
   const opposite = FACE_OPPOSITE[activeFace];
+
+  // 蓋開口の円（実データがある場合のみ描画。数値が読めない「丸蓋」表記は代表的な大きさの円のみ、
+  // 数値は創作しない）。boxInteriorPx=196-4=192が実際のouterMmに対応する内側の描画幅。
+  const boxInteriorPx = 192;
+  const lidDiametersMm = lidOpening ? parseLidDiametersMm(lidOpening) : [];
+  const lidCircleRadiiPx = outerMm && lidDiametersMm.length > 0
+    ? [...lidDiametersMm].sort((a, b) => b - a).map(d => (d / outerMm) * (boxInteriorPx / 2))
+    : [];
 
   return (
     <div className="flex flex-col items-center gap-1.5">
@@ -87,6 +118,26 @@ export default function HandholePlanView({
             </g>
           );
         })}
+        {/* 蓋開口（丸）。社長ご指摘「真四角なら真ん中に丸があるからいい」に対応し、実際のカタログ値
+            （KKE_OUTER_SPEC[width].lidOpening）から円を描く。数値が2つある場合（例:φ870/φ600＝
+            蓋枠/開口）は両方を実寸比の同心円で示す。数値が読めない「丸蓋」表記は代表的な円のみ
+            （数値は創作しない）。 */}
+        {lidCircleRadiiPx.length > 0 ? (
+          lidCircleRadiiPx.map((rPx, i) => (
+            <circle key={i} cx={100} cy={100} r={rPx} fill="none" stroke={c.axis} strokeWidth={1.2}
+              strokeDasharray={i === 0 ? '3 2' : undefined} style={{ pointerEvents: 'none' }} />
+          ))
+        ) : lidOpening ? (
+          <circle cx={100} cy={100} r={30} fill="none" stroke={c.axis} strokeWidth={1.2} strokeDasharray="3 2" style={{ pointerEvents: 'none' }} />
+        ) : null}
+        {lidOpening && (
+          <g style={{ pointerEvents: 'none' }}>
+            <rect x={73} y={94} width={54} height={12} rx={2} fill={c.idleFill} opacity={0.85} />
+            <text x={100} y={100} textAnchor="middle" dominantBaseline="middle" fontSize={7.5} fill={c.axis} style={{ userSelect: 'none' }}>
+              蓋開口{lidOpening}
+            </text>
+          </g>
+        )}
       </svg>
       <p className="text-[10px] text-slate-400 text-center max-w-[200px]">
         真上から見た模式図（クリックで面を選択）。配管は直進して反対側から出ることが多いため、

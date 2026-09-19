@@ -17,6 +17,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Boxes, Plus, X, AlertTriangle, RotateCcw, Info, Download, Loader2 } from 'lucide-react';
+import { NumberField } from '../../components/ui/NumberField';
 import {
   CONNECTOR_BRAND_LABELS,
   CONNECTOR_BRAND_ORDER,
@@ -595,9 +596,8 @@ export default function HandholeKnockoutCalc() {
           <div className="flex flex-wrap items-end gap-3 pt-1">
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500">本数</span>
-              <input
-                type="number" inputMode="numeric" min={1} value={suggestCount}
-                onChange={e => setSuggestCount(Math.max(Number(e.target.value) || 0, 0))}
+              <NumberField
+                value={suggestCount} onChange={setSuggestCount} min={0}
                 className="w-20 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold"
               />
             </div>
@@ -653,6 +653,8 @@ export default function HandholeKnockoutCalc() {
             faceHoleCounts={Object.fromEntries(
               HANDHOLE_FACE_ORDER.map(f => [f, result.faces.find(x => x.face === f)?.placedHoles.length ?? 0]),
             )}
+            lidOpening={KKE_OUTER_SPEC[width].lidOpening}
+            outerMm={KKE_OUTER_SPEC[width].outerMm}
           />
           <div className="flex-1 min-w-0 space-y-2 w-full">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -770,9 +772,8 @@ export default function HandholeKnockoutCalc() {
                 <div className="flex flex-wrap items-end gap-3 pt-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500">本数</span>
-                    <input
-                      type="number" inputMode="numeric" min={1} value={addCount}
-                      onChange={e => setAddCount(Math.max(Number(e.target.value) || 0, 0))}
+                    <NumberField
+                      value={addCount} onChange={setAddCount} min={0}
                       className="w-20 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold"
                     />
                   </div>
@@ -814,9 +815,8 @@ export default function HandholeKnockoutCalc() {
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-4 space-y-2">
         <label className="text-xs font-semibold text-slate-500 block">工具用の追加離隔（mm、既定0）</label>
         <div className="flex items-center gap-2">
-          <input
-            type="number" inputMode="numeric" min={0} value={extraClearanceMm}
-            onChange={e => setExtraClearanceMm(Math.max(Number(e.target.value) || 0, 0))}
+          <NumberField
+            value={extraClearanceMm} onChange={setExtraClearanceMm} min={0}
             className="w-24 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold"
           />
           <span className="text-xs text-slate-400">mm（メーカー規定の10mm/30mmに上乗せ）</span>
@@ -911,9 +911,8 @@ export default function HandholeKnockoutCalc() {
                     </button>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-slate-500">コネクタ同士の空き(mm)</span>
-                      <input
-                        type="number" inputMode="numeric" min={0} value={gapInputMm}
-                        onChange={e => setGapInputMm(Math.max(Number(e.target.value) || 0, 0))}
+                      <NumberField
+                        value={gapInputMm} onChange={setGapInputMm} min={0}
                         className="w-20 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold"
                       />
                       <button

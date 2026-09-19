@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from 'react';
 import { Target, Plus, X, AlertTriangle, RotateCcw, Info } from 'lucide-react';
+import { NumberField } from '../../components/ui/NumberField';
 import {
   CLEARANCE_OPTIONS_MM,
   CONDUIT_KIND_LABELS,
@@ -158,18 +159,16 @@ export default function PullBoxKnockoutCalc() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500 w-8">横</span>
-            <input
-              type="number" inputMode="numeric" value={boxWidthMm}
-              onChange={e => setBoxWidthMm(Math.max(Number(e.target.value) || 0, 1))}
+            <NumberField
+              value={boxWidthMm} onChange={setBoxWidthMm} min={1}
               className="w-24 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold"
             />
             <span className="text-xs text-slate-400">mm</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500 w-8">高さ</span>
-            <input
-              type="number" inputMode="numeric" value={boxHeightMm}
-              onChange={e => setBoxHeightMm(Math.max(Number(e.target.value) || 0, 1))}
+            <NumberField
+              value={boxHeightMm} onChange={setBoxHeightMm} min={1}
               className="w-24 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold"
             />
             <span className="text-xs text-slate-400">mm</span>
@@ -335,9 +334,8 @@ export default function PullBoxKnockoutCalc() {
           {alignment !== 'center' && (
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500">端から1本目の管まで（あき）</span>
-              <input
-                type="number" inputMode="numeric" value={edgeGapMm}
-                onChange={e => setEdgeGapMm(Math.max(Number(e.target.value) || 0, 0))}
+              <NumberField
+                value={edgeGapMm} onChange={setEdgeGapMm} min={0}
                 className="w-20 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold text-slate-800 dark:text-slate-100"
               />
               <span className="text-xs text-slate-400">mm</span>
