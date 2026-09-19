@@ -173,7 +173,11 @@ export default function HandholeKnockoutCalc() {
   // 穴IDに面が含まれるため、面をまたいだ選択が残っても実害は無い（表示中の面のチップにしか
   // 現れず、実行対象も表示中の面の穴に絞って計算する）。
   const [selectedHoleIds, setSelectedHoleIds] = useState<Set<string>>(new Set());
-  const [pitchInputMm, setPitchInputMm] = useState(0);
+  // 中心間の「ピッチ」ではなく、コネクター同士の実際の空き(mm、外径の縁から縁)を指定する
+  // （2026-09-19 社長ご指摘「このピッチをまとめるじゃなくて、コネクタ同士の空きを決めた方が
+  // いいかもしれん」）。中心間ピッチだと外径を知らないと解釈できないが、空きなら他の離隔表示
+  // （「コネクター同士の離隔は最低10mm以上」等）と同じ単位で直感的に指定できる。
+  const [gapInputMm, setGapInputMm] = useState(0);
 
   const toggleHoleSelect = (holeId: string) => {
     setSelectedHoleIds(prev => {
@@ -203,21 +207,29 @@ export default function HandholeKnockoutCalc() {
     });
   };
 
-  // 選択した穴を、現在の中心位置を保ったまま指定ピッチ(mm)で並べ直す（中心から左右に展開）。
-  // 実際の削孔図でもC面・D面に左右対称配置する例が複数確認できているため（2026-09-18調査）、
-  // 左端基準ではなく中心基準にしている。
-  const distributeSelectedWithPitch = () => {
-    if (!displayedFaceResult || pitchInputMm <= 0) return;
+  // 選択した穴を、現在の中心位置を保ったまま指定の空き(mm、コネクター外径の縁から縁)で
+  // 並べ直す（中心から左右に展開）。実際の削孔図でもC面・D面に左右対称配置する例が複数
+  // 確認できているため（2026-09-18調査）、左端基準ではなく中心基準にしている。
+  // 中心間距離は隣り合う穴どうしの外径(footprintDiameterMm)半径の和＋指定の空きで、
+  // 選んだ穴の径が揃っていない場合でも正しく計算する（layoutRowXの離隔計算と同じ考え方）。
+  const distributeSelectedWithGap = () => {
+    if (!displayedFaceResult || gapInputMm <= 0) return;
     const selected = displayedFaceResult.placedHoles.filter(h => selectedHoleIds.has(h.id));
     if (selected.length < 2) return;
     const sorted = [...selected].sort((a, b) => a.x - b.x);
     const n = sorted.length;
+    const centersFromStart = [0];
+    for (let i = 1; i < n; i++) {
+      const pitch = gapInputMm + sorted[i - 1].footprintDiameterMm / 2 + sorted[i].footprintDiameterMm / 2;
+      centersFromStart.push(centersFromStart[i - 1] + pitch);
+    }
+    const totalSpan = centersFromStart[n - 1];
     const centerX = (sorted[0].x + sorted[n - 1].x) / 2;
-    const startX = centerX - (pitchInputMm * (n - 1)) / 2;
+    const startX = centerX - totalSpan / 2;
     setManualPositions(prev => {
       const next = { ...prev };
       sorted.forEach((h, i) => {
-        const xMm = Math.round((startX + pitchInputMm * i) / gridMm) * gridMm;
+        const xMm = Math.round((startX + centersFromStart[i]) / gridMm) * gridMm;
         next[h.id] = { x: xMm, y: h.y };
       });
       return next;
@@ -855,7 +867,9 @@ export default function HandholeKnockoutCalc() {
               機能不足）と判明。onToggleHoleSelectで加工図の穴を直接クリック/タップしても選べる
               ようにし、こちらを主な選択手段として案内文言も直した。下のチップ一覧は選択状態を
               見比べる一覧として残す（同じselectedHoleIds stateを共有、どちらで選んでも同じ）。
-              均等割付け・指定ピッチのボタンは、グループを整列させる別の手段として残している。 */}
+              均等割付け・指定の空きのボタンは、グループを整列させる別の手段として残している
+              （2026-09-19、社長ご指摘「このピッチをまとめるじゃなくて、コネクタ同士の空きを
+              決めた方がいいかもしれん」を受け、中心間ピッチ指定から実際の空き指定に変更）。 */}
           {displayedFaceResult && displayedFaceResult.placedHoles.length >= 2 && (() => {
             const selectedInFace = displayedFaceResult.placedHoles.filter(h => selectedHoleIds.has(h.id));
             return (
@@ -886,7 +900,7 @@ export default function HandholeKnockoutCalc() {
                   ))}
                 </div>
                 {selectedInFace.length < 2 ? (
-                  <p className="text-[11px] text-slate-400">2つ以上選ぶとグループになり、上の加工図でそのうちの1つをドラッグすると全部一緒に動きます（均等割付け・指定ピッチも使えるようになります）。</p>
+                  <p className="text-[11px] text-slate-400">2つ以上選ぶとグループになり、上の加工図でそのうちの1つをドラッグすると全部一緒に動きます（均等割付け・指定の空きも使えるようになります）。</p>
                 ) : (
                   <div className="flex flex-wrap items-center gap-3 pt-1">
                     <button
@@ -896,31 +910,33 @@ export default function HandholeKnockoutCalc() {
                       均等割付け（両端はそのまま、間を均等に）
                     </button>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">指定ピッチ(mm)</span>
+                      <span className="text-xs text-slate-500">コネクタ同士の空き(mm)</span>
                       <input
-                        type="number" inputMode="numeric" min={0} value={pitchInputMm}
-                        onChange={e => setPitchInputMm(Math.max(Number(e.target.value) || 0, 0))}
+                        type="number" inputMode="numeric" min={0} value={gapInputMm}
+                        onChange={e => setGapInputMm(Math.max(Number(e.target.value) || 0, 0))}
                         className="w-20 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold"
                       />
                       <button
-                        onClick={distributeSelectedWithPitch}
-                        disabled={pitchInputMm <= 0}
+                        onClick={distributeSelectedWithGap}
+                        disabled={gapInputMm <= 0}
                         className={`px-3 py-2 rounded-lg text-xs font-bold transition-colors ${
-                          pitchInputMm > 0
+                          gapInputMm > 0
                             ? 'bg-blue-600 hover:bg-blue-700 text-white'
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
                         }`}
                       >
-                        このピッチで並べる
+                        この空きで並べる
                       </button>
                     </div>
                   </div>
                 )}
                 <p className="text-[11px] text-slate-400">
                   選んだ穴は上の加工図で縁が青くなり、1つをドラッグすると選んだ穴全部が同じ量だけ一緒に動きます
-                  （相対位置は保ったまま平行移動）。均等割付け・指定ピッチのボタンは中心位置(x)だけを並べ替えます
-                  （yは変えません）。グリッド単位に丸めるため、ピッチがグリッドの倍数でない場合はわずかにずれる
-                  ことがあります。離隔不足・⊗マーク重なりが出た場合は上の図で穴の縁が赤くなるので確認してください。
+                  （相対位置は保ったまま平行移動）。均等割付け・指定の空きのボタンは中心位置(x)だけを並べ替えます
+                  （yは変えません）。「コネクタ同士の空き」は中心間ピッチではなく、コネクター外径の縁から縁までの
+                  実際のすき間(mm)です（選んだ穴の径がそろっていなくても正しく計算します）。グリッド単位に丸める
+                  ため、わずかにずれることがあります。離隔不足・⊗マーク重なりが出た場合は上の図で穴の縁が赤くなる
+                  ので確認してください。
                 </p>
               </div>
             );
